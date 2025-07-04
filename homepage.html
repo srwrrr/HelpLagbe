@@ -135,9 +135,9 @@
   <header>
     <h1>HelpLagbe</h1>
     <nav>
-      <a href="#">Home</a>
-      <a href="#">Post a Task</a>
-      <a href="#">Find Technicians</a>
+      <a href="index.html">Home</a>
+      <a href="posttask.html" id="postTaskLink">Post a Task</a>
+      <a href="postedtasks.html">Find Tasks</a>
       <a href="login.html">Login</a>
     </nav>
   </header>
@@ -150,39 +150,55 @@
     </div>
   </section>
 
-<section class="features">
-  <div class="feature-card">
-    <img src="images/service.jpg" alt="Service Icon">
-    <h3>Wide Range of Services</h3>
-    <p>From appliance repair to electrical and plumbing – we've got you covered.</p>
-  </div>
-  <div class="feature-card">
-    <img src="images/task.jpg" alt="Task Icon">
-    <h3>Easy Task Posting</h3>
-    <p>Describe your issue, set your budget, and receive bids from qualified technicians.</p>
-  </div>
-  <div class="feature-card">
-    <img src="images/language.png" alt="Language Icon">
-    <h3>Support for Bangla & English</h3>
-    <p>Multilingual support ensures everyone can use the platform easily.</p>
-  </div>
-  <div class="feature-card">
-    <img src="images/review.avif" alt="Review Icon">
-    <h3>Trusted Reviews</h3>
-    <p>Compare bids, read reviews, and hire the best professional for your job.</p>
-  </div>
-</section>
-
+  <section class="features">
+    <div class="feature-card">
+      <img src="images/service.jpg" alt="Service Icon">
+      <h3>Wide Range of Services</h3>
+      <p>From appliance repair to electrical and plumbing – we've got you covered.</p>
+    </div>
+    <div class="feature-card">
+      <img src="images/task.jpg" alt="Task Icon">
+      <h3>Easy Task Posting</h3>
+      <p>Describe your issue, set your budget, and receive bids from qualified technicians.</p>
+    </div>
+    <div class="feature-card">
+      <img src="images/language.png" alt="Language Icon">
+      <h3>Support for Bangla & English</h3>
+      <p>Multilingual support ensures everyone can use the platform easily.</p>
+    </div>
+    <div class="feature-card">
+      <img src="images/review.avif" alt="Review Icon">
+      <h3>Trusted Reviews</h3>
+      <p>Compare bids, read reviews, and hire the best professional for your job.</p>
+    </div>
+  </section>
 
   <section class="cta">
     <h2>Ready to get started?</h2>
     <p>Post your task now and get bids from skilled technicians near you.</p>
-    <a href="#">Post a Task</a>
+    <a href="#" id="postTaskButton">Post a Task</a>
   </section>
 
   <footer>
     &copy; 2025 HelpLagbe. All rights reserved.
   </footer>
+
+  <script>
+    // Shared function for both header and CTA button
+    function handlePostTaskRedirect(e) {
+      e.preventDefault();
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      if (isLoggedIn === "true") {
+        window.location.href = "post-task.html";
+      } else {
+        window.location.href = "login.html";
+      }
+    }
+
+    // Apply event listeners to both links
+    document.getElementById("postTaskLink").addEventListener("click", handlePostTaskRedirect);
+    document.getElementById("postTaskButton").addEventListener("click", handlePostTaskRedirect);
+  </script>
 
 </body>
 </html>
