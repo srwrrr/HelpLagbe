@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Up | HelpLagbe</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background-color: #f0f4f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #2c3e50;
+    }
+
+    .signup-container {
+      background-color: #fff;
+      padding: 32px 40px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      border: 1px solid #dde6f0;
+    }
+
+    h2 {
+      text-align: center;
+      font-weight: 700;
+      color: #27ae60;
+      margin-bottom: 28px;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+    }
+
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: 600;
+      color: #34495e;
+      font-size: 15px;
+      user-select: none;
+    }
+
+    select,
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    textarea,
+    input[type="file"] {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1.8px solid #bdc3c7;
+      font-size: 16px;
+      font-family: inherit;
+      background-color: #fff;
+      color: #34495e;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    select:focus,
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #27ae60;
+      box-shadow: 0 0 8px rgba(39, 174, 96, 0.4);
+    }
+
+    input[type="file"] {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+
+    button[type="submit"] {
+      margin-top: 30px;
+      width: 100%;
+      padding: 14px;
+      font-size: 17px;
+      background-color: #27ae60;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(39, 174, 96, 0.5);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
+    }
+
+    button[type="submit"]:hover {
+      background-color: #219150;
+      box-shadow: 0 8px 28px rgba(33, 145, 80, 0.7);
+    }
+
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #7f8c8d;
+      user-select: none;
+    }
+
+    .footer a {
+      color: #27ae60;
+      font-weight: 600;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .footer a:hover {
+      color: #219150;
+      text-decoration: underline;
+    }
+
+    .form-section {
+      display: none;
+      margin-top: 20px;
+    }
+
+    .form-section.active {
+      display: block;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="signup-container" role="main" aria-label="Sign up form container">
+    <h2>Sign Up</h2>
+
+    <label for="role">Register As</label>
+    <select id="role" onchange="showForm()" aria-required="true" aria-describedby="role-desc">
+      <option value="">-- Select Role --</option>
+      <option value="customer">Customer</option>
+      <option value="technician">Technician</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div id="role-desc" class="sr-only">Select your user role to display the corresponding form</div>
+
+    <!-- Customer Form -->
+    <form id="customer-form" class="form-section" novalidate>
+      <label for="c-name">Full Name</label>
+      <input type="text" id="c-name" name="c-name" required autocomplete="name" />
+
+      <label for="c-email">Email</label>
+      <input type="email" id="c-email" name="c-email" required autocomplete="email" />
+
+      <label for="c-phone">Phone</label>
+      <input type="tel" id="c-phone" name="c-phone" required autocomplete="tel" />
+
+      <label for="c-address">Address</label>
+      <textarea id="c-address" name="c-address" rows="3" required></textarea>
+
+      <label for="c-password">Password</label>
+      <input type="password" id="c-password" name="c-password" required autocomplete="new-password" />
+
+      <label for="c-confirm">Confirm Password</label>
+      <input type="password" id="c-confirm" name="c-confirm" required autocomplete="new-password" />
+
+      <button type="submit">Sign Up as Customer</button>
+    </form>
+
+    <!-- Technician Form -->
+    <form id="technician-form" class="form-section" enctype="multipart/form-data" novalidate>
+      <label for="t-name">Full Name</label>
+      <input type="text" id="t-name" name="t-name" required autocomplete="name" />
+
+      <label for="t-email">Email</label>
+      <input type="email" id="t-email" name="t-email" required autocomplete="email" />
+
+      <label for="t-phone">Phone</label>
+      <input type="tel" id="t-phone" name="t-phone" required autocomplete="tel" />
+
+      <label for="t-skills">Skills (comma separated)</label>
+      <input type="text" id="t-skills" name="t-skills" required placeholder="e.g. Electrical, Plumbing" />
+
+      <label for="t-address">Address</label>
+      <textarea id="t-address" name="t-address" rows="3" required></textarea>
+
+      <label for="t-image">Profile Image</label>
+      <input type="file" id="t-image" name="t-image" accept="image/*" required />
+
+      <label for="t-password">Password</label>
+      <input type="password" id="t-password" name="t-password" required autocomplete="new-password" />
+
+      <label for="t-confirm">Confirm Password</label>
+      <input type="password" id="t-confirm" name="t-confirm" required autocomplete="new-password" />
+
+      <button type="submit">Sign Up as Technician</button>
+    </form>
+
+    <!-- Admin Form -->
+    <form id="admin-form" class="form-section" novalidate>
+      <label for="a-username">Username</label>
+      <input type="text" id="a-username" name="a-username" required autocomplete="username" />
+
+      <label for="a-email">Email</label>
+      <input type="email" id="a-email" name="a-email" required autocomplete="email" />
+
+      <label for="a-password">Password</label>
+      <input type="password" id="a-password" name="a-password" required autocomplete="new-password" />
+
+      <label for="a-confirm">Confirm Password</label>
+      <input type="password" id="a-confirm" name="a-confirm" required autocomplete="new-password" />
+
+      <button type="submit">Sign Up as Admin</button>
+    </form>
+
+    <div class="footer">
+      Already have an account? <a href="login.html" tabindex="0">Login here</a>
+    </div>
+  </div>
+
+  <script>
+    function showForm() {
+      const role = document.getElementById('role').value;
+      const forms = document.querySelectorAll('.form-section');
+
+      forms.forEach(form => form.classList.remove('active'));
+
+      if (role === 'customer') {
+        document.getElementById('customer-form').classList.add('active');
+      } else if (role === 'technician') {
+        document.getElementById('technician-form').classList.add('active');
+      } else if (role === 'admin') {
+        document.getElementById('admin-form').classList.add('active');
+      }
+    }
+
+    // Optional: Prevent form submission for demo and validate passwords match
+    const forms = document.querySelectorAll('form.form-section');
+    forms.forEach(form => {
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const pwd = form.querySelector('input[type="password"]:nth-of-type(1)');
+        const confirmPwd = form.querySelector('input[type="password"]:nth-of-type(2)');
+        if (pwd && confirmPwd && pwd.value !== confirmPwd.value) {
+          alert("Passwords do not match!");
+          return;
+        }
+        alert('Form submitted successfully!');
+        form.reset();
+        document.getElementById('role').value = '';
+        forms.forEach(f => f.classList.remove('active'));
+      });
+    });
+  </script>
+
+</body>
+</html>

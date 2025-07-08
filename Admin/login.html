@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login | HelpLagbe</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background-color: #f0f4f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #2c3e50;
+    }
+
+    .login-container {
+      background-color: #fff;
+      padding: 36px 44px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      border: 1px solid #dde6f0;
+    }
+
+    h2 {
+      text-align: center;
+      font-weight: 700;
+      color: #27ae60;
+      margin-bottom: 32px;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      user-select: none;
+    }
+
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: 600;
+      color: #34495e;
+      font-size: 15px;
+      user-select: none;
+    }
+
+    select,
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1.8px solid #bdc3c7;
+      font-size: 16px;
+      font-family: inherit;
+      background-color: #fff;
+      color: #34495e;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    select:focus,
+    input:focus {
+      outline: none;
+      border-color: #27ae60;
+      box-shadow: 0 0 8px rgba(39, 174, 96, 0.4);
+    }
+
+    button[type="submit"] {
+      margin-top: 32px;
+      width: 100%;
+      padding: 14px;
+      font-size: 17px;
+      background-color: #27ae60;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(39, 174, 96, 0.5);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
+    }
+
+    button[type="submit"]:hover {
+      background-color: #219150;
+      box-shadow: 0 8px 28px rgba(33, 145, 80, 0.7);
+    }
+
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #7f8c8d;
+      user-select: none;
+      line-height: 1.5;
+    }
+
+    .footer a {
+      color: #27ae60;
+      font-weight: 600;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .footer a:hover {
+      color: #219150;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <main class="login-container" role="main" aria-label="Login form container">
+    <h2>Login to HelpLagbe</h2>
+    <form action="#" method="post" novalidate>
+      <label for="role">Select Role</label>
+      <select id="role" name="role" required aria-required="true">
+        <option value="" disabled selected>Select your role</option>
+        <option value="technician">Technician</option>
+        <option value="customer">Customer</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <label for="email">Email or Username</label>
+      <input type="text" id="email" name="email" required autocomplete="username" />
+
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password" />
+
+      <button type="submit">Login</button>
+    </form>
+
+    <div class="footer">
+      Don't have an account? <a href="signup.html" tabindex="0">Sign up here</a><br>
+      &copy; 2025 HelpLagbe. All rights reserved.
+    </div>
+  </main>
+
+</body>
+</html>
