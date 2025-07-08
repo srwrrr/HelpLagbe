@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Technician Dashboard | HelpLagbe</title>
+  <style>
+    /* Reset and base */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background-color: #fafafa;
+      color: #222;
+    }
+
+    .page-wrapper {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: row;
+      background: #fff;
+    }
+
+    /* Sidebar */
+    nav.sidebar {
+      width: 240px;
+      background-color: #333;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding-top: 20px;
+      user-select: none;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow-y: auto;
+    }
+    nav.sidebar a {
+      color: #ccc;
+      padding: 15px 25px;
+      text-decoration: none;
+      font-weight: 600;
+      border-left: 4px solid transparent;
+      transition: background-color 0.3s, border-left-color 0.3s, color 0.3s;
+    }
+    nav.sidebar a:hover,
+    nav.sidebar a.active {
+      background-color: #444;
+      color: #fff;
+      border-left-color: #4CAF50;
+    }
+
+    /* Content wrapper flex */
+    .content-wrapper {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header.topnav {
+      background-color: #4CAF50;
+      color: white;
+      padding: 15px 30px;
+      font-size: 20px;
+      font-weight: bold;
+      user-select: none;
+    }
+
+    /* Main content */
+    main.content {
+      flex: 1 1 auto;
+      padding: 30px 40px;
+      background-color: #f9f9f9;
+      overflow-y: auto;
+    }
+
+    /* Sections hidden by default */
+    main.content section {
+      display: none;
+    }
+    main.content section.active {
+      display: block;
+    }
+
+    /* Profile Section */
+    #section-profile h2 {
+      margin-top: 0;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    #profileInfo p {
+      font-size: 16px;
+      margin: 6px 0;
+      color: #555;
+    }
+    #editProfileBtn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 15px;
+      transition: background-color 0.3s ease;
+    }
+    #editProfileBtn:hover {
+      background-color: #45a049;
+    }
+
+    /* Tasks Section */
+    #section-tasks h2 {
+      color: #333;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+    .task-card {
+      background: white;
+      border-left: 6px solid #4CAF50;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 15px 20px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+    }
+    .task-card h3 {
+      margin: 0 0 8px;
+      color: #222;
+    }
+    .task-card p {
+      margin: 5px 0;
+      color: #555;
+    }
+
+    /* Bids Section */
+    #section-bids h2 {
+      margin-top: 0;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .bid-card {
+      background: white;
+      border-left: 6px solid #ff9800;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      padding: 15px 20px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+    }
+    .bid-card h3 {
+      margin: 0 0 8px;
+      color: #222;
+    }
+    .bid-card p {
+      margin: 5px 0;
+      color: #555;
+    }
+    .btn {
+      padding: 7px 16px;
+      margin-top: 10px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-accept {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .btn-accept:hover {
+      background-color: #3a9d40;
+    }
+    .btn-decline {
+      background-color: #f44336;
+      color: white;
+    }
+    .btn-decline:hover {
+      background-color: #d7372a;
+    }
+
+    /* Wallet Section */
+    #section-wallet h2 {
+      margin-top: 0;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    #walletBalance {
+      font-size: 24px;
+      color: #4CAF50;
+      font-weight: bold;
+    }
+
+    /* Available Tasks Section */
+    #section-available h2 {
+      margin-top: 0;
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .area-select {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    .area-select label {
+      font-weight: 600;
+      margin-right: 10px;
+      font-size: 16px;
+      color: #333;
+    }
+    .area-select select {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      background-color: #fff;
+      cursor: pointer;
+      min-width: 200px;
+    }
+    .task-card {
+      border: 1px solid #ddd;
+      border-left: 5px solid #999;
+      background-color: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      position: relative;
+    }
+    .task-card h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    .task-card p {
+      margin: 5px 0;
+      color: #555;
+    }
+    .task-card button {
+      margin-top: 10px;
+      padding: 8px 16px;
+      font-size: 14px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .task-card button:hover {
+      background-color: #388e3c;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .modal[aria-hidden="false"] {
+      display: flex;
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 0 20px;
+      padding: 20px;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .modal-content h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    .modal-content input,
+    .modal-content textarea {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      resize: vertical;
+    }
+    .modal-content button {
+      margin-top: 15px;
+      padding: 10px;
+      font-size: 14px;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      font-weight: 600;
+      width: 100%;
+    }
+    .modal-content button:hover {
+      background-color: #388e3c;
+    }
+    .close {
+      position: absolute;
+      right: 15px;
+      top: 12px;
+      font-size: 22px;
+      font-weight: bold;
+      color: #666;
+      cursor: pointer;
+      user-select: none;
+    }
+    .close:hover {
+      color: #000;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page-wrapper {
+        flex-direction: column;
+      }
+      nav.sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+      }
+      .content-wrapper {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper" role="application">
+
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" role="navigation" aria-label="Main navigation">
+      <a href="#" class="active" data-section="profile">Profile</a>
+      <a href="#" data-section="tasks">View Tasks</a>
+      <a href="#" data-section="bids">Bid Notifications</a>
+      <a href="#" data-section="wallet">Wallet</a>
+      <a href="#" data-section="available">Available Tasks</a>
+      <a href="logout.html" style="margin-top:auto; color:#bbb; border-left:none; text-align:center;">Logout</a>
+    </nav>
+
+    <!-- Main content area -->
+    <div class="content-wrapper">
+      <header class="topnav" role="banner">
+        Technician Dashboard
+        <button id="editProfileBtn" style="float:right; background:#357a38;">Edit Profile</button>
+      </header>
+
+      <main class="content" role="main">
+
+        <!-- Profile Section -->
+        <section id="section-profile" class="active" aria-label="Profile Section">
+          <h2>Your Profile</h2>
+          <div id="profileInfo">
+            <p><strong>Name:</strong> Rakib Ahmed</p>
+            <p><strong>Email:</strong> rakib@example.com</p>
+            <p><strong>Phone:</strong> +880 1234 567890</p>
+            <p><strong>Skills:</strong> Electrical Repair, Appliance Repair</p>
+            <p><strong>Address:</strong> Banani, Dhaka</p>
+          </div>
+        </section>
+
+        <!-- Tasks Section -->
+        <section id="section-tasks" aria-label="Your Tasks">
+          <h2>Your Tasks</h2>
+          <div class="task-card">
+            <h3>Fix light switch</h3>
+            <p><strong>Description:</strong> Short circuit issue</p>
+            <p><strong>Date:</strong> 2025-07-06</p>
+            <p><strong>Status:</strong> Completed</p>
+          </div>
+          <div class="task-card">
+            <h3>Install ceiling fan</h3>
+            <p><strong>Description:</strong> Wiring required</p>
+            <p><strong>Date:</strong> 2025-07-07</p>
+            <p><strong>Status:</strong> In Progress</p>
+          </div>
+        </section>
+
+        <!-- Bid Notifications Section -->
+        <section id="section-bids" aria-label="Bid Notifications">
+          <h2>Bid Notifications</h2>
+          <div class="bid-card">
+            <h3>Bid on: Fix kitchen sink leak</h3>
+            <p><strong>Offer:</strong> BDT 500</p>
+            <button class="btn btn-accept" onclick="handleBid('accept', 101)">Accept</button>
+            <button class="btn btn-decline" onclick="handleBid('decline', 101)">Decline</button>
+          </div>
+        </section>
+
+        <!-- Wallet Section -->
+        <section id="section-wallet" aria-label="Wallet Section">
+          <h2>Your Wallet</h2>
+          <p>Your current balance is:</p>
+          <p id="walletBalance">BDT 5,000</p>
+        </section>
+
+        <!-- Available Tasks Section -->
+        <section id="section-available" aria-label="Available Tasks Section">
+          <h2>Available Tasks Near You</h2>
+          <div class="area-select">
+            <label for="area">Your Area:</label>
+            <select id="area" aria-label="Select your area">
+              <option value="Dhanmondi">Dhanmondi</option>
+              <option value="Banani">Banani</option>
+              <option value="Gulshan">Gulshan</option>
+              <option value="Mirpur">Mirpur</option>
+              <option value="Mohakhali">Mohakhali</option>
+              <option value="Badda">Badda</option>
+            </select>
+          </div>
+          <div id="taskList" aria-live="polite" aria-atomic="true"></div>
+        </section>
+
+      </main>
+
+      <div id="bidModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-content">
+          <span class="close" id="closeModal" aria-label="Close modal">&times;</span>
+          <h3 id="modalTitle">Submit Your Bid</h3>
+          <form id="bidForm">
+            <input type="hidden" id="taskTitle" />
+            <label for="amount">Your Offer (BDT):</label>
+            <input type="number" id="amount" required min="0" />
+            <label for="message">Message (optional):</label>
+            <textarea id="message" rows="3" placeholder="Any note for the client..."></textarea>
+            <button type="submit">Submit Bid</button>
+          </form>
+        </div>
+      </div>
+
+      <footer>
+        &copy; 2025 HelpLagbe. All rights reserved.
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // Sidebar navigation & content toggling
+    const sidebarLinks = document.querySelectorAll('nav.sidebar a[data-section]');
+    const sections = {
+      profile: document.getElementById('section-profile'),
+      tasks: document.getElementById('section-tasks'),
+      bids: document.getElementById('section-bids'),
+      wallet: document.getElementById('section-wallet'),
+      available: document.getElementById('section-available'),
+    };
+
+    sidebarLinks.forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        sidebarLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+
+        const sectionToShow = link.getAttribute('data-section');
+        for (const key in sections) {
+          if (key === sectionToShow) {
+            sections[key].classList.add('active');
+          } else {
+            sections[key].classList.remove('active');
+          }
+        }
+      });
+    });
+
+    // Edit Profile button placeholder
+    document.getElementById('editProfileBtn').addEventListener('click', () => {
+      alert('Edit Profile clicked! (Functionality to be implemented)');
+    });
+
+    // Bid Notifications accept/decline placeholder
+    function handleBid(action, bidId) {
+      alert(`You ${action}ed bid with ID: ${bidId}`);
+      // TODO: Implement accept/decline logic
+    }
+
+    // Available Tasks Logic
+    const tasks = [
+      { title: "Fix kitchen sink leak", area: "Dhanmondi", description: "Water leaking under the sink.", budget: 800, date: "2025-07-01" },
+      { title: "AC not cooling", area: "Gulshan", description: "AC needs gas refill or servicing.", budget: 1500, date: "2025-07-02" },
+      { title: "Install ceiling fan", area: "Banani", description: "Need a new ceiling fan installed.", budget: 600, date: "2025-06-30" },
+      { title: "Wiring issue in living room", area: "Mohakhali", description: "Lights flicker, possibly loose connection.", budget: 1000, date: "2025-06-29" },
+      { title: "Washing machine not spinning", area: "Mirpur", description: "Top-load washer not spinning clothes dry.", budget: 900, date: "2025-07-03" }
+    ];
+
+    const taskList = document.getElementById("taskList");
+    const areaSelect = document.getElementById("area");
+    const modal = document.getElementById("bidModal");
+    const closeModal = document.getElementById("closeModal");
+    const bidForm = document.getElementById("bidForm");
+    const taskTitleInput = document.getElementById("taskTitle");
+
+    function renderTasks(area) {
+      // Sort tasks: tasks from selected area first, then others alphabetically
+      const sorted = tasks.slice().sort((a, b) => {
+        if (a.area === area && b.area !== area) return -1;
+        if (a.area !== area && b.area === area) return 1;
+        return a.area.localeCompare(b.area);
+      });
+      taskList.innerHTML = "";
+      sorted.forEach(task => {
+        const card = document.createElement("div");
+        card.className = "task-card";
+        card.innerHTML = `
+          <h3>${task.title}</h3>
+          <p><strong>Area:</strong> ${task.area}</p>
+          <p><strong>Description:</strong> ${task.description}</p>
+          <p><strong>Budget:</strong> BDT ${task.budget}</p>
+          <p><strong>Date:</strong> ${task.date}</p>
+          <button type="button" onclick="openBidModal('${task.title}')">Bid</button>
+        `;
+        taskList.appendChild(card);
+      });
+    }
+
+    function openBidModal(title) {
+      taskTitleInput.value = title;
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    closeModal.onclick = () => {
+      modal.setAttribute('aria-hidden', 'true');
+      bidForm.reset();
+    };
+
+    window.onclick = function(event) {
+      if (event.target === modal) {
+        modal.setAttribute('aria-hidden', 'true');
+        bidForm.reset();
+      }
+    };
+
+    bidForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const task = taskTitleInput.value;
+      const amount = document.getElementById("amount").value;
+      const message = document.getElementById("message").value.trim() || 'None';
+      alert(`Bid submitted for "${task}"\nOffer: BDT ${amount}\nMessage: ${message}`);
+      modal.setAttribute('aria-hidden', 'true');
+      bidForm.reset();
+    });
+
+    areaSelect.addEventListener("change", () => renderTasks(areaSelect.value));
+    renderTasks(areaSelect.value);
+  </script>
+</body>
+</html>
