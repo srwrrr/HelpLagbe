@@ -201,9 +201,9 @@
   <header>
     <h1>HelpLagbe</h1>
     <nav>
-      <a href="#">Find Services</a>
+      <a href="#" class="find-services-link">Find Services</a>
       <a href="posttask.html">Post a Job</a>
-      <a href="signup.html">Become a Technician</a>
+      <a href="signup.html" class="become-tech-link">Become a Technician</a>
       <a href="login.html" class="login-btn">Login</a>
     </nav>
   </header>
@@ -301,132 +301,133 @@
     </div>
   </footer>
 
-  <script>
-document.addEventListener('DOMContentLoaded', () => {
-  fetch('api/get_recent_jobs.php')
-    .then(res => res.json())
-    .then(jobs => {
-      const container = document.querySelector('.jobs');
-      container.innerHTML = jobs.map(job => `
-        <div class="job">
-          <h4>${job.title}</h4>
-          <p>Budget: ৳${job.budget}<br>Location: ${job.location}<br>Date: ${job.date}</p>
-          <p><small>${job.bids} bids • Urgency: High</small></p>
-          <button class="view-btn" onclick="viewBids(${job.task_id})">View Bids</button>
-        </div>
-      `).join('') || '<p>No recent jobs found.</p>';
-    });
-
-  fetch('api/get_technicians.php')
-    .then(res => res.json())
-    .then(techs => {
-      const container = document.querySelector('.technicians');
-      container.innerHTML = techs.map(t => `
-        <div class="tech">
-          <img src="images/user.png" alt="${t.full_name}">
-          <strong>${t.full_name}</strong>
-          <p>⭐ ${parseFloat(t.avg_rating).toFixed(1)} • ${t.jobs_completed} Jobs</p>
-          <button class="view-btn" onclick="viewProfile(${t.technician_id})">View Profile</button>
-          <button class="hire-btn" onclick="hireTech(${t.technician_id})">Hire Now</button>
-        </div>
-      `).join('') || '<p>No technicians found.</p>';
-    });
-
-  // Search functionality (optional)
-  document.querySelector('.search-box button').addEventListener('click', () => {
-    const query = document.querySelector('.search-box input[type="text"]').value.trim();
-    if (!query) return alert('Please enter a search term.');
-
-    Promise.all([
-      fetch('api/search_jobs.php?q=' + encodeURIComponent(query)).then(r => r.json()),
-      fetch('api/search_technicians.php?q=' + encodeURIComponent(query)).then(r => r.json())
-    ]).then(([jobs, techs]) => {
-      const hero = document.querySelector('.hero');
-      hero.innerHTML = `
-        <h2>Search Results for "${query}"</h2>
-        <div>
-          <h3>Jobs</h3>
-          ${jobs.length ? jobs.map(j => `<p>${j.title}</p>`).join('') : '<p>No jobs found.</p>'}
-        </div>
-        <div>
-          <h3>Technicians</h3>
-          ${techs.length ? techs.map(t => `<p>${t.full_name} – ${t.skills}</p>`).join('') : '<p>No technicians found.</p>'}
-        </div>
-        <button onclick="window.location.reload()">Clear Search</button>
-      `;
-    });
-  });
-});
-
-function viewBids(taskId) {
-  alert('View bids for task ' + taskId);
-  // Implement redirect or modal for bids
-}
-
-function viewProfile(id) {
-  window.location.href = `technician.php?id=${id}`;
-}
-
-function hireTech(id) {
-  alert('Hire technician ' + id);
-  // Implement hire functionality
-}
-</script>
-
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
   const userRole = localStorage.getItem('userRole');
   const userName = localStorage.getItem('userName');
 
-  const header = document.querySelector('header nav');
+  const nav = document.querySelector('header nav');
+  const heroSection = document.querySelector('.hero');
+
+  const findServicesLink = nav.querySelector('.find-services-link');
+  const postJobLink = nav.querySelector('a[href="posttask.html"]');
+  const becomeTechLink = nav.querySelector('.become-tech-link');
+  const loginLink = nav.querySelector('a.login-btn');
+
+  [...nav.querySelectorAll('.dynamic-link, .greeting')].forEach(el => el.remove());
 
   if (userRole) {
-    // Remove existing login link
-    const loginLink = header.querySelector('a.login-btn');
     if (loginLink) loginLink.remove();
+    if (becomeTechLink && (userRole === 'customer' || userRole === 'technician')) {
+      becomeTechLink.remove();
+    }
 
-    // Add Dashboard link or Profile link depending on role
-    const dashboardLink = document.createElement('a');
-    dashboardLink.href = (userRole === 'admin') ? 'adminpanel.html' : 'dashboard.html';
-    dashboardLink.textContent = 'Dashboard';
-    dashboardLink.style.fontWeight = '700';
-    header.appendChild(dashboardLink);
-
-    // Add greeting
-    const greeting = document.createElement('span');
-    greeting.textContent = `Hello, ${userName || 'User'}`;
-    greeting.style.marginLeft = '15px';
-    greeting.style.fontWeight = '600';
-    header.appendChild(greeting);
-
-    // Add Logout button
-    const logoutBtn = document.createElement('a');
-    logoutBtn.href = '#';
-    logoutBtn.textContent = 'Logout';
-    logoutBtn.style.marginLeft = '15px';
-    logoutBtn.style.color = '#e53935';
-    logoutBtn.style.fontWeight = '700';
-    logoutBtn.style.cursor = 'pointer';
-
-    logoutBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('userName');
-      window.location.href = 'login.html';
-    });
-
-    header.appendChild(logoutBtn);
-
-    // Optionally: customize page for technicians
     if (userRole === 'technician') {
-      const hero = document.querySelector('.hero h2');
-      if (hero) hero.textContent = `Welcome back, Technician ${userName}!`;
-      // You can also add technician-specific sections here
+      if (findServicesLink) findServicesLink.remove();
+
+      if (!nav.querySelector('.find-jobs-link')) {
+        const findJobsLink = document.createElement('a');
+        findJobsLink.href = 'availablejobs.html';
+        findJobsLink.textContent = 'Find Available Jobs';
+        findJobsLink.classList.add('dynamic-link', 'find-jobs-link');
+        findJobsLink.style.fontWeight = '600';
+        nav.insertBefore(findJobsLink, postJobLink);
+      }
+
+      // 👨‍🔧 Replace Hero Text for Technician
+      if (heroSection) {
+        heroSection.innerHTML = `
+          <h2>Ready to fix things, ${userName || 'Technician'}? 🔧</h2>
+          <p>Check out nearby jobs and show off your skills</p>
+          <div class="search-box">
+            <input type="text" placeholder="Search jobs...">
+            <input type="text" placeholder="Location">
+            <button>Find Jobs</button>
+          </div>
+        `;
+      }
+
+    } else {
+      // 🙋‍♂️ Add Welcome Message for Customer
+      if (heroSection) {
+        const welcome = document.createElement('h4');
+        welcome.textContent = `Welcome back, ${userName || 'User'} 👋`;
+        welcome.style.fontSize = '22px';
+        welcome.style.color = '#333';
+        welcome.style.marginBottom = '10px';
+        heroSection.insertBefore(welcome, heroSection.firstChild);
+      }
+    }
+
+    if (!nav.querySelector('.dashboard-link')) {
+      const dashboardLink = document.createElement('a');
+      dashboardLink.href = userRole === 'admin' ? 'adminpanel.html' :
+                           userRole === 'technician' ? 'techdash.html' :
+                           'userdash.html';
+      dashboardLink.textContent = 'My Dashboard';
+      dashboardLink.classList.add('dynamic-link', 'dashboard-link');
+      dashboardLink.style.fontWeight = '700';
+      nav.appendChild(dashboardLink);
+    }
+
+    if (!nav.querySelector('.logout-link')) {
+      const logoutBtn = document.createElement('a');
+      logoutBtn.href = '#';
+      logoutBtn.textContent = 'Logout';
+      logoutBtn.classList.add('dynamic-link', 'logout-link');
+      logoutBtn.style.marginLeft = '15px';
+      logoutBtn.style.color = '#e53935';
+      logoutBtn.style.fontWeight = '700';
+      logoutBtn.style.cursor = 'pointer';
+
+      logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userName');
+        window.location.href = 'login.html';
+      });
+
+      nav.appendChild(logoutBtn);
+    }
+
+  } else {
+    // Not logged in - show default links
+    if (!findServicesLink) {
+      const fsLink = document.createElement('a');
+      fsLink.href = '#';
+      fsLink.textContent = 'Find Services';
+      fsLink.classList.add('find-services-link');
+      fsLink.style.fontWeight = '600';
+      nav.insertBefore(fsLink, postJobLink);
+    }
+
+    if (!becomeTechLink) {
+      const btLink = document.createElement('a');
+      btLink.href = 'signup.html';
+      btLink.textContent = 'Become a Technician';
+      btLink.classList.add('become-tech-link');
+      btLink.style.fontWeight = '600';
+      nav.insertBefore(btLink, loginLink);
+    }
+
+    if (!loginLink) {
+      const loginBtn = document.createElement('a');
+      loginBtn.href = 'login.html';
+      loginBtn.textContent = 'Login';
+      loginBtn.classList.add('login-btn');
+      loginBtn.style.fontWeight = 'bold';
+      loginBtn.style.backgroundColor = '#1e88e5';
+      loginBtn.style.color = '#fff';
+      loginBtn.style.padding = '10px 16px';
+      loginBtn.style.borderRadius = '6px';
+      loginBtn.style.textDecoration = 'none';
+      nav.appendChild(loginBtn);
     }
   }
 });
-
 </script>
+
+
 
 
 </body>
