@@ -301,5 +301,78 @@
     </div>
   </footer>
 
+  <script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('api/get_recent_jobs.php')
+    .then(res => res.json())
+    .then(jobs => {
+      const container = document.querySelector('.jobs');
+      container.innerHTML = jobs.map(job => `
+        <div class="job">
+          <h4>${job.title}</h4>
+          <p>Budget: ৳${job.budget}<br>Location: ${job.location}<br>Date: ${job.date}</p>
+          <p><small>${job.bids} bids • Urgency: High</small></p>
+          <button class="view-btn" onclick="viewBids(${job.task_id})">View Bids</button>
+        </div>
+      `).join('') || '<p>No recent jobs found.</p>';
+    });
+
+  fetch('api/get_technicians.php')
+    .then(res => res.json())
+    .then(techs => {
+      const container = document.querySelector('.technicians');
+      container.innerHTML = techs.map(t => `
+        <div class="tech">
+          <img src="images/user.png" alt="${t.full_name}">
+          <strong>${t.full_name}</strong>
+          <p>⭐ ${parseFloat(t.avg_rating).toFixed(1)} • ${t.jobs_completed} Jobs</p>
+          <button class="view-btn" onclick="viewProfile(${t.technician_id})">View Profile</button>
+          <button class="hire-btn" onclick="hireTech(${t.technician_id})">Hire Now</button>
+        </div>
+      `).join('') || '<p>No technicians found.</p>';
+    });
+
+  // Search functionality (optional)
+  document.querySelector('.search-box button').addEventListener('click', () => {
+    const query = document.querySelector('.search-box input[type="text"]').value.trim();
+    if (!query) return alert('Please enter a search term.');
+
+    Promise.all([
+      fetch('api/search_jobs.php?q=' + encodeURIComponent(query)).then(r => r.json()),
+      fetch('api/search_technicians.php?q=' + encodeURIComponent(query)).then(r => r.json())
+    ]).then(([jobs, techs]) => {
+      const hero = document.querySelector('.hero');
+      hero.innerHTML = `
+        <h2>Search Results for "${query}"</h2>
+        <div>
+          <h3>Jobs</h3>
+          ${jobs.length ? jobs.map(j => `<p>${j.title}</p>`).join('') : '<p>No jobs found.</p>'}
+        </div>
+        <div>
+          <h3>Technicians</h3>
+          ${techs.length ? techs.map(t => `<p>${t.full_name} – ${t.skills}</p>`).join('') : '<p>No technicians found.</p>'}
+        </div>
+        <button onclick="window.location.reload()">Clear Search</button>
+      `;
+    });
+  });
+});
+
+function viewBids(taskId) {
+  alert('View bids for task ' + taskId);
+  // Implement redirect or modal for bids
+}
+
+function viewProfile(id) {
+  window.location.href = `technician.php?id=${id}`;
+}
+
+function hireTech(id) {
+  alert('Hire technician ' + id);
+  // Implement hire functionality
+}
+</script>
+
+
 </body>
 </html>
