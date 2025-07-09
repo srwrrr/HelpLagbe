@@ -373,6 +373,61 @@ function hireTech(id) {
 }
 </script>
 
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+  const userRole = localStorage.getItem('userRole');
+  const userName = localStorage.getItem('userName');
+
+  const header = document.querySelector('header nav');
+
+  if (userRole) {
+    // Remove existing login link
+    const loginLink = header.querySelector('a.login-btn');
+    if (loginLink) loginLink.remove();
+
+    // Add Dashboard link or Profile link depending on role
+    const dashboardLink = document.createElement('a');
+    dashboardLink.href = (userRole === 'admin') ? 'adminpanel.html' : 'dashboard.html';
+    dashboardLink.textContent = 'Dashboard';
+    dashboardLink.style.fontWeight = '700';
+    header.appendChild(dashboardLink);
+
+    // Add greeting
+    const greeting = document.createElement('span');
+    greeting.textContent = `Hello, ${userName || 'User'}`;
+    greeting.style.marginLeft = '15px';
+    greeting.style.fontWeight = '600';
+    header.appendChild(greeting);
+
+    // Add Logout button
+    const logoutBtn = document.createElement('a');
+    logoutBtn.href = '#';
+    logoutBtn.textContent = 'Logout';
+    logoutBtn.style.marginLeft = '15px';
+    logoutBtn.style.color = '#e53935';
+    logoutBtn.style.fontWeight = '700';
+    logoutBtn.style.cursor = 'pointer';
+
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userName');
+      window.location.href = 'login.html';
+    });
+
+    header.appendChild(logoutBtn);
+
+    // Optionally: customize page for technicians
+    if (userRole === 'technician') {
+      const hero = document.querySelector('.hero h2');
+      if (hero) hero.textContent = `Welcome back, Technician ${userName}!`;
+      // You can also add technician-specific sections here
+    }
+  }
+});
+
+</script>
+
 
 </body>
 </html>

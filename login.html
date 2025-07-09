@@ -142,5 +142,43 @@
     </div>
   </main>
 
+  <script>
+ const form = document.querySelector('form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = new FormData(form);
+
+  try {
+    const res = await fetch('login.php', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      // Save user info if needed
+      localStorage.setItem('userRole', data.role);
+      localStorage.setItem('userName', data.userName || '');
+
+      // Redirect based on role
+      if (data.role === 'admin') {
+        window.location.href = 'adminpanel.html';
+      } else {
+        window.location.href = 'homepage.html';
+      }
+    } else {
+      // Show error message only on failure
+      alert(data.message);
+    }
+  } catch (err) {
+    alert('Login request failed. Please try again.');
+    console.error(err);
+  }
+});
+
+
+</script>
+
 </body>
 </html>
