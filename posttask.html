@@ -1,0 +1,66 @@
+<!-- Post a Job Modal or Section -->
+<div id="postTaskModal" style="max-width: 600px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+  <h2 style="margin-bottom: 20px; color: #1e88e5;">Post a New Job</h2>
+  <form id="postTaskForm">
+    <div style="margin-bottom: 15px;">
+      <label>Service Category:</label><br>
+      <input type="text" name="category" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;">
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label>Description:</label><br>
+      <textarea name="description" rows="4" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;"></textarea>
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label>Budget (৳):</label><br>
+      <input type="number" name="budget" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;">
+    </div>
+
+    <div style="margin-bottom: 15px;">
+      <label>Location:</label><br>
+      <input type="text" name="location" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;">
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <label>Date:</label><br>
+      <input type="date" name="date" required style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;">
+    </div>
+
+    <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 14px 20px; font-size: 16px; border-radius: 8px; cursor: pointer;">Post Job</button>
+  </form>
+</div>
+
+<script>
+const form = document.getElementById('postTaskForm');
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+
+  const data = {
+    category: form.category.value,
+    description: form.description.value,
+    budget: parseInt(form.budget.value),
+    location: form.location.value,
+    date: form.date.value
+  };
+
+  fetch('post_task.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
+  .then(res => res.json())
+  .then(response => {
+    alert(response.message);
+    form.reset();
+  })
+  .catch(error => {
+    console.error('Error posting task:', error);
+    alert('Something went wrong while posting the task.');
+  });
+});
+</script>
+

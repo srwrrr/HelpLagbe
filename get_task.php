@@ -1,27 +1,29 @@
 <?php
 session_start();
-require '../config/db.php';
+header('Content-Type: application/json');
+
+require_once 'db.php';
 
 if (!isset($_SESSION['user_id'])) {
-  http_response_code(403);
-  echo json_encode(['error' => 'Not authenticated']);
-  exit;
+    http_response_code(401);
+    echo json_encode(['message' => 'User not logged in']);
+    exit();
 }
 
-$stmt1 = $pdo->prepare("SELECT * FROM tasks WHERE user_id = ?");
-$stmt1->execute([$_SESSION['user_id']]);
-$posted = $stmt1->fetchAll();
+$user_id = $_SESSION['user_id'];
 
-$stmt2 = $pdo->prepare("SELECT t.*, u.name AS technician 
-  FROM accepted_tasks at 
-  JOIN tasks t ON t.id = at.task_id 
-  JOIN users u ON at.technician_id = u.id 
-  WHERE t.user_id = ?");
-$stmt2->execute([$_SESSION['user_id']]);
-$accepted = $stmt2->fetchAll();
+$stmt = $conn->prepare("SELECT id, category, description, budget, location, preferred_date, status, created_at FROM tasks WHERE user_id = ? ORDER BY created_at DESC");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
 
-echo json_encode([
-  'posted' => $posted,
-  'accepted' => $accepted
-]);
-?>
+$result = $stmt->get_result();
+$tasks = [];
+
+while ($row = $result->fetch_assoc()) {
+    $tasks[] = $row;
+}
+
+echo json_encode($tasks);
+
+$stmt->close();
+$conn->close();

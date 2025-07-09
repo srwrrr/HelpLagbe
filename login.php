@@ -1,12 +1,8 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
 header('Content-Type: application/json');
+require_once 'db.php';
 
-require_once 'db.php';  // Make sure this path is correct and db.php returns $conn (PDO instance)
-
-function respond($status, $message, $data = [])
-{
+function respond($status, $message, $data = []) {
     echo json_encode(array_merge(['status' => $status, 'message' => $message], $data));
     exit;
 }
@@ -16,53 +12,43 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $role = $_POST['role'] ?? '';
-$emailOrUsername = trim($_POST['email'] ?? '');
+$loginInput = trim($_POST['email'] ?? '');  // email or username field from form
 $password = $_POST['password'] ?? '';
 
-if (!$role || !$emailOrUsername || !$password) {
-    respond('error', 'Please fill in all fields.');
+if (!$role || !$loginInput || !$password) {
+    respond('error', 'Please fill all fields.');
 }
 
 try {
-    if ($role === 'customer') {
-        // Customers login by email only
-        $stmt = $conn->prepare("SELECT * FROM customers WHERE email = ?");
-        $stmt->execute([$emailOrUsername]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    } elseif ($role === 'technician') {
-        // Technicians login by email only
-        $stmt = $conn->prepare("SELECT * FROM technicians WHERE email = ?");
-        $stmt->execute([$emailOrUsername]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    } elseif ($role === 'admin') {
-        // Admin login by username or email
-        $stmt = $conn->prepare("SELECT * FROM admins WHERE username = ? OR email = ?");
-        $stmt->execute([$emailOrUsername, $emailOrUsername]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
+    if ($role === 'admin') {
+        // Admins login with username or email? Let's allow username only here:
+        $stmt = $conn->prepare("SELECT * FROM users WHERE user_type = 'admin' AND username = ?");
+        $stmt->execute([$loginInput]);
     } else {
-        respond('error', 'Invalid role selected');
+        // Customers and technicians login with email
+        $stmt = $conn->prepare("SELECT * FROM users WHERE user_type = ? AND email = ?");
+        $stmt->execute([$role, $loginInput]);
     }
+
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
-        respond('error', 'User not found.');
+        respond('error', 'User not found');
     }
 
-    // Check password: you must have hashed passwords stored
     if (!password_verify($password, $user['password'])) {
-        respond('error', 'Incorrect password.');
+        respond('error', 'Incorrect password');
     }
 
-    // Successful login response, return role and display name
-    $displayName = $user['name'] ?? $user['username'] ?? 'User';
+    // Prepare display name
+    $displayName = $role === 'admin' ? $user['username'] : $user['name'];
 
-    respond('success', 'Login successful. Welcome ' . $displayName, [
-        'role' => $role,
-        'userName' => $displayName
+    respond('success', 'Login successful', [
+        'role' => $user['user_type'],
+        'userName' => $displayName,
+        'userId' => $user['id']
     ]);
-
 } catch (PDOException $e) {
     respond('error', 'Database error: ' . $e->getMessage());
 }
+?>
