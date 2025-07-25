@@ -508,7 +508,7 @@
       else if (page === 'viewtasks') {
         mainContent.innerHTML = `<h2>My Posted Tasks</h2><p>Loading...</p><h2>Accepted Tasks</h2>`; // Show a loading state
 
-        fetch('get_tasks.php')
+        fetch('view_task.php')
           .then(response => response.json())
           .then(tasks => {
             const postedTasksHtml = tasks.length 
@@ -617,7 +617,7 @@
       openModalBtn.focus();
     }
 
-    // Post Task form submission (dummy)
+    // Post Task form submission (working)
     form.addEventListener('submit', e => {
   e.preventDefault();
 
@@ -663,7 +663,10 @@
 
     // Load default page on startup
     loadPage('profile');
+
   </script>
+
+  
 
 </body>
 </html>

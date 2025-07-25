@@ -544,17 +544,58 @@
     };
 
     bidForm.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const task = taskTitleInput.value;
-      const amount = document.getElementById("amount").value;
-      const message = document.getElementById("message").value.trim() || 'None';
-      alert(`Bid submitted for "${task}"\nOffer: BDT ${amount}\nMessage: ${message}`);
+  e.preventDefault();
+  
+  const task = taskTitleInput.value;
+  const amount = document.getElementById("amount").value;
+  const message = document.getElementById("message").value.trim();
+  
+  // Replace 'Rakib Ahmed' with logged-in technician's name if available
+  const payload = {
+    technician_name: "Rakib Ahmed",
+    task_title: task,
+    amount: amount,
+    message: message
+  };
+
+  fetch("submit_bid.php", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message);
+    if (data.status === 'success') {
       modal.setAttribute('aria-hidden', 'true');
       bidForm.reset();
-    });
+    }
+  })
+  .catch(() => {
+    alert("Something went wrong while submitting the bid.");
+  });
+});
+
 
     areaSelect.addEventListener("change", () => renderTasks(areaSelect.value));
     renderTasks(areaSelect.value);
+
+    // Save active section in localStorage
+sidebarLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    localStorage.setItem('activeSection', link.getAttribute('data-section'));
+  });
+});
+
+// On load
+const saved = localStorage.getItem('activeSection');
+if (saved && sections[saved]) {
+  document.querySelector(`nav.sidebar a[data-section="${saved}"]`).click();
+}
+
+
   </script>
 </body>
 </html>
