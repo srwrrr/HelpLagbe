@@ -10,9 +10,11 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: Arial, sans-serif;
-      background-color: #fafafa;
-      color: #222;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f8;
+      color: #2e2e2e;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     .page-wrapper {
@@ -20,35 +22,69 @@
       display: flex;
       flex-direction: row;
       background: #fff;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.03);
     }
 
     /* Sidebar */
     nav.sidebar {
-      width: 240px;
-      background-color: #333;
+      width: 260px;
+      background-color: #2f3e4e;
       color: white;
       display: flex;
       flex-direction: column;
-      padding-top: 20px;
+      padding-top: 30px;
       user-select: none;
       height: 100vh;
       position: sticky;
       top: 0;
       overflow-y: auto;
+      box-shadow: 3px 0 12px rgba(0,0,0,0.1);
+      font-weight: 600;
     }
     nav.sidebar a {
-      color: #ccc;
-      padding: 15px 25px;
+      color: #aab8c7;
+      padding: 16px 28px;
       text-decoration: none;
-      font-weight: 600;
       border-left: 4px solid transparent;
-      transition: background-color 0.3s, border-left-color 0.3s, color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 16px;
+      transition: background-color 0.3s ease, border-left-color 0.3s ease, color 0.3s ease;
+      cursor: pointer;
+      user-select: none;
+    }
+    nav.sidebar a svg {
+      fill: #aab8c7;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      transition: fill 0.3s ease;
     }
     nav.sidebar a:hover,
     nav.sidebar a.active {
-      background-color: #444;
+      background-color: #405a78;
       color: #fff;
-      border-left-color: #4CAF50;
+      border-left-color: #4caf50;
+    }
+    nav.sidebar a.active svg,
+    nav.sidebar a:hover svg {
+      fill: #4caf50;
+    }
+    nav.sidebar a.logout {
+      margin-top: auto;
+      text-align: center;
+      font-weight: 500;
+      font-size: 14px;
+      border-left: none;
+      color: #8996a5;
+      padding: 14px;
+      user-select: none;
+    }
+    nav.sidebar a.logout:hover {
+      color: #4caf50;
+      background-color: transparent;
+      border-left: none;
     }
 
     /* Content wrapper flex */
@@ -57,121 +93,141 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      background-color: #f9fafb;
     }
 
     /* Header */
     header.topnav {
-      background-color: #4CAF50;
+      background-color: #4caf50;
       color: white;
-      padding: 15px 30px;
-      font-size: 20px;
-      font-weight: bold;
+      padding: 16px 40px;
+      font-size: 24px;
+      font-weight: 700;
       user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+    }
+    #editProfileBtn {
+      background-color: #357a38;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 15px;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.25s ease;
+      box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+    }
+    #editProfileBtn:hover {
+      background-color: #2f662f;
     }
 
     /* Main content */
     main.content {
       flex: 1 1 auto;
-      padding: 30px 40px;
-      background-color: #f9f9f9;
+      padding: 30px 50px;
       overflow-y: auto;
+      scroll-behavior: smooth;
     }
 
-    /* Sections hidden by default */
     main.content section {
       display: none;
+      animation: fadeInSection 0.3s ease forwards;
     }
     main.content section.active {
       display: block;
+    }
+    @keyframes fadeInSection {
+      from {opacity: 0; transform: translateY(10px);}
+      to {opacity: 1; transform: translateY(0);}
     }
 
     /* Profile Section */
     #section-profile h2 {
       margin-top: 0;
-      color: #333;
-      margin-bottom: 20px;
+      color: #2f3e4e;
+      margin-bottom: 25px;
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      border-bottom: 3px solid #4caf50;
+      display: inline-block;
+      padding-bottom: 4px;
     }
     #profileInfo p {
-      font-size: 16px;
+      font-size: 17px;
+      margin: 12px 0;
+      color: #444;
+      line-height: 1.5;
+    }
+
+    /* Task Cards */
+    .task-card,
+    .bid-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgb(0 0 0 / 0.08);
+      padding: 22px 26px;
+      margin-bottom: 18px;
+      transition: box-shadow 0.3s ease;
+      cursor: default;
+    }
+    .task-card:hover,
+    .bid-card:hover {
+      box-shadow: 0 8px 20px rgb(0 0 0 / 0.12);
+    }
+    .task-card h3,
+    .bid-card h3 {
+      margin: 0 0 10px 0;
+      color: #2e2e2e;
+      font-weight: 700;
+      font-size: 20px;
+      user-select: text;
+    }
+    .task-card p,
+    .bid-card p {
       margin: 6px 0;
       color: #555;
+      font-size: 15px;
+      line-height: 1.4;
+      user-select: text;
     }
-    #editProfileBtn {
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 15px;
-      transition: background-color 0.3s ease;
-    }
-    #editProfileBtn:hover {
-      background-color: #45a049;
-    }
-
-    /* Tasks Section */
-    #section-tasks h2 {
+    .task-card p strong,
+    .bid-card p strong {
       color: #333;
-      margin-top: 0;
-      margin-bottom: 20px;
     }
     .task-card {
-      background: white;
-      border-left: 6px solid #4CAF50;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      padding: 15px 20px;
-      margin-bottom: 15px;
-      border-radius: 6px;
-    }
-    .task-card h3 {
-      margin: 0 0 8px;
-      color: #222;
-    }
-    .task-card p {
-      margin: 5px 0;
-      color: #555;
-    }
-
-    /* Bids Section */
-    #section-bids h2 {
-      margin-top: 0;
-      color: #333;
-      margin-bottom: 20px;
+      border-left: 6px solid #4caf50;
     }
     .bid-card {
-      background: white;
       border-left: 6px solid #ff9800;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      padding: 15px 20px;
-      margin-bottom: 15px;
-      border-radius: 6px;
     }
-    .bid-card h3 {
-      margin: 0 0 8px;
-      color: #222;
-    }
-    .bid-card p {
-      margin: 5px 0;
-      color: #555;
-    }
+
+    /* Buttons */
     .btn {
-      padding: 7px 16px;
-      margin-top: 10px;
-      margin-right: 10px;
+      padding: 8px 22px;
+      margin-top: 14px;
+      margin-right: 12px;
       border: none;
-      border-radius: 4px;
-      font-weight: bold;
+      border-radius: 6px;
+      font-weight: 700;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 15px;
+      user-select: none;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+      transition: background-color 0.25s ease, box-shadow 0.25s ease;
+      display: inline-block;
     }
     .btn-accept {
-      background-color: #4CAF50;
+      background-color: #4caf50;
       color: white;
     }
     .btn-accept:hover {
       background-color: #3a9d40;
+      box-shadow: 0 4px 14px rgb(58 157 64 / 0.4);
     }
     .btn-decline {
       background-color: #f44336;
@@ -179,152 +235,205 @@
     }
     .btn-decline:hover {
       background-color: #d7372a;
+      box-shadow: 0 4px 14px rgb(215 55 42 / 0.4);
     }
 
     /* Wallet Section */
     #section-wallet h2 {
       margin-top: 0;
-      color: #333;
-      margin-bottom: 20px;
+      color: #2f3e4e;
+      margin-bottom: 25px;
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      border-bottom: 3px solid #4caf50;
+      display: inline-block;
+      padding-bottom: 4px;
     }
     #walletBalance {
-      font-size: 24px;
-      color: #4CAF50;
-      font-weight: bold;
+      font-size: 28px;
+      color: #4caf50;
+      font-weight: 700;
+      margin-top: 12px;
+      user-select: text;
     }
 
     /* Available Tasks Section */
     #section-available h2 {
       margin-top: 0;
-      color: #333;
+      color: #2f3e4e;
       margin-bottom: 20px;
       text-align: center;
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      border-bottom: 3px solid #4caf50;
+      display: inline-block;
+      padding-bottom: 6px;
     }
     .area-select {
-      margin-bottom: 30px;
+      margin-bottom: 40px;
       text-align: center;
     }
     .area-select label {
-      font-weight: 600;
-      margin-right: 10px;
-      font-size: 16px;
-      color: #333;
+      font-weight: 700;
+      margin-right: 14px;
+      font-size: 17px;
+      color: #2f3e4e;
+      user-select: none;
     }
     .area-select select {
-      padding: 10px;
+      padding: 12px 18px;
       font-size: 16px;
-      border: 1px solid #aaa;
-      border-radius: 5px;
+      border: 1.8px solid #b0b7c3;
+      border-radius: 7px;
       background-color: #fff;
       cursor: pointer;
-      min-width: 200px;
+      min-width: 240px;
+      transition: border-color 0.3s ease;
+      outline-offset: 2px;
     }
-    .task-card {
-      border: 1px solid #ddd;
-      border-left: 5px solid #999;
-      background-color: #fff;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-      position: relative;
-    }
-    .task-card h3 {
-      margin-top: 0;
-      color: #333;
-    }
-    .task-card p {
-      margin: 5px 0;
-      color: #555;
+    .area-select select:focus {
+      border-color: #4caf50;
+      outline: none;
+      box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
     }
     .task-card button {
-      margin-top: 10px;
-      padding: 8px 16px;
-      font-size: 14px;
-      background-color: #4CAF50;
+      margin-top: 14px;
+      padding: 10px 26px;
+      font-size: 16px;
+      background-color: #4caf50;
       color: #fff;
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
+      font-weight: 700;
+      box-shadow: 0 3px 9px rgba(76, 175, 80, 0.4);
     }
     .task-card button:hover {
       background-color: #388e3c;
+      box-shadow: 0 5px 14px rgba(56, 142, 60, 0.7);
     }
 
     /* Modal */
     .modal {
       display: none;
       position: fixed;
-      z-index: 10;
+      z-index: 15;
       left: 0;
       top: 0;
       width: 100%;
       height: 100%;
-      overflow: auto;
-      background-color: rgba(0, 0, 0, 0.5);
+      overflow-y: auto;
+      background-color: rgba(0, 0, 0, 0.45);
       align-items: center;
       justify-content: center;
+      padding: 40px 15px;
+      animation: fadeIn 0.25s ease forwards;
     }
     .modal[aria-hidden="false"] {
       display: flex;
     }
+    @keyframes fadeIn {
+      from {opacity: 0;}
+      to {opacity: 1;}
+    }
     .modal-content {
       background-color: #fff;
-      margin: 0 20px;
-      padding: 20px;
-      border-radius: 8px;
+      margin: 0 auto;
+      padding: 28px 32px;
+      border-radius: 14px;
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      max-width: 450px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
       position: relative;
+      user-select: none;
     }
     .modal-content h3 {
       margin-top: 0;
-      color: #333;
+      color: #2f3e4e;
+      font-weight: 700;
+      font-size: 24px;
+      user-select: text;
+    }
+    .modal-content label {
+      font-weight: 600;
+      font-size: 15px;
+      color: #444;
+      display: block;
+      margin-top: 20px;
+      user-select: none;
     }
     .modal-content input,
     .modal-content textarea {
       width: 100%;
-      margin-top: 10px;
-      padding: 10px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      margin-top: 8px;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 1.6px solid #c4c9d4;
+      border-radius: 8px;
       resize: vertical;
+      transition: border-color 0.3s ease;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: text;
+    }
+    .modal-content input:focus,
+    .modal-content textarea:focus {
+      outline: none;
+      border-color: #4caf50;
+      box-shadow: 0 0 12px rgba(76, 175, 80, 0.4);
     }
     .modal-content button {
-      margin-top: 15px;
-      padding: 10px;
-      font-size: 14px;
-      background-color: #4CAF50;
+      margin-top: 26px;
+      padding: 14px;
+      font-size: 16px;
+      background-color: #4caf50;
       color: #fff;
       border: none;
-      border-radius: 4px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: background-color 0.3s ease;
-      font-weight: 600;
+      font-weight: 700;
       width: 100%;
+      box-shadow: 0 4px 14px rgb(76 175 80 / 0.5);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
     }
     .modal-content button:hover {
       background-color: #388e3c;
+      box-shadow: 0 6px 20px rgb(56 142 60 / 0.7);
     }
     .close {
       position: absolute;
-      right: 15px;
-      top: 12px;
-      font-size: 22px;
-      font-weight: bold;
-      color: #666;
+      right: 22px;
+      top: 18px;
+      font-size: 26px;
+      font-weight: 700;
+      color: #888;
       cursor: pointer;
       user-select: none;
+      transition: color 0.25s ease;
+      line-height: 1;
     }
     .close:hover {
-      color: #000;
+      color: #4caf50;
+    }
+
+    /* Footer */
+    footer {
+      padding: 14px 40px;
+      font-size: 14px;
+      color: #666;
+      background-color: #f0f2f5;
+      text-align: center;
+      user-select: none;
+      border-top: 1px solid #ddd;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
     /* Responsive */
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       .page-wrapper {
         flex-direction: column;
       }
@@ -332,11 +441,27 @@
         width: 100%;
         height: auto;
         position: relative;
+        box-shadow: none;
       }
       .content-wrapper {
         min-height: auto;
       }
+      header.topnav {
+        padding: 14px 24px;
+        font-size: 22px;
+      }
+      #editProfileBtn {
+        padding: 8px 20px;
+        font-size: 14px;
+      }
+      main.content {
+        padding: 25px 20px;
+      }
+      .area-select select {
+        min-width: 100%;
+      }
     }
+
   </style>
 </head>
 <body>
@@ -344,19 +469,34 @@
 
     <!-- Sidebar Navigation -->
     <nav class="sidebar" role="navigation" aria-label="Main navigation">
-      <a href="#" class="active" data-section="profile">Profile</a>
-      <a href="#" data-section="tasks">View Tasks</a>
-      <a href="#" data-section="bids">Bid Notifications</a>
-      <a href="#" data-section="wallet">Wallet</a>
-      <a href="#" data-section="available">Available Tasks</a>
-      <a href="logout.html" style="margin-top:auto; color:#bbb; border-left:none; text-align:center;">Logout</a>
+      <a href="#" class="active" data-section="profile" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        Profile
+      </a>
+      <a href="#" data-section="tasks" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11H7v2h2v-2zm0 4H7v2h2v-2zm4-4h-2v2h2v-2zm0 4h-2v2h2v-2zm4-8h-6V5h6v2z"/></svg>
+        View Tasks
+      </a>
+      <a href="#" data-section="bids" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l4-4h12c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+        Bid Notifications
+      </a>
+      <a href="#" data-section="wallet" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 7H3v10h18V7zM3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>
+        Wallet
+      </a>
+      <a href="#" data-section="available" tabindex="0">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3v10zm10 8h8v-6h-8v6zM3 21h8v-6H3v6z"/></svg>
+        Available Tasks
+      </a>
+      <a href="logout.html" class="logout" tabindex="0">Logout</a>
     </nav>
 
     <!-- Main content area -->
     <div class="content-wrapper">
       <header class="topnav" role="banner">
         Technician Dashboard
-        <button id="editProfileBtn" style="float:right; background:#357a38;">Edit Profile</button>
+        <button id="editProfileBtn" aria-label="Edit Profile">Edit Profile</button>
       </header>
 
       <main class="content" role="main">
@@ -376,13 +516,13 @@
         <!-- Tasks Section -->
         <section id="section-tasks" aria-label="Your Tasks">
           <h2>Your Tasks</h2>
-          <div class="task-card">
+          <div class="task-card" tabindex="0">
             <h3>Fix light switch</h3>
             <p><strong>Description:</strong> Short circuit issue</p>
             <p><strong>Date:</strong> 2025-07-06</p>
             <p><strong>Status:</strong> Completed</p>
           </div>
-          <div class="task-card">
+          <div class="task-card" tabindex="0">
             <h3>Install ceiling fan</h3>
             <p><strong>Description:</strong> Wiring required</p>
             <p><strong>Date:</strong> 2025-07-07</p>
@@ -393,11 +533,11 @@
         <!-- Bid Notifications Section -->
         <section id="section-bids" aria-label="Bid Notifications">
           <h2>Bid Notifications</h2>
-          <div class="bid-card">
+          <div class="bid-card" tabindex="0">
             <h3>Bid on: Fix kitchen sink leak</h3>
             <p><strong>Offer:</strong> BDT 500</p>
-            <button class="btn btn-accept" onclick="handleBid('accept', 101)">Accept</button>
-            <button class="btn btn-decline" onclick="handleBid('decline', 101)">Decline</button>
+            <button class="btn btn-accept" onclick="handleBid('accept', 101)" aria-label="Accept bid for Fix kitchen sink leak">Accept</button>
+            <button class="btn btn-decline" onclick="handleBid('decline', 101)" aria-label="Decline bid for Fix kitchen sink leak">Decline</button>
           </div>
         </section>
 
@@ -405,7 +545,7 @@
         <section id="section-wallet" aria-label="Wallet Section">
           <h2>Your Wallet</h2>
           <p>Your current balance is:</p>
-          <p id="walletBalance">BDT 5,000</p>
+          <p id="walletBalance" tabindex="0">BDT 5,000</p>
         </section>
 
         <!-- Available Tasks Section -->
@@ -434,9 +574,9 @@
           <form id="bidForm">
             <input type="hidden" id="taskTitle" />
             <label for="amount">Your Offer (BDT):</label>
-            <input type="number" id="amount" required min="0" />
+            <input type="number" id="amount" required min="0" aria-required="true" />
             <label for="message">Message (optional):</label>
-            <textarea id="message" rows="3" placeholder="Any note for the client..."></textarea>
+            <textarea id="message" rows="3" placeholder="Any note for the client..." aria-label="Message to client"></textarea>
             <button type="submit">Submit Bid</button>
           </form>
         </div>
@@ -504,7 +644,6 @@
     const taskTitleInput = document.getElementById("taskTitle");
 
     function renderTasks(area) {
-      // Sort tasks: tasks from selected area first, then others alphabetically
       const sorted = tasks.slice().sort((a, b) => {
         if (a.area === area && b.area !== area) return -1;
         if (a.area !== area && b.area === area) return 1;
@@ -514,13 +653,14 @@
       sorted.forEach(task => {
         const card = document.createElement("div");
         card.className = "task-card";
+        card.tabIndex = 0;
         card.innerHTML = `
           <h3>${task.title}</h3>
           <p><strong>Area:</strong> ${task.area}</p>
           <p><strong>Description:</strong> ${task.description}</p>
           <p><strong>Budget:</strong> BDT ${task.budget}</p>
           <p><strong>Date:</strong> ${task.date}</p>
-          <button type="button" onclick="openBidModal('${task.title}')">Bid</button>
+          <button type="button" onclick="openBidModal('${task.title}')" aria-label="Bid on ${task.title}">Bid</button>
         `;
         taskList.appendChild(card);
       });
@@ -529,6 +669,7 @@
     function openBidModal(title) {
       taskTitleInput.value = title;
       modal.setAttribute('aria-hidden', 'false');
+      document.getElementById('amount').focus();
     }
 
     closeModal.onclick = () => {
@@ -544,58 +685,55 @@
     };
 
     bidForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  
-  const task = taskTitleInput.value;
-  const amount = document.getElementById("amount").value;
-  const message = document.getElementById("message").value.trim();
-  
-  // Replace 'Rakib Ahmed' with logged-in technician's name if available
-  const payload = {
-    technician_name: "Rakib Ahmed",
-    task_title: task,
-    amount: amount,
-    message: message
-  };
+      e.preventDefault();
+      
+      const task = taskTitleInput.value;
+      const amount = document.getElementById("amount").value;
+      const message = document.getElementById("message").value.trim();
+      
+      // Replace 'Rakib Ahmed' with logged-in technician's name if available
+      const payload = {
+        technician_name: "Rakib Ahmed",
+        task_title: task,
+        amount: amount,
+        message: message
+      };
 
-  fetch("submit_bid.php", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.message);
-    if (data.status === 'success') {
-      modal.setAttribute('aria-hidden', 'true');
-      bidForm.reset();
-    }
-  })
-  .catch(() => {
-    alert("Something went wrong while submitting the bid.");
-  });
-});
-
+      fetch("submit_bid.php", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        if (data.status === 'success') {
+          modal.setAttribute('aria-hidden', 'true');
+          bidForm.reset();
+        }
+      })
+      .catch(() => {
+        alert("Something went wrong while submitting the bid.");
+      });
+    });
 
     areaSelect.addEventListener("change", () => renderTasks(areaSelect.value));
     renderTasks(areaSelect.value);
 
     // Save active section in localStorage
-sidebarLinks.forEach(link => {
-  link.addEventListener('click', e => {
-    localStorage.setItem('activeSection', link.getAttribute('data-section'));
-  });
-});
+    sidebarLinks.forEach(link => {
+      link.addEventListener('click', e => {
+        localStorage.setItem('activeSection', link.getAttribute('data-section'));
+      });
+    });
 
-// On load
-const saved = localStorage.getItem('activeSection');
-if (saved && sections[saved]) {
-  document.querySelector(`nav.sidebar a[data-section="${saved}"]`).click();
-}
-
-
+    // On load - restore last active section
+    const saved = localStorage.getItem('activeSection');
+    if (saved && sections[saved]) {
+      document.querySelector(`nav.sidebar a[data-section="${saved}"]`).click();
+    }
   </script>
 </body>
 </html>
