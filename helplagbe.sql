@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 03, 2025 at 11:18 PM
+-- Generation Time: Aug 09, 2025 at 09:46 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -24,18 +24,118 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Table structure for table `bids`
+-- Table structure for table `admin`
 --
 
-CREATE TABLE `bids` (
-  `id` int(11) NOT NULL,
-  `technician_id` int(11) NOT NULL,
-  `task_id` int(11) NOT NULL,
-  `amount` decimal(10,2) NOT NULL,
-  `message` text DEFAULT NULL,
-  `status` enum('pending','accepted','declined') DEFAULT 'pending',
+CREATE TABLE `admin` (
+  `admin_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `admin`
+--
+
+INSERT INTO `admin` (`admin_id`, `created_at`) VALUES
+(1, '2025-08-09 19:05:58');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admin_dashboard`
+--
+
+CREATE TABLE `admin_dashboard` (
+  `ad_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `post_id` int(11) DEFAULT NULL,
+  `task_id` int(11) DEFAULT NULL,
+  `admin_id` int(11) DEFAULT NULL,
+  `technician_id` int(11) DEFAULT NULL,
+  `Type` varchar(100) DEFAULT NULL,
+  `action` varchar(100) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `available_tasks`
+-- (See below for the actual view)
+--
+CREATE TABLE `available_tasks` (
+`post_id` int(11)
+,`Post_detail` text
+,`Image` varchar(255)
+,`Category` varchar(100)
+,`Sub-Category` varchar(100)
+,`user_id` int(11)
+,`created_at` timestamp
+,`updated_at` timestamp
+,`posted_by` varchar(255)
+,`contact_phone` varchar(20)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `contact`
+--
+
+CREATE TABLE `contact` (
+  `contact_id` int(11) NOT NULL,
+  `Name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone_no` varchar(20) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `message` text NOT NULL,
+  `status` enum('new','read','responded') DEFAULT 'new',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payment`
+--
+
+CREATE TABLE `payment` (
+  `payment_id` int(11) NOT NULL,
+  `payment_status` enum('pending','completed','failed','refunded') DEFAULT 'pending',
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` varchar(50) DEFAULT NULL,
+  `transaction_id` varchar(255) DEFAULT NULL,
+  `task_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `posts`
+--
+
+CREATE TABLE `posts` (
+  `post_id` int(11) NOT NULL,
+  `Post_detail` text NOT NULL,
+  `Image` varchar(255) DEFAULT NULL,
+  `Category` varchar(100) NOT NULL,
+  `Sub-Category` varchar(100) DEFAULT NULL,
+  `user_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `posts`
+--
+
+INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Category`, `user_id`, `created_at`, `updated_at`) VALUES
+(1, 'My AC is not cooling properly. Need urgent repair.', NULL, 'appliance', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(2, 'Kitchen sink is leaking. Need plumber immediately.', NULL, 'plumbing', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(3, 'Electrical outlet not working in bedroom.', NULL, 'electrical', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58');
 
 -- --------------------------------------------------------
 
@@ -44,43 +144,80 @@ CREATE TABLE `bids` (
 --
 
 CREATE TABLE `tasks` (
-  `id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `category` varchar(100) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `budget` int(11) DEFAULT NULL,
-  `location` varchar(100) DEFAULT NULL,
-  `date_posted` date DEFAULT NULL
+  `task_id` int(11) NOT NULL,
+  `task_status` enum('pending','accepted','in_progress','completed','cancelled') DEFAULT 'pending',
+  `price` decimal(10,2) NOT NULL,
+  `post_id` int(11) NOT NULL,
+  `technician_id` int(11) NOT NULL,
+  `accepted_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tasks`
 --
 
-INSERT INTO `tasks` (`id`, `user_id`, `category`, `description`, `budget`, `location`, `date_posted`) VALUES
-(1, 1, 'electric', 'dsad', 2332, 'Dhanmondi', '2025-07-16'),
-(2, 1, 'plumbing', 'Water leaking from under the sink', 200, 'Dhanmondi', '2025-07-25'),
-(3, 1, 'appliance', 'Washing machine', 600, 'Banani', '2025-07-26'),
-(4, 1, 'maintenance', 'Clean my house', 500, 'Bikrampur', '2025-07-25');
+INSERT INTO `tasks` (`task_id`, `task_status`, `price`, `post_id`, `technician_id`, `accepted_at`, `completed_at`, `created_at`, `updated_at`) VALUES
+(1, 'accepted', 500.00, 3, 2, NULL, NULL, '2025-08-09 19:33:23', '2025-08-09 19:42:42');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `technicians`
+-- Table structure for table `task_feedback`
 --
 
-CREATE TABLE `technicians` (
+CREATE TABLE `task_feedback` (
+  `feedback_id` int(11) NOT NULL,
+  `consumer_rating` int(11) DEFAULT NULL CHECK (`consumer_rating` >= 1 and `consumer_rating` <= 5),
+  `consumer_feedback` text DEFAULT NULL,
+  `technician_rating` int(11) DEFAULT NULL CHECK (`technician_rating` >= 1 and `technician_rating` <= 5),
+  `technician_feedback` text DEFAULT NULL,
+  `task_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `technician`
+--
+
+CREATE TABLE `technician` (
+  `technician_id` int(11) NOT NULL,
+  `national_id` varchar(50) NOT NULL,
+  `Full_Name` varchar(255) NOT NULL,
+  `Required_Documents` text DEFAULT NULL,
+  `Skill_details` text NOT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
   `user_id` int(11) NOT NULL,
-  `skills` varchar(255) DEFAULT NULL,
-  `image` varchar(255) DEFAULT NULL
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `technicians`
+-- Dumping data for table `technician`
 --
 
-INSERT INTO `technicians` (`user_id`, `skills`, `image`) VALUES
-(2, 'Plumbing', 'uploads/1752093248_998989898.JPG');
+INSERT INTO `technician` (`technician_id`, `national_id`, `Full_Name`, `Required_Documents`, `Skill_details`, `status`, `user_id`, `created_at`, `updated_at`) VALUES
+(1, '1234567890123', 'Mohammad Rahman', NULL, 'AC repair, refrigerator maintenance, electrical work. 5 years experience.', 'approved', 2, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(2, '1234567890124', 'Abdul Karim', NULL, 'Plumbing, pipe fitting, water system installation. 8 years experience.', 'approved', 3, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(3, '21331123', 'Samir Hossain', NULL, 'Im an expert at everything', 'pending', 4, '2025-08-09 19:29:49', '2025-08-09 19:29:49');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `technician_dashboard`
+--
+
+CREATE TABLE `technician_dashboard` (
+  `td_id` int(11) NOT NULL,
+  `task_id` int(11) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -89,103 +226,311 @@ INSERT INTO `technicians` (`user_id`, `skills`, `image`) VALUES
 --
 
 CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
-  `user_type` enum('admin','customer','technician') NOT NULL,
-  `username` varchar(50) DEFAULT NULL,
-  `name` varchar(100) DEFAULT NULL,
-  `email` varchar(100) NOT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `address` text DEFAULT NULL,
+  `user_id` int(11) NOT NULL,
+  `username` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone_no` varchar(20) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `address` text DEFAULT NULL,
+  `Image` varchar(255) DEFAULT NULL,
+  `admin_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `user_type`, `username`, `name`, `email`, `phone`, `address`, `password`, `created_at`) VALUES
-(1, 'customer', NULL, 'Sarwar Hossain', 'sarwarhossain083@gmail.com', '01325409985', '38/1, Haji Abul Khair Nibas, Opposite to Tollabag Masjid, Jigatola, Dhanmondi', '$2y$10$8VLFHzgsfov2I7coNOHkFeGU7wxDz3WnfXREpEDxy9mqRR1GfgqNW', '2025-07-09 20:33:36'),
-(2, 'technician', NULL, 'Samir Hossain', 'samirhossain083@gmail.com', '01904476903', 'Zigatola', '$2y$10$AfoBrDA96.pBVsyltVTvW.I7FBa6yBbu.8MbpFNobcGGf/6EF/Z2m', '2025-07-09 20:34:08'),
-(3, 'admin', 'Sarwar Admin', NULL, '2131231@iub.edu.bd', NULL, NULL, '$2y$10$iuaqBshKG/Y.5Paxosn6j.7azoZw0yxILYU/cbff4oAz.p.Oq2gqS', '2025-07-09 20:34:29');
+INSERT INTO `users` (`user_id`, `username`, `email`, `phone_no`, `password`, `address`, `Image`, `admin_id`, `created_at`, `updated_at`) VALUES
+(1, 'john_doe', 'john@example.com', '+8801234567890', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhanmondi, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(2, 'jane_smith', 'jane@example.com', '+8801234567891', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gulshan, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(3, 'ahmed_khan', 'ahmed@example.com', '+8801234567892', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Uttara, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(4, 'samirhossain083', 'samirhossain083@gmail.com', '01904476903', '$2y$10$kRQa8RhrHFNGAfTcBsZBKutA1eg1.3m0sFlCl7cyAJmhM65PDoICS', NULL, NULL, NULL, '2025-08-09 19:29:49', '2025-08-09 19:29:49'),
+(5, 'Sarwar Hossain', 'sarwarhossain083@gmail.com', '01325409985', '$2y$10$D2eo9qTngRPYeFmYQHkuT.uxliPWA/t.OXYKoHjbrgA7IGm6WnAYW', 'Bangladesh Dhaka', NULL, NULL, '2025-08-09 19:30:44', '2025-08-09 19:30:44');
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `user_posts_with_bids`
+-- (See below for the actual view)
+--
+CREATE TABLE `user_posts_with_bids` (
+`post_id` int(11)
+,`Post_detail` text
+,`Image` varchar(255)
+,`Category` varchar(100)
+,`Sub-Category` varchar(100)
+,`user_id` int(11)
+,`created_at` timestamp
+,`updated_at` timestamp
+,`bid_count` bigint(21)
+,`latest_status` enum('pending','accepted','in_progress','completed','cancelled')
+,`username` varchar(255)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `website_feedback`
+--
+
+CREATE TABLE `website_feedback` (
+  `feedback_id` int(11) NOT NULL,
+  `rating` int(11) NOT NULL CHECK (`rating` >= 1 and `rating` <= 5),
+  `feedback` text NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `available_tasks`
+--
+DROP TABLE IF EXISTS `available_tasks`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `available_tasks`  AS SELECT `p`.`post_id` AS `post_id`, `p`.`Post_detail` AS `Post_detail`, `p`.`Image` AS `Image`, `p`.`Category` AS `Category`, `p`.`Sub-Category` AS `Sub-Category`, `p`.`user_id` AS `user_id`, `p`.`created_at` AS `created_at`, `p`.`updated_at` AS `updated_at`, `u`.`username` AS `posted_by`, `u`.`phone_no` AS `contact_phone` FROM (`posts` `p` join `users` `u` on(`p`.`user_id` = `u`.`user_id`)) WHERE !(`p`.`post_id` in (select distinct `tasks`.`post_id` from `tasks` where `tasks`.`task_status` = 'accepted')) ORDER BY `p`.`created_at` DESC ;
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `user_posts_with_bids`
+--
+DROP TABLE IF EXISTS `user_posts_with_bids`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `user_posts_with_bids`  AS SELECT `p`.`post_id` AS `post_id`, `p`.`Post_detail` AS `Post_detail`, `p`.`Image` AS `Image`, `p`.`Category` AS `Category`, `p`.`Sub-Category` AS `Sub-Category`, `p`.`user_id` AS `user_id`, `p`.`created_at` AS `created_at`, `p`.`updated_at` AS `updated_at`, count(`t`.`task_id`) AS `bid_count`, max(`t`.`task_status`) AS `latest_status`, `u`.`username` AS `username` FROM ((`posts` `p` left join `tasks` `t` on(`p`.`post_id` = `t`.`post_id`)) join `users` `u` on(`p`.`user_id` = `u`.`user_id`)) GROUP BY `p`.`post_id` ;
 
 --
 -- Indexes for dumped tables
 --
 
 --
--- Indexes for table `bids`
+-- Indexes for table `admin`
 --
-ALTER TABLE `bids`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `technician_id` (`technician_id`),
-  ADD KEY `task_id` (`task_id`);
+ALTER TABLE `admin`
+  ADD PRIMARY KEY (`admin_id`);
+
+--
+-- Indexes for table `admin_dashboard`
+--
+ALTER TABLE `admin_dashboard`
+  ADD PRIMARY KEY (`ad_id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `post_id` (`post_id`),
+  ADD KEY `task_id` (`task_id`),
+  ADD KEY `admin_id` (`admin_id`),
+  ADD KEY `technician_id` (`technician_id`);
+
+--
+-- Indexes for table `contact`
+--
+ALTER TABLE `contact`
+  ADD PRIMARY KEY (`contact_id`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_email` (`email`);
+
+--
+-- Indexes for table `payment`
+--
+ALTER TABLE `payment`
+  ADD PRIMARY KEY (`payment_id`),
+  ADD KEY `idx_task_id` (`task_id`),
+  ADD KEY `idx_status` (`payment_status`);
+
+--
+-- Indexes for table `posts`
+--
+ALTER TABLE `posts`
+  ADD PRIMARY KEY (`post_id`),
+  ADD KEY `idx_category` (`Category`),
+  ADD KEY `idx_user_id` (`user_id`),
+  ADD KEY `idx_posts_created_at` (`created_at`);
 
 --
 -- Indexes for table `tasks`
 --
 ALTER TABLE `tasks`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD PRIMARY KEY (`task_id`),
+  ADD UNIQUE KEY `unique_post_technician` (`post_id`,`technician_id`),
+  ADD KEY `idx_post_id` (`post_id`),
+  ADD KEY `idx_technician_id` (`technician_id`),
+  ADD KEY `idx_status` (`task_status`),
+  ADD KEY `idx_tasks_created_at` (`created_at`);
 
 --
--- Indexes for table `technicians`
+-- Indexes for table `task_feedback`
 --
-ALTER TABLE `technicians`
-  ADD PRIMARY KEY (`user_id`);
+ALTER TABLE `task_feedback`
+  ADD PRIMARY KEY (`feedback_id`),
+  ADD KEY `idx_task_id` (`task_id`);
+
+--
+-- Indexes for table `technician`
+--
+ALTER TABLE `technician`
+  ADD PRIMARY KEY (`technician_id`),
+  ADD UNIQUE KEY `national_id` (`national_id`),
+  ADD KEY `idx_user_id` (`user_id`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `technician_dashboard`
+--
+ALTER TABLE `technician_dashboard`
+  ADD PRIMARY KEY (`td_id`),
+  ADD KEY `task_id` (`task_id`);
 
 --
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
+  ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `email` (`email`),
-  ADD UNIQUE KEY `username_unique` (`username`);
+  ADD KEY `admin_id` (`admin_id`),
+  ADD KEY `idx_email` (`email`),
+  ADD KEY `idx_users_created_at` (`created_at`);
+
+--
+-- Indexes for table `website_feedback`
+--
+ALTER TABLE `website_feedback`
+  ADD PRIMARY KEY (`feedback_id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `idx_rating` (`rating`);
 
 --
 -- AUTO_INCREMENT for dumped tables
 --
 
 --
--- AUTO_INCREMENT for table `bids`
+-- AUTO_INCREMENT for table `admin`
 --
-ALTER TABLE `bids`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `admin`
+  MODIFY `admin_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `admin_dashboard`
+--
+ALTER TABLE `admin_dashboard`
+  MODIFY `ad_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `contact`
+--
+ALTER TABLE `contact`
+  MODIFY `contact_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `payment`
+--
+ALTER TABLE `payment`
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `posts`
+--
+ALTER TABLE `posts`
+  MODIFY `post_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `task_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `task_feedback`
+--
+ALTER TABLE `task_feedback`
+  MODIFY `feedback_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `technician`
+--
+ALTER TABLE `technician`
+  MODIFY `technician_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `technician_dashboard`
+--
+ALTER TABLE `technician_dashboard`
+  MODIFY `td_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `website_feedback`
+--
+ALTER TABLE `website_feedback`
+  MODIFY `feedback_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables
 --
 
 --
--- Constraints for table `bids`
+-- Constraints for table `admin_dashboard`
 --
-ALTER TABLE `bids`
-  ADD CONSTRAINT `bids_ibfk_1` FOREIGN KEY (`technician_id`) REFERENCES `users` (`id`),
-  ADD CONSTRAINT `bids_ibfk_2` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`);
+ALTER TABLE `admin_dashboard`
+  ADD CONSTRAINT `admin_dashboard_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `admin_dashboard_ibfk_2` FOREIGN KEY (`post_id`) REFERENCES `posts` (`post_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `admin_dashboard_ibfk_3` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `admin_dashboard_ibfk_4` FOREIGN KEY (`admin_id`) REFERENCES `admin` (`admin_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `admin_dashboard_ibfk_5` FOREIGN KEY (`technician_id`) REFERENCES `technician` (`technician_id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `payment`
+--
+ALTER TABLE `payment`
+  ADD CONSTRAINT `payment_ibfk_1` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `posts`
+--
+ALTER TABLE `posts`
+  ADD CONSTRAINT `posts_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tasks`
 --
 ALTER TABLE `tasks`
-  ADD CONSTRAINT `tasks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+  ADD CONSTRAINT `tasks_ibfk_1` FOREIGN KEY (`post_id`) REFERENCES `posts` (`post_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `tasks_ibfk_2` FOREIGN KEY (`technician_id`) REFERENCES `technician` (`technician_id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `technicians`
+-- Constraints for table `task_feedback`
 --
-ALTER TABLE `technicians`
-  ADD CONSTRAINT `technicians_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+ALTER TABLE `task_feedback`
+  ADD CONSTRAINT `task_feedback_ibfk_1` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `technician`
+--
+ALTER TABLE `technician`
+  ADD CONSTRAINT `technician_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `technician_dashboard`
+--
+ALTER TABLE `technician_dashboard`
+  ADD CONSTRAINT `technician_dashboard_ibfk_1` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `admin` (`admin_id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `website_feedback`
+--
+ALTER TABLE `website_feedback`
+  ADD CONSTRAINT `website_feedback_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
