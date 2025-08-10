@@ -1242,35 +1242,6 @@
             }
         };
 
-        // Mock data for demo purposes
-        const mockData = {
-            users: [
-                { user_id: 1, username: 'john_doe', email: 'john@example.com', phone_no: '01712345678', post_count: 3, is_technician: 0, address: 'Dhaka, Bangladesh' },
-                { user_id: 2, username: 'jane_smith', email: 'jane@example.com', phone_no: '01787654321', post_count: 1, is_technician: 1, address: 'Chittagong, Bangladesh', technician_name: 'Jane Smith', skills: 'Electrical work, Plumbing' },
-                { user_id: 3, username: 'ahmed_rahman', email: 'ahmed@example.com', phone_no: '01699887766', post_count: 5, is_technician: 0, address: 'Sylhet, Bangladesh' }
-            ],
-            technicians: [
-                { technician_id: 1, Full_Name: 'Jane Smith', email: 'jane@example.com', phone_no: '01787654321', Skill_details: 'Electrical installation, wiring, circuit repairs, plumbing', task_count: 15, completion_rate: 94 },
-                { technician_id: 2, Full_Name: 'Mohammad Ali', email: 'ali@example.com', phone_no: '01655443322', Skill_details: 'Appliance repair, AC servicing, refrigerator repair', task_count: 22, completion_rate: 89 },
-                { technician_id: 3, Full_Name: 'Sarah Khan', email: 'sarah@example.com', phone_no: '01566778899', Skill_details: 'General maintenance, carpentry, painting', task_count: 8, completion_rate: 100 }
-            ],
-            posts: [
-                { post_id: 1, posted_by: 'john_doe', Category: 'electrical', Post_detail: 'Need to fix electrical wiring in bedroom. Lights not working properly.', bid_count: 3, is_accepted: false, created_at: '2024-01-15T10:00:00Z', latest_status: 'pending' },
-                { post_id: 2, posted_by: 'ahmed_rahman', Category: 'appliance', Post_detail: 'Air conditioner not cooling properly. Need immediate repair.', bid_count: 5, is_accepted: true, created_at: '2024-01-14T14:30:00Z', latest_status: 'accepted' },
-                { post_id: 3, posted_by: 'john_doe', Category: 'plumbing', Post_detail: 'Kitchen sink is leaking. Water pipe needs to be repaired.', bid_count: 2, is_accepted: false, created_at: '2024-01-13T09:15:00Z', latest_status: 'pending' }
-            ],
-            tasks: [
-                { task_id: 1, client_name: 'Ahmed Rahman', technician_name: 'Mohammad Ali', Category: 'appliance', price: 1500, task_status: 'completed', created_at: '2024-01-14T14:30:00Z' },
-                { task_id: 2, client_name: 'John Doe', technician_name: 'Jane Smith', Category: 'electrical', price: 800, task_status: 'accepted', created_at: '2024-01-15T10:00:00Z' },
-                { task_id: 3, client_name: 'Fatima Ali', technician_name: 'Sarah Khan', Category: 'maintenance', price: 1200, task_status: 'pending', created_at: '2024-01-16T11:00:00Z' }
-            ],
-            bids: [
-                { task_id: 1, Full_Name: 'Jane Smith', phone_no: '01787654321', price: 800, task_status: 'accepted', Skill_details: 'Electrical work, circuit repairs' },
-                { task_id: 2, Full_Name: 'Mohammad Ali', phone_no: '01655443322', price: 750, task_status: 'pending', Skill_details: 'General electrical work' },
-                { task_id: 3, Full_Name: 'Sarah Khan', phone_no: '01566778899', price: 900, task_status: 'pending', Skill_details: 'Electrical installation' }
-            ]
-        };
-
         // API Helper Functions
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
