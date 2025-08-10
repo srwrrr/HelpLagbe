@@ -1,0 +1,15 @@
+RewriteEngine On
+
+# Allow access to existing files and directories
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Route all requests to index.php or appropriate PHP files
+
+RewriteRule ^api/(.\*)$ api/$1.php [L]
+
+# Optional: remove trailing slashes
+
+RewriteCond %{REQUEST_URI} (.+)/$
+RewriteRule ^ %1 [R=301,L]

@@ -11,11 +11,27 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary-color: #ff6b35;
+            --primary-dark: #e55a2b;
+            --secondary-color: #ff8c42;
+            --bg-dark: #1a1a1a;
+            --bg-darker: #0f0f0f;
+            --bg-light: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --text-muted: #999999;
+            --border-color: #333333;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-primary);
+            background: var(--bg-dark);
             min-height: 100vh;
         }
 
@@ -27,14 +43,13 @@
 
         /* Header Styles */
         header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background: var(--bg-darker);
+            border-bottom: 2px solid var(--primary-color);
             position: fixed;
             width: 100%;
             top: 0;
             z-index: 1000;
-            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
         }
 
         nav {
@@ -45,12 +60,27 @@
         }
 
         .logo {
-            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo img {
+            height: 40px;
+            width: auto;
+        }
+
+        .logo-text {
+            font-size: 1.8rem;
             font-weight: bold;
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--primary-color);
+        }
+
+        .logo-tagline {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .nav-links {
@@ -61,7 +91,7 @@
 
         .nav-links a {
             text-decoration: none;
-            color: #333;
+            color: var(--text-secondary);
             font-weight: 500;
             transition: color 0.3s ease;
             position: relative;
@@ -69,7 +99,11 @@
         }
 
         .nav-links a:hover {
-            color: #667eea;
+            color: var(--primary-color);
+        }
+
+        .nav-links a.active {
+            color: var(--primary-color);
         }
 
         .nav-links a::after {
@@ -79,11 +113,12 @@
             height: 2px;
             bottom: -5px;
             left: 0;
-            background: #667eea;
+            background: var(--primary-color);
             transition: width 0.3s ease;
         }
 
-        .nav-links a:hover::after {
+        .nav-links a:hover::after,
+        .nav-links a.active::after {
             width: 100%;
         }
 
@@ -93,35 +128,71 @@
             align-items: center;
         }
 
-        .lang-switch, .admin-access {
-            background: #667eea;
-            color: white;
+        .btn {
+            padding: 0.75rem 1.5rem;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
         }
 
-        .admin-access {
-            background: #dc3545;
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
         }
 
-        .lang-switch:hover, .admin-access:hover {
+        .btn-primary:hover {
+            background: var(--primary-dark);
             transform: translateY(-2px);
         }
 
-        .lang-switch:hover {
-            background: #5a6fd8;
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
         }
 
-        .admin-access:hover {
-            background: #c82333;
+        .btn-secondary:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .lang-switch {
+            background: var(--bg-light);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .lang-switch:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
         }
 
         /* Main Content */
         main {
-            margin-top: 100px;
+            margin-top: 90px;
+            min-height: calc(100vh - 90px - 100px); /* Account for header and footer */
             padding: 2rem 0;
         }
 
@@ -137,12 +208,33 @@
         .hero {
             text-align: center;
             padding: 4rem 0;
-            color: white;
+            background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+            border-radius: 20px;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, var(--primary-color)20, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
         }
 
         .hero h1 {
             font-size: 3.5rem;
             margin-bottom: 1rem;
+            color: var(--text-primary);
             opacity: 0;
             animation: fadeInUp 1s ease 0.3s forwards;
         }
@@ -150,6 +242,7 @@
         .hero p {
             font-size: 1.3rem;
             margin-bottom: 2rem;
+            color: var(--text-secondary);
             opacity: 0;
             animation: fadeInUp 1s ease 0.6s forwards;
         }
@@ -163,76 +256,20 @@
             animation: fadeInUp 1s ease 0.9s forwards;
         }
 
-        /* Button Styles */
-        .btn {
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-primary {
-            background: white;
-            color: #667eea;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: white;
-            border: 2px solid white;
-        }
-
-        .btn-secondary:hover {
-            background: white;
-            color: #667eea;
-            transform: translateY(-3px);
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-warning {
-            background: #ffc107;
-            color: #212529;
-        }
-
-        .btn-sm {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.875rem;
-        }
-
         /* Services Section */
         .services {
-            background: white;
+            background: var(--bg-light);
             margin: 4rem 0;
             padding: 4rem 2rem;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
         }
 
         .services h2 {
             text-align: center;
             margin-bottom: 3rem;
             font-size: 2.5rem;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .service-grid {
@@ -242,41 +279,73 @@
         }
 
         .service-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: var(--bg-dark);
             padding: 2rem;
             border-radius: 15px;
             text-align: center;
             transition: all 0.3s ease;
             cursor: pointer;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--primary-color)20, transparent);
+            transition: left 0.6s;
+        }
+
+        .service-card:hover::before {
+            left: 100%;
         }
 
         .service-card:hover {
             transform: translateY(-10px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary-color);
+            box-shadow: 0 20px 40px rgba(255, 107, 53, 0.1);
         }
 
         .service-icon {
             font-size: 3rem;
             margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .service-card h3 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .service-card p {
+            color: var(--text-secondary);
         }
 
         /* Auth Section */
         .auth-section {
-            background: white;
+            background: var(--bg-light);
             margin: 2rem 0;
             padding: 3rem;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+            max-width: 600px;
+            margin: 2rem auto;
         }
 
         .auth-tabs {
             display: flex;
             justify-content: center;
             margin-bottom: 2rem;
-            background: #f8f9fa;
+            background: var(--bg-dark);
             border-radius: 50px;
             padding: 0.5rem;
             flex-wrap: wrap;
+            border: 1px solid var(--border-color);
         }
 
         .auth-tab {
@@ -288,10 +357,11 @@
             transition: all 0.3s ease;
             font-weight: 600;
             margin: 0.25rem;
+            color: var(--text-secondary);
         }
 
         .auth-tab.active {
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
         }
 
@@ -304,21 +374,28 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
         }
 
-        .form-group input, .form-group textarea, .form-group select {
+        .form-group input, 
+        .form-group textarea, 
+        .form-group select {
             width: 100%;
             padding: 1rem;
-            border: 2px solid #e9ecef;
+            border: 2px solid var(--border-color);
             border-radius: 10px;
             font-size: 1rem;
             transition: border-color 0.3s ease;
+            background: var(--bg-dark);
+            color: var(--text-primary);
         }
 
-        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+        .form-group input:focus, 
+        .form-group textarea:focus, 
+        .form-group select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
         }
 
         .auth-form {
@@ -331,11 +408,20 @@
 
         /* Dashboard Styles */
         .dashboard {
-            background: white;
+            background: var(--bg-light);
             margin: 2rem 0;
             padding: 3rem;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .dashboard-nav {
@@ -346,18 +432,20 @@
         }
 
         .dashboard-tab {
-            background: #f8f9fa;
-            border: none;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
             padding: 1rem 1.5rem;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
             font-weight: 600;
+            color: var(--text-secondary);
         }
 
         .dashboard-tab.active {
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
+            border-color: var(--primary-color);
         }
 
         .dashboard-content {
@@ -370,16 +458,15 @@
 
         /* Admin Panel Styles */
         .admin-panel {
-            background: white;
+            background: var(--bg-light);
             margin: 2rem 0;
             padding: 3rem;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-            color: #333;
+            border: 1px solid var(--border-color);
         }
 
         .admin-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             color: white;
             padding: 2rem;
             border-radius: 15px;
@@ -387,10 +474,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .admin-header h1 {
-            font-size: 2rem;
         }
 
         .admin-stats {
@@ -401,50 +484,23 @@
         }
 
         .stat-card {
-            background: #f8f9fa;
+            background: var(--bg-dark);
             padding: 1.5rem;
             border-radius: 15px;
             text-align: center;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid var(--primary-color);
+            border: 1px solid var(--border-color);
         }
 
         .stat-number {
             font-size: 2rem;
             font-weight: bold;
-            color: #667eea;
+            color: var(--primary-color);
         }
 
         .stat-label {
-            color: #666;
+            color: var(--text-secondary);
             margin-top: 0.5rem;
-        }
-
-        .admin-nav {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-        }
-
-        .admin-nav-tabs {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .admin-nav-tab {
-            background: white;
-            border: none;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-
-        .admin-nav-tab.active {
-            background: #667eea;
-            color: white;
         }
 
         /* Table Styles */
@@ -452,26 +508,28 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
-            background: white;
+            background: var(--bg-dark);
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
         }
 
         .table th,
         .table td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
         }
 
         .table th {
-            background: #f8f9fa;
+            background: var(--bg-darker);
             font-weight: 600;
+            color: var(--primary-color);
         }
 
         .table tr:hover {
-            background: #f8f9fa;
+            background: var(--bg-light);
         }
 
         /* Status Badges */
@@ -485,55 +543,72 @@
         }
 
         .status-pending {
-            background: #fff3cd;
-            color: #856404;
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
         }
 
         .status-completed {
-            background: #d1edff;
-            color: #0c5460;
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
         }
 
         .status-accepted {
-            background: #d4edda;
-            color: #155724;
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
         }
 
         .status-cancelled {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(220, 53, 69, 0.2);
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
         }
 
         /* Post and Task Cards */
         .post-card, .task-card {
-            background: #f8f9fa;
+            background: var(--bg-dark);
             padding: 1.5rem;
             border-radius: 15px;
             margin-bottom: 1rem;
-            border-left: 4px solid #667eea;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .post-card h4, .task-card h4 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .post-card p, .task-card p {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
         }
 
         /* Loading and Error States */
         .loading {
             text-align: center;
             padding: 2rem;
-            color: #666;
+            color: var(--text-muted);
         }
 
         .error {
-            background: #f8d7da;
-            color: #721c24;
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--error-color);
             padding: 1rem;
             border-radius: 10px;
             margin-bottom: 1rem;
+            border: 1px solid var(--error-color);
         }
 
         .success {
-            background: #d4edda;
-            color: #155724;
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success-color);
             padding: 1rem;
             border-radius: 10px;
             margin-bottom: 1rem;
+            border: 1px solid var(--success-color);
         }
 
         /* Modal Styles */
@@ -543,21 +618,23 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.8);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 10000;
+            backdrop-filter: blur(5px);
         }
 
         .modal-content {
-            background: white;
+            background: var(--bg-light);
             padding: 2rem;
             border-radius: 15px;
             max-width: 600px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
+            border: 1px solid var(--border-color);
         }
 
         .modal-header {
@@ -566,7 +643,11 @@
             align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 1rem;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h3 {
+            color: var(--text-primary);
         }
 
         .close-btn {
@@ -574,7 +655,50 @@
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
-            color: #666;
+            color: var(--text-muted);
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--primary-color);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-darker);
+            border-top: 2px solid var(--primary-color);
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .footer-section h4 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .footer-section p,
+        .footer-section a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            line-height: 1.6;
+        }
+
+        .footer-section a:hover {
+            color: var(--primary-color);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
         }
 
         /* Notification */
@@ -583,15 +707,16 @@
             top: 20px;
             right: 20px;
             padding: 15px 20px;
-            background: #28a745;
+            background: var(--success-color);
             color: white;
             border-radius: 10px;
             z-index: 10000;
             animation: slideInRight 0.3s ease;
+            border-left: 4px solid rgba(255, 255, 255, 0.3);
         }
 
         .notification.error {
-            background: #dc3545;
+            background: var(--error-color);
         }
 
         /* Floating Chat */
@@ -599,14 +724,14 @@
             position: fixed;
             bottom: 2rem;
             right: 2rem;
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
             border: none;
             width: 60px;
             height: 60px;
             border-radius: 50%;
             cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
             transition: all 0.3s ease;
             z-index: 1000;
             font-size: 1.5rem;
@@ -614,7 +739,7 @@
 
         .floating-chat:hover {
             transform: scale(1.1);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 15px 40px rgba(255, 107, 53, 0.4);
         }
 
         /* Animations */
@@ -643,10 +768,11 @@
         /* Mobile Responsive */
         .mobile-menu {
             display: none;
-            background: white;
+            background: none;
             border: none;
             font-size: 1.5rem;
             cursor: pointer;
+            color: var(--text-primary);
         }
 
         @media (max-width: 768px) {
@@ -656,10 +782,10 @@
                 top: 100%;
                 left: 0;
                 right: 0;
-                background: white;
+                background: var(--bg-darker);
                 flex-direction: column;
                 padding: 1rem;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+                border-top: 1px solid var(--border-color);
             }
 
             .nav-links.active {
@@ -703,8 +829,8 @@
                 grid-template-columns: 1fr;
             }
 
-            .admin-nav-tabs {
-                flex-direction: column;
+            .footer-content {
+                grid-template-columns: 1fr;
             }
 
             .table {
@@ -716,21 +842,60 @@
                 padding: 0.5rem;
             }
         }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid var(--bg-light);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* User Avatar */
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
     </style>
 </head>
 <body>
     <header>
         <nav>
-            <div class="logo">HelpLagbe</div>
+            <div class="logo">
+                <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <span style="color: white; font-size: 1.5rem; font-weight: bold;">🔧</span>
+                </div>
+                <div>
+                    <div class="logo-text">HelpLagbe</div>
+                    <div class="logo-tagline">Help Anytime, Anywhere</div>
+                </div>
+            </div>
             <ul class="nav-links" id="navLinks">
-                <li><a onclick="showSection('home')">Home</a></li>
+                <li><a onclick="showSection('home')" class="active">Home</a></li>
                 <li><a onclick="showSection('services')">Services</a></li>
+                <li><a onclick="showSection('about')">About</a></li>
                 <li><a onclick="showSection('auth')" id="authNavLink">Login</a></li>
                 <li><a onclick="showSection('dashboard')" id="dashboardNavLink" style="display: none;">Dashboard</a></li>
             </ul>
             <div class="nav-controls">
-                <button class="admin-access" onclick="showAdminPanel()" id="adminAccessBtn">Admin</button>
-                <button class="lang-switch" onclick="toggleLanguage()">বাংলা</button>
+                <button class="btn btn-primary btn-sm" onclick="showAdminPanel()" id="adminAccessBtn">Admin</button>
+                <button class="btn lang-switch btn-sm" onclick="toggleLanguage()">বাংলা</button>
                 <button class="mobile-menu" onclick="toggleMobileMenu()">☰</button>
             </div>
         </nav>
@@ -741,36 +906,38 @@
             <!-- Home Section -->
             <section id="home" class="section active">
                 <div class="hero">
-                    <h1 id="heroTitle">Find Expert Technicians</h1>
-                    <p id="heroSubtitle">Connect with skilled professionals for all your repair and maintenance needs</p>
-                    <div class="cta-buttons">
-                        <button class="btn btn-primary" onclick="showSection('auth')" id="getStartedBtn">Get Started</button>
-                        <button class="btn btn-secondary" onclick="showSection('services')" id="browseServicesBtn">Browse Services</button>
+                    <div class="hero-content">
+                        <h1 id="heroTitle">Find Expert Technicians</h1>
+                        <p id="heroSubtitle">Connect with skilled professionals for all your repair and maintenance needs across Bangladesh</p>
+                        <div class="cta-buttons">
+                            <button class="btn btn-primary" onclick="showSection('auth')" id="getStartedBtn">Get Started</button>
+                            <button class="btn btn-secondary" onclick="showSection('services')" id="browseServicesBtn">Browse Services</button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="services">
                     <h2 id="servicesTitle">Our Services</h2>
                     <div class="service-grid">
-                        <div class="service-card">
+                        <div class="service-card" onclick="createServiceRequest('appliance')">
                             <div class="service-icon">🔧</div>
                             <h3 id="applianceTitle">Appliance Repair</h3>
-                            <p id="applianceDesc">Fix your home appliances with certified technicians</p>
+                            <p id="applianceDesc">Professional repair services for all home appliances</p>
                         </div>
-                        <div class="service-card">
+                        <div class="service-card" onclick="createServiceRequest('electrical')">
                             <div class="service-icon">⚡</div>
                             <h3 id="electricalTitle">Electrical Work</h3>
-                            <p id="electricalDesc">Professional electrical installation and repair services</p>
+                            <p id="electricalDesc">Licensed electricians for safe installations and repairs</p>
                         </div>
-                        <div class="service-card">
+                        <div class="service-card" onclick="createServiceRequest('plumbing')">
+                            <div class="service-icon">🚿</div>
+                            <h3 id="plumbingTitle">Plumbing</h3>
+                            <p id="plumbingDesc">Expert plumbing solutions for your water systems</p>
+                        </div>
+                        <div class="service-card" onclick="createServiceRequest('maintenance')">
                             <div class="service-icon">🔨</div>
                             <h3 id="maintenanceTitle">General Maintenance</h3>
                             <p id="maintenanceDesc">Complete home and office maintenance solutions</p>
-                        </div>
-                        <div class="service-card">
-                            <div class="service-icon">🚿</div>
-                            <h3 id="plumbingTitle">Plumbing</h3>
-                            <p id="plumbingDesc">Expert plumbing services for your water systems</p>
                         </div>
                     </div>
                 </div>
@@ -784,26 +951,69 @@
                         <div class="service-card" onclick="createServiceRequest('appliance')">
                             <div class="service-icon">🔧</div>
                             <h3>Appliance Repair</h3>
-                            <p>Refrigerators, ACs, Washing Machines, Microwaves</p>
-                            <button class="btn btn-primary">Request Service</button>
+                            <p>Refrigerators, ACs, Washing Machines, Microwaves, and more</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
                         </div>
                         <div class="service-card" onclick="createServiceRequest('electrical')">
                             <div class="service-icon">⚡</div>
                             <h3>Electrical Work</h3>
-                            <p>Wiring, Outlets, Switches, Circuit Breakers</p>
-                            <button class="btn btn-primary">Request Service</button>
+                            <p>Wiring, Outlets, Switches, Circuit Breakers, Installation</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
                         </div>
                         <div class="service-card" onclick="createServiceRequest('plumbing')">
                             <div class="service-icon">🚿</div>
-                            <h3>Plumbing</h3>
-                            <p>Pipes, Faucets, Toilets, Water Heaters</p>
-                            <button class="btn btn-primary">Request Service</button>
+                            <h3>Plumbing Services</h3>
+                            <p>Pipes, Faucets, Toilets, Water Heaters, Drainage</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
                         </div>
                         <div class="service-card" onclick="createServiceRequest('maintenance')">
                             <div class="service-icon">🔨</div>
                             <h3>General Maintenance</h3>
-                            <p>Carpentry, Painting, Cleaning, Repairs</p>
-                            <button class="btn btn-primary">Request Service</button>
+                            <p>Carpentry, Painting, Cleaning, Home Repairs</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
+                        </div>
+                        <div class="service-card" onclick="createServiceRequest('ac')">
+                            <div class="service-icon">❄️</div>
+                            <h3>AC Services</h3>
+                            <p>AC Installation, Repair, Maintenance, Gas Refill</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
+                        </div>
+                        <div class="service-card" onclick="createServiceRequest('electronics')">
+                            <div class="service-icon">📺</div>
+                            <h3>Electronics Repair</h3>
+                            <p>TV, Mobile, Computer, Sound System Repairs</p>
+                            <button class="btn btn-primary" style="margin-top: 1rem;">Request Service</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- About Section -->
+            <section id="about" class="section">
+                <div class="services">
+                    <h2>About HelpLagbe</h2>
+                    <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+                        <p style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                            HelpLagbe is Bangladesh's premier platform connecting customers with verified, skilled technicians. 
+                            We ensure quality service delivery with transparent pricing and reliable professionals.
+                        </p>
+                        
+                        <div class="service-grid" style="margin-top: 3rem;">
+                            <div class="service-card">
+                                <div class="service-icon">✅</div>
+                                <h3>Verified Technicians</h3>
+                                <p>All our technicians are background-checked and skill-verified professionals</p>
+                            </div>
+                            <div class="service-card">
+                                <div class="service-icon">💰</div>
+                                <h3>Transparent Pricing</h3>
+                                <p>Clear, upfront pricing with no hidden charges. Pay only for what you need</p>
+                            </div>
+                            <div class="service-card">
+                                <div class="service-icon">🕒</div>
+                                <h3>24/7 Support</h3>
+                                <p>Round-the-clock customer support for all your service needs</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -820,6 +1030,7 @@
 
                     <!-- Login Form -->
                     <div id="login-form" class="auth-form active">
+                        <h3 style="text-align: center; margin-bottom: 2rem; color: var(--text-primary);">Login to Your Account</h3>
                         <form onsubmit="handleLogin(event)">
                             <div class="form-group">
                                 <label id="emailLabel">Email</label>
@@ -829,15 +1040,16 @@
                                 <label id="passwordLabel">Password</label>
                                 <input type="password" name="password" required>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="loginBtn">Login</button>
+                            <button type="submit" class="btn btn-primary" id="loginBtn" style="width: 100%;">Login</button>
                         </form>
                     </div>
 
                     <!-- Register Form -->
                     <div id="register-form" class="auth-form">
+                        <h3 style="text-align: center; margin-bottom: 2rem; color: var(--text-primary);">Create New Account</h3>
                         <form onsubmit="handleRegister(event)">
                             <div class="form-group">
-                                <label id="usernameLabel">Username</label>
+                                <label id="usernameLabel">Full Name</label>
                                 <input type="text" name="username" required>
                             </div>
                             <div class="form-group">
@@ -845,23 +1057,24 @@
                                 <input type="email" name="email" required>
                             </div>
                             <div class="form-group">
-                                <label id="phoneLabel">Phone</label>
+                                <label id="phoneLabel">Phone Number</label>
                                 <input type="tel" name="phone" required>
                             </div>
                             <div class="form-group">
                                 <label id="regPasswordLabel">Password</label>
-                                <input type="password" name="password" required>
+                                <input type="password" name="password" required minlength="6">
                             </div>
                             <div class="form-group">
                                 <label id="addressLabel">Address</label>
                                 <textarea name="address" rows="3" required></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="registerBtn">Register</button>
+                            <button type="submit" class="btn btn-primary" id="registerBtn" style="width: 100%;">Create Account</button>
                         </form>
                     </div>
 
                     <!-- Technician Form -->
                     <div id="technician-form" class="auth-form">
+                        <h3 style="text-align: center; margin-bottom: 2rem; color: var(--text-primary);">Join as Technician</h3>
                         <form onsubmit="handleTechnicianRegister(event)">
                             <div class="form-group">
                                 <label id="fullNameLabel">Full Name</label>
@@ -876,18 +1089,19 @@
                                 <input type="email" name="email" required>
                             </div>
                             <div class="form-group">
-                                <label id="techPhoneLabel">Phone</label>
+                                <label id="techPhoneLabel">Phone Number</label>
                                 <input type="tel" name="phone" required>
                             </div>
                             <div class="form-group">
-                                <label id="skillsLabel">Skills</label>
-                                <textarea name="skills" rows="4" placeholder="Describe your technical skills and experience" required></textarea>
+                                <label id="skillsLabel">Skills & Experience</label>
+                                <textarea name="skills" rows="4" placeholder="Describe your technical skills and experience in detail" required></textarea>
                             </div>
                             <div class="form-group">
-                                <label id="documentsLabel">Required Documents</label>
+                                <label id="documentsLabel">Upload Documents (NID, Certificates)</label>
                                 <input type="file" name="documents" multiple accept=".pdf,.jpg,.png">
+                                <small style="color: var(--text-muted);">Upload your NID copy and any relevant certificates</small>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="applyBtn">Apply as Technician</button>
+                            <button type="submit" class="btn btn-primary" id="applyBtn" style="width: 100%;">Submit Application</button>
                         </form>
                     </div>
                 </div>
@@ -896,61 +1110,93 @@
             <!-- Dashboard Section -->
             <section id="dashboard" class="section">
                 <div class="dashboard">
+                    <div class="dashboard-header">
+                        <h2 style="color: var(--text-primary);">Dashboard</h2>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span style="color: var(--text-secondary);">Welcome back!</span>
+                            <div class="user-avatar" id="userAvatar">U</div>
+                        </div>
+                    </div>
+                    
                     <div class="dashboard-nav">
                         <button class="dashboard-tab active" onclick="showDashboardTab('posts')" id="postsTab">My Posts</button>
-                        <button class="dashboard-tab" onclick="showDashboardTab('tasks')" id="tasksTab">Tasks</button>
+                        <button class="dashboard-tab" onclick="showDashboardTab('tasks')" id="tasksTab">Available Tasks</button>
                         <button class="dashboard-tab" onclick="showDashboardTab('create')" id="createTab">Create Post</button>
                         <button class="dashboard-tab" onclick="showDashboardTab('profile')" id="profileTab">Profile</button>
+                        <button class="dashboard-tab" onclick="showDashboardTab('history')" id="historyTab">History</button>
                     </div>
 
                     <!-- Posts Tab -->
                     <div id="posts-content" class="dashboard-content active">
-                        <h3 id="yourPostsTitle">Your Posts</h3>
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Your Service Requests</h3>
                         <div id="posts-container">
-                            <div class="loading">Loading posts...</div>
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading your posts...</p>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Tasks Tab -->
                     <div id="tasks-content" class="dashboard-content">
-                        <h3 id="availableTasksTitle">Available Tasks</h3>
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Available Tasks</h3>
                         <div id="tasks-container">
-                            <div class="loading">Loading tasks...</div>
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading available tasks...</p>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Create Post Tab -->
                     <div id="create-content" class="dashboard-content">
-                        <h3 id="createNewPostTitle">Create New Post</h3>
+                        <h3 style="color: var(--text-primary); margin-bottom: 2rem;">Create Service Request</h3>
                         <form onsubmit="handleCreatePost(event)">
                             <div class="form-group">
                                 <label id="categoryLabel">Service Category</label>
                                 <select name="category" required>
-                                    <option value="">Select Category</option>
+                                    <option value="">Select a service category</option>
                                     <option value="appliance">Appliance Repair</option>
                                     <option value="electrical">Electrical Work</option>
-                                    <option value="plumbing">Plumbing</option>
+                                    <option value="plumbing">Plumbing Services</option>
                                     <option value="maintenance">General Maintenance</option>
+                                    <option value="ac">AC Services</option>
+                                    <option value="electronics">Electronics Repair</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label id="descriptionLabel">Problem Description</label>
-                                <textarea name="description" rows="4" placeholder="Describe your problem in detail" required></textarea>
+                                <textarea name="description" rows="4" placeholder="Describe your problem in detail. Include location, urgency, and any specific requirements." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Preferred Date & Time</label>
+                                <input type="datetime-local" name="preferredTime" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Budget Range (৳)</label>
+                                <select name="budget" required>
+                                    <option value="">Select budget range</option>
+                                    <option value="500-1000">৳500 - ৳1,000</option>
+                                    <option value="1000-2000">৳1,000 - ৳2,000</option>
+                                    <option value="2000-5000">৳2,000 - ৳5,000</option>
+                                    <option value="5000+">৳5,000+</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label id="imagesLabel">Upload Images</label>
                                 <input type="file" name="images" multiple accept="image/*">
+                                <small style="color: var(--text-muted);">Upload photos of the problem to help technicians understand better</small>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="postRequestBtn">Post Request</button>
+                            <button type="submit" class="btn btn-primary" id="postRequestBtn" style="width: 100%;">Submit Service Request</button>
                         </form>
                     </div>
 
                     <!-- Profile Tab -->
                     <div id="profile-content" class="dashboard-content">
-                        <h3 id="profileSettingsTitle">Profile Settings</h3>
+                        <h3 style="color: var(--text-primary); margin-bottom: 2rem;">Profile Settings</h3>
                         <form onsubmit="handleProfileUpdate(event)" id="profile-form">
                             <div class="form-group">
-                                <label id="profileUsernameLabel">Username</label>
+                                <label id="profileUsernameLabel">Full Name</label>
                                 <input type="text" name="username" required>
                             </div>
                             <div class="form-group">
@@ -958,15 +1204,30 @@
                                 <input type="email" name="email" required>
                             </div>
                             <div class="form-group">
-                                <label id="profilePhoneLabel">Phone</label>
+                                <label id="profilePhoneLabel">Phone Number</label>
                                 <input type="tel" name="phone" required>
                             </div>
                             <div class="form-group">
                                 <label id="profileAddressLabel">Address</label>
                                 <textarea name="address" rows="3" required></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary" id="updateProfileBtn">Update Profile</button>
+                            <div class="form-group">
+                                <label>Change Password</label>
+                                <input type="password" name="newPassword" placeholder="Leave blank to keep current password">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="updateProfileBtn" style="width: 100%;">Update Profile</button>
                         </form>
+                    </div>
+
+                    <!-- History Tab -->
+                    <div id="history-content" class="dashboard-content">
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Service History</h3>
+                        <div id="history-container">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                <p>Loading service history...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -977,21 +1238,18 @@
                     <!-- Admin Login -->
                     <div id="admin-login" class="admin-section active">
                         <div class="auth-section" style="max-width: 400px; margin: 0 auto;">
-                            <h2 style="text-align: center; margin-bottom: 2rem; color: #667eea;">Admin Login</h2>
+                            <h2 style="text-align: center; margin-bottom: 2rem; color: var(--primary-color);">Admin Access</h2>
                             <form onsubmit="handleAdminLogin(event)">
                                 <div class="form-group">
-                                    <label>Username</label>
+                                    <label>Admin Username</label>
                                     <input type="text" name="username" required>
                                 </div>
                                 <div class="form-group">
                                     <label>Password</label>
                                     <input type="password" name="password" required>
                                 </div>
-                                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+                                <button type="submit" class="btn btn-primary" style="width: 100%;">Login to Admin Panel</button>
                             </form>
-                            <div style="margin-top: 1rem; text-align: center; color: #666; font-size: 0.9rem;">
-                                Demo credentials: admin / admin123
-                            </div>
                         </div>
                     </div>
 
@@ -1013,98 +1271,97 @@
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="total-technicians">0</div>
-                                <div class="stat-label">Total Technicians</div>
+                                <div class="stat-label">Verified Technicians</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="total-posts">0</div>
-                                <div class="stat-label">Total Posts</div>
+                                <div class="stat-label">Service Requests</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="total-tasks">0</div>
-                                <div class="stat-label">Total Tasks</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="completed-tasks">0</div>
                                 <div class="stat-label">Completed Tasks</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-number" id="pending-tasks">0</div>
-                                <div class="stat-label">Pending Tasks</div>
+                                <div class="stat-number" id="revenue">৳0</div>
+                                <div class="stat-label">Total Revenue</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="pending-approval">0</div>
+                                <div class="stat-label">Pending Approvals</div>
                             </div>
                         </div>
 
                         <!-- Admin Navigation -->
-                        <div class="admin-nav">
-                            <div class="admin-nav-tabs">
-                                <button class="admin-nav-tab active" onclick="showAdminTab('overview')" id="overview-tab">Overview</button>
-                                <button class="admin-nav-tab" onclick="showAdminTab('users')" id="users-tab">Users</button>
-                                <button class="admin-nav-tab" onclick="showAdminTab('technicians')" id="technicians-tab">Technicians</button>
-                                <button class="admin-nav-tab" onclick="showAdminTab('admin-posts')" id="admin-posts-tab">Posts</button>
-                                <button class="admin-nav-tab" onclick="showAdminTab('admin-tasks')" id="admin-tasks-tab">Tasks</button>
-                            </div>
+                        <div class="dashboard-nav">
+                            <button class="dashboard-tab active" onclick="showAdminTab('overview')" id="overview-tab">Overview</button>
+                            <button class="dashboard-tab" onclick="showAdminTab('users')" id="users-tab">Users</button>
+                            <button class="dashboard-tab" onclick="showAdminTab('technicians')" id="technicians-tab">Technicians</button>
+                            <button class="dashboard-tab" onclick="showAdminTab('admin-posts')" id="admin-posts-tab">Service Requests</button>
+                            <button class="dashboard-tab" onclick="showAdminTab('admin-tasks')" id="admin-tasks-tab">Tasks</button>
+                            <button class="dashboard-tab" onclick="showAdminTab('approvals')" id="approvals-tab">Approvals</button>
                         </div>
 
                         <!-- Admin Content Areas -->
-                        <div id="admin-overview-content" class="admin-content active">
-                            <h3>System Overview</h3>
-                            <div class="admin-stats">
-                                <div class="stat-card">
-                                    <div class="stat-number">95%</div>
-                                    <div class="stat-label">System Uptime</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-number">24</div>
-                                    <div class="stat-label">Active Sessions</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-number">12</div>
-                                    <div class="stat-label">Tasks Today</div>
-                                </div>
-                            </div>
+                        <div id="admin-overview-content" class="dashboard-content active">
+                            <h3 style="color: var(--text-primary);">System Overview</h3>
                             <div style="margin-top: 2rem;">
-                                <h4>Recent Activities</h4>
+                                <h4 style="color: var(--text-primary); margin-bottom: 1rem;">Recent Activities</h4>
                                 <div id="recent-activities">
-                                    <div class="post-card">
-                                        <p><strong>New user registration:</strong> john@example.com</p>
-                                        <small>2 minutes ago</small>
-                                    </div>
-                                    <div class="post-card">
-                                        <p><strong>Task completed:</strong> Electrical repair in Dhaka</p>
-                                        <small>15 minutes ago</small>
-                                    </div>
-                                    <div class="post-card">
-                                        <p><strong>New technician application:</strong> Ahmed Rahman</p>
-                                        <small>1 hour ago</small>
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                        <p>Loading recent activities...</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="admin-users-content" class="admin-content">
-                            <h3>All Users</h3>
+                        <div id="admin-users-content" class="dashboard-content">
+                            <h3 style="color: var(--text-primary);">Manage Users</h3>
                             <div id="admin-users-container">
-                                <div class="loading">Loading users...</div>
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <p>Loading users...</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div id="admin-technicians-content" class="admin-content">
-                            <h3>All Technicians</h3>
+                        <div id="admin-technicians-content" class="dashboard-content">
+                            <h3 style="color: var(--text-primary);">Manage Technicians</h3>
                             <div id="admin-technicians-container">
-                                <div class="loading">Loading technicians...</div>
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <p>Loading technicians...</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div id="admin-posts-content" class="admin-content">
-                            <h3>All Posts</h3>
+                        <div id="admin-posts-content" class="dashboard-content">
+                            <h3 style="color: var(--text-primary);">Service Requests</h3>
                             <div id="admin-posts-container">
-                                <div class="loading">Loading posts...</div>
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <p>Loading service requests...</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div id="admin-tasks-content" class="admin-content">
-                            <h3>All Tasks</h3>
+                        <div id="admin-tasks-content" class="dashboard-content">
+                            <h3 style="color: var(--text-primary);">Task Management</h3>
                             <div id="admin-tasks-container">
-                                <div class="loading">Loading tasks...</div>
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <p>Loading tasks...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="approvals-content" class="dashboard-content">
+                            <h3 style="color: var(--text-primary);">Pending Approvals</h3>
+                            <div id="admin-approvals-container">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <p>Loading pending approvals...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1113,18 +1370,52 @@
         </div>
     </main>
 
-    <!-- Modal for User Details -->
-    <div id="user-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>User Details</h3>
-                <button class="close-btn" onclick="closeUserModal()">&times;</button>
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="logo" style="margin-bottom: 1rem;">
+                        <div style="width: 40px; height: 40px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <span style="color: white; font-size: 1.5rem; font-weight: bold;">🔧</span>
+                        </div>
+                        <div>
+                            <div class="logo-text">HelpLagbe</div>
+                            <div class="logo-tagline">Help Anytime, Anywhere</div>
+                        </div>
+                    </div>
+                    <p>Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed.</p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Services</h4>
+                    <p><a href="#" onclick="createServiceRequest('appliance')">Appliance Repair</a></p>
+                    <p><a href="#" onclick="createServiceRequest('electrical')">Electrical Work</a></p>
+                    <p><a href="#" onclick="createServiceRequest('plumbing')">Plumbing Services</a></p>
+                    <p><a href="#" onclick="createServiceRequest('maintenance')">General Maintenance</a></p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Company</h4>
+                    <p><a href="#" onclick="showSection('about')">About Us</a></p>
+                    <p><a href="#" onclick="showSection('services')">Our Services</a></p>
+                    <p><a href="#" onclick="showSection('auth')">Join as Technician</a></p>
+                    <p><a href="#" onclick="showAdminPanel()">Admin Access</a></p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <p>📞 +880 1XXX-XXXXXX</p>
+                    <p>✉️ support@helplagbe.com</p>
+                    <p>📍 Dhaka, Bangladesh</p>
+                    <p>🕒 24/7 Customer Support</p>
+                </div>
             </div>
-            <div id="user-modal-content">
-                <div class="loading">Loading user details...</div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 HelpLagbe. All rights reserved. | Privacy Policy | Terms of Service</p>
             </div>
         </div>
-    </div>
+    </footer>
 
     <!-- Modal for Bid Details -->
     <div id="bid-modal" class="modal">
@@ -1134,7 +1425,26 @@
                 <button class="close-btn" onclick="closeBidModal()">&times;</button>
             </div>
             <div id="bid-modal-content">
-                <div class="loading">Loading bid details...</div>
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading bid details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Service Details -->
+    <div id="service-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Service Details</h3>
+                <button class="close-btn" onclick="closeServiceModal()">&times;</button>
+            </div>
+            <div id="service-modal-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading service details...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1143,7 +1453,7 @@
 
     <script>
         // Configuration
-        const API_BASE_URL = '/helplagbe/api'; // Adjust this to your API path
+        const API_BASE_URL = '/api'; // Update this to your actual API endpoint
         let currentLanguage = 'en';
         let isLoggedIn = false;
         let isAdminLoggedIn = false;
@@ -1154,187 +1464,113 @@
         const translations = {
             en: {
                 heroTitle: "Find Expert Technicians",
-                heroSubtitle: "Connect with skilled professionals for all your repair and maintenance needs",
+                heroSubtitle: "Connect with skilled professionals for all your repair and maintenance needs across Bangladesh",
                 getStartedBtn: "Get Started",
                 browseServicesBtn: "Browse Services",
                 servicesTitle: "Our Services",
                 servicesPageTitle: "Available Services",
                 applianceTitle: "Appliance Repair",
-                applianceDesc: "Fix your home appliances with certified technicians",
+                applianceDesc: "Professional repair services for all home appliances",
                 electricalTitle: "Electrical Work",
-                electricalDesc: "Professional electrical installation and repair services",
+                electricalDesc: "Licensed electricians for safe installations and repairs",
                 maintenanceTitle: "General Maintenance",
                 maintenanceDesc: "Complete home and office maintenance solutions",
                 plumbingTitle: "Plumbing",
-                plumbingDesc: "Expert plumbing services for your water systems",
+                plumbingDesc: "Expert plumbing solutions for your water systems",
                 loginTab: "Login",
                 registerTab: "Register",
                 technicianTab: "Join as Technician",
                 emailLabel: "Email",
                 passwordLabel: "Password",
                 loginBtn: "Login",
-                usernameLabel: "Username",
-                phoneLabel: "Phone",
+                usernameLabel: "Full Name",
+                phoneLabel: "Phone Number",
                 addressLabel: "Address",
-                registerBtn: "Register",
+                registerBtn: "Create Account",
                 fullNameLabel: "Full Name",
                 nationalIdLabel: "National ID",
-                skillsLabel: "Skills",
-                documentsLabel: "Required Documents",
-                applyBtn: "Apply as Technician",
+                skillsLabel: "Skills & Experience",
+                documentsLabel: "Upload Documents",
+                applyBtn: "Submit Application",
                 postsTab: "My Posts",
-                tasksTab: "Tasks",
+                tasksTab: "Available Tasks",
                 createTab: "Create Post",
                 profileTab: "Profile",
-                yourPostsTitle: "Your Posts",
-                availableTasksTitle: "Available Tasks",
-                createNewPostTitle: "Create New Post",
-                profileSettingsTitle: "Profile Settings",
+                historyTab: "History",
                 categoryLabel: "Service Category",
                 descriptionLabel: "Problem Description",
                 imagesLabel: "Upload Images",
-                postRequestBtn: "Post Request",
+                postRequestBtn: "Submit Service Request",
                 updateProfileBtn: "Update Profile"
             },
             bn: {
                 heroTitle: "দক্ষ কারিগর খুঁজুন",
-                heroSubtitle: "আপনার সকল মেরামত ও রক্ষণাবেক্ষণের জন্য দক্ষ পেশাদারদের সাথে যোগাযোগ করুন",
+                heroSubtitle: "বাংলাদেশ জুড়ে আপনার সকল মেরামত ও রক্ষণাবেক্ষণের জন্য দক্ষ পেশাদারদের সাথে যোগাযোগ করুন",
                 getStartedBtn: "শুরু করুন",
                 browseServicesBtn: "সেবা দেখুন",
                 servicesTitle: "আমাদের সেবা",
                 servicesPageTitle: "উপলব্ধ সেবা",
                 applianceTitle: "যন্ত্র মেরামত",
-                applianceDesc: "প্রত্যয়িত কারিগরদের সাথে আপনার ঘরের যন্ত্র মেরামত করুন",
+                applianceDesc: "সকল ঘরোয়া যন্ত্রের জন্য পেশাদার মেরামত সেবা",
                 electricalTitle: "বৈদ্যুতিক কাজ",
-                electricalDesc: "পেশাদার বৈদ্যুতিক স্থাপনা ও মেরামত সেবা",
+                electricalDesc: "নিরাপদ স্থাপনা ও মেরামতের জন্য লাইসেন্সপ্রাপ্ত ইলেকট্রিশিয়ান",
                 maintenanceTitle: "সাধারণ রক্ষণাবেক্ষণ",
                 maintenanceDesc: "সম্পূর্ণ বাড়ি ও অফিস রক্ষণাবেক্ষণ সমাধান",
                 plumbingTitle: "নলসাজি",
-                plumbingDesc: "আপনার পানি ব্যবস্থার জন্য বিশেষজ্ঞ নলসাজি সেবা",
+                plumbingDesc: "আপনার পানি ব্যবস্থার জন্য বিশেষজ্ঞ নলসাজি সমাধান",
                 loginTab: "লগইন",
                 registerTab: "রেজিস্টার",
                 technicianTab: "কারিগর হিসেবে যোগদান",
                 emailLabel: "ইমেইল",
                 passwordLabel: "পাসওয়ার্ড",
                 loginBtn: "লগইন",
-                usernameLabel: "ব্যবহারকারীর নাম",
-                phoneLabel: "ফোন",
+                usernameLabel: "পূর্ণ নাম",
+                phoneLabel: "ফোন নম্বর",
                 addressLabel: "ঠিকানা",
-                registerBtn: "রেজিস্টার",
+                registerBtn: "অ্যাকাউন্ট তৈরি করুন",
                 fullNameLabel: "পূর্ণ নাম",
                 nationalIdLabel: "জাতীয় পরিচয়পত্র",
-                skillsLabel: "দক্ষতা",
-                documentsLabel: "কাগজপত্র",
-                applyBtn: "কারিগর হিসেবে আবেদন",
+                skillsLabel: "দক্ষতা ও অভিজ্ঞতা",
+                documentsLabel: "কাগজপত্র আপলোড করুন",
+                applyBtn: "আবেদন জমা দিন",
                 postsTab: "আমার পোস্ট",
-                tasksTab: "কাজ",
-                createTab: "পোস্ট তৈরি",
+                tasksTab: "উপলব্ধ কাজ",
+                createTab: "পোস্ট তৈরি করুন",
                 profileTab: "প্রোফাইল",
-                yourPostsTitle: "আপনার পোস্ট",
-                availableTasksTitle: "উপলব্ধ কাজ",
-                createNewPostTitle: "নতুন পোস্ট তৈরি",
-                profileSettingsTitle: "প্রোফাইল সেটিংস",
+                historyTab: "ইতিহাস",
                 categoryLabel: "সেবার ধরন",
                 descriptionLabel: "সমস্যার বিবরণ",
-                imagesLabel: "ছবি আপলোড",
-                postRequestBtn: "অনুরোধ পোস্ট করুন",
-                updateProfileBtn: "প্রোফাইল আপডেট"
+                imagesLabel: "ছবি আপলোড করুন",
+                postRequestBtn: "সেবার অনুরোধ জমা দিন",
+                updateProfileBtn: "প্রোফাইল আপডেট করুন"
             }
         };
 
         // API Helper Functions
         async function apiCall(endpoint, method = 'GET', data = null) {
             try {
-                // For demo purposes, simulate API calls with mock data
-                console.log('API Call:', endpoint, method, data);
-                
-                // Simulate network delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Mock API responses
-                if (endpoint.includes('auth.php')) {
-                    if (data?.action === 'login') {
-                        if (data.email === 'demo@example.com' && data.password === 'demo123') {
-                            return { success: true, data: { user_id: 1, username: 'demo_user', email: 'demo@example.com', is_technician: 0 } };
-                        } else {
-                            return { success: false, message: 'Invalid credentials' };
-                        }
+                const config = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     }
-                    if (data?.action === 'register') {
-                        return { success: true, data: { user_id: Date.now(), username: data.username, email: data.email, is_technician: 0 } };
-                    }
-                    if (data?.action === 'technician_register') {
-                        return { success: true, message: 'Application submitted successfully' };
-                    }
+                };
+
+                if (data && method !== 'GET') {
+                    config.body = JSON.stringify(data);
                 }
+
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
                 
-                // Mock admin API responses
-                if (endpoint.includes('admin.php')) {
-                    if (data?.action === 'admin_login') {
-                        if (data.username === 'admin' && data.password === 'admin123') {
-                            return { success: true, data: { username: 'admin', role: 'admin' } };
-                        } else {
-                            return { success: false, message: 'Invalid admin credentials' };
-                        }
-                    }
-                    
-                    if (endpoint.includes('dashboard_stats')) {
-                        return {
-                            success: true,
-                            data: {
-                                total_users: mockData.users.length,
-                                total_technicians: mockData.technicians.length,
-                                total_posts: mockData.posts.length,
-                                total_tasks: mockData.tasks.length,
-                                completed_tasks: mockData.tasks.filter(t => t.task_status === 'completed').length,
-                                pending_tasks: mockData.tasks.filter(t => t.task_status === 'pending').length
-                            }
-                        };
-                    }
-                    
-                    if (endpoint.includes('all_users')) {
-                        return { success: true, data: mockData.users };
-                    }
-                    
-                    if (endpoint.includes('all_technicians')) {
-                        return { success: true, data: mockData.technicians };
-                    }
-                    
-                    if (endpoint.includes('all_posts')) {
-                        return { success: true, data: mockData.posts };
-                    }
-                    
-                    if (endpoint.includes('all_tasks')) {
-                        return { success: true, data: mockData.tasks };
-                    }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
-                // Mock posts API responses
-                if (endpoint.includes('posts.php')) {
-                    if (endpoint.includes('user_posts')) {
-                        return { success: true, data: mockData.posts.slice(0, 2) };
-                    }
-                    if (endpoint.includes('available_tasks')) {
-                        return { success: true, data: mockData.posts };
-                    }
-                    if (endpoint.includes('post_bids')) {
-                        return { success: true, data: mockData.bids };
-                    }
-                    if (data?.action === 'create_post') {
-                        return { success: true, message: 'Post created successfully' };
-                    }
-                    if (data?.action === 'submit_bid') {
-                        return { success: true, message: 'Bid submitted successfully' };
-                    }
-                    if (data?.action === 'accept_bid') {
-                        return { success: true, message: 'Bid accepted successfully' };
-                    }
-                }
-                
-                return { success: false, message: 'API endpoint not found' };
+
+                return await response.json();
             } catch (error) {
                 console.error('API call error:', error);
-                return { success: false, message: 'Network error' };
+                throw error;
             }
         }
 
@@ -1359,6 +1595,16 @@
 
         // Navigation functions
         function showSection(sectionName) {
+            // Remove active class from all nav links
+            const navLinks = document.querySelectorAll('.nav-links a');
+            navLinks.forEach(link => link.classList.remove('active'));
+
+            // Add active class to current nav link
+            const currentLink = document.querySelector(`.nav-links a[onclick="showSection('${sectionName}')"]`);
+            if (currentLink) {
+                currentLink.classList.add('active');
+            }
+
             // Hide all sections
             const sections = document.querySelectorAll('.section');
             sections.forEach(section => {
@@ -1399,6 +1645,12 @@
                 authNavLink.textContent = currentLanguage === 'en' ? 'Logout' : 'লগআউট';
                 authNavLink.onclick = logout;
                 dashboardNavLink.style.display = 'block';
+
+                // Update user avatar
+                const userAvatar = document.getElementById('userAvatar');
+                if (userAvatar && userData.username) {
+                    userAvatar.textContent = userData.username.charAt(0).toUpperCase();
+                }
             } else {
                 authNavLink.textContent = currentLanguage === 'en' ? 'Login' : 'লগইন';
                 authNavLink.onclick = () => showSection('auth');
@@ -1435,13 +1687,13 @@
             const formData = new FormData(event.target);
             
             const data = {
-                action: 'admin_login',
                 username: formData.get('username'),
                 password: formData.get('password')
             };
 
             try {
-                const result = await apiCall('/admin.php', 'POST', data);
+                showNotification('Connecting to admin panel...', 'info');
+                const result = await apiCall('/admin/login', 'POST', data);
                 
                 if (result.success) {
                     isAdminLoggedIn = true;
@@ -1451,10 +1703,11 @@
                     loadAdminStats();
                     showNotification('Admin login successful!');
                 } else {
-                    showNotification(result.message, 'error');
+                    showNotification(result.message || 'Invalid admin credentials', 'error');
                 }
             } catch (error) {
-                showNotification('Login failed: ' + error.message, 'error');
+                showNotification('Failed to connect to admin panel. Please check your connection.', 'error');
+                console.error('Admin login error:', error);
             }
         }
 
@@ -1467,35 +1720,39 @@
 
         async function loadAdminStats() {
             try {
-                const result = await apiCall('/admin.php?action=dashboard_stats');
+                const result = await apiCall('/admin/stats');
                 
                 if (result.success) {
                     const stats = result.data;
-                    document.getElementById('total-users').textContent = stats.total_users;
-                    document.getElementById('total-technicians').textContent = stats.total_technicians;
-                    document.getElementById('total-posts').textContent = stats.total_posts;
-                    document.getElementById('total-tasks').textContent = stats.total_tasks;
-                    document.getElementById('completed-tasks').textContent = stats.completed_tasks;
-                    document.getElementById('pending-tasks').textContent = stats.pending_tasks;
+                    document.getElementById('total-users').textContent = stats.total_users || 0;
+                    document.getElementById('total-technicians').textContent = stats.total_technicians || 0;
+                    document.getElementById('total-posts').textContent = stats.total_posts || 0;
+                    document.getElementById('total-tasks').textContent = stats.total_tasks || 0;
+                    document.getElementById('revenue').textContent = `৳${stats.revenue || 0}`;
+                    document.getElementById('pending-approval').textContent = stats.pending_approval || 0;
                 }
             } catch (error) {
                 console.error('Failed to load admin stats:', error);
+                showNotification('Failed to load admin statistics', 'error');
             }
         }
 
         function showAdminTab(tabName) {
             // Update tab buttons
-            const tabs = document.querySelectorAll('.admin-nav-tab');
+            const tabs = document.querySelectorAll('.dashboard-tab');
             tabs.forEach(tab => tab.classList.remove('active'));
-            document.getElementById(`${tabName === 'overview' ? 'overview' : tabName}-tab`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
 
             // Show tab content
-            const contents = document.querySelectorAll('.admin-content');
+            const contents = document.querySelectorAll('.dashboard-content');
             contents.forEach(content => content.classList.remove('active'));
             document.getElementById(`admin-${tabName}-content`).classList.add('active');
 
             // Load data for the tab
             switch (tabName) {
+                case 'overview':
+                    loadAdminOverview();
+                    break;
                 case 'users':
                     loadAdminUsers();
                     break;
@@ -1508,48 +1765,73 @@
                 case 'admin-tasks':
                     loadAdminTasks();
                     break;
+                case 'approvals':
+                    loadPendingApprovals();
+                    break;
             }
         }
 
         // Admin data loading functions
-        async function loadAdminUsers() {
-            const container = document.getElementById('admin-users-container');
-            container.innerHTML = '<div class="loading">Loading users...</div>';
+        async function loadAdminOverview() {
+            const container = document.getElementById('recent-activities');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading recent activities...</p></div>';
 
             try {
-                const result = await apiCall('/admin.php?action=all_users');
+                const result = await apiCall('/admin/recent-activities');
                 
-                if (result.success) {
-                    const users = result.data;
-                    
+                if (result.success && result.data.length > 0) {
+                    container.innerHTML = result.data.map(activity => `
+                        <div class="post-card">
+                            <p><strong>${activity.type}:</strong> ${activity.description}</p>
+                            <small style="color: var(--text-muted);">${new Date(activity.timestamp).toLocaleString()}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-muted);">No recent activities found.</p>';
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="error">Failed to load recent activities</div>';
+            }
+        }
+
+        async function loadAdminUsers() {
+            const container = document.getElementById('admin-users-container');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading users...</p></div>';
+
+            try {
+                const result = await apiCall('/admin/users');
+                
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = `
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Username</th>
+                                    <th>Name</th>
                                     <th>Email</th>
                                     <th>Phone</th>
                                     <th>Posts</th>
-                                    <th>Type</th>
+                                    <th>Join Date</th>
+                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${users.map(user => `
+                                ${result.data.map(user => `
                                     <tr>
-                                        <td>${user.user_id}</td>
-                                        <td>${user.username}</td>
+                                        <td>${user.id}</td>
+                                        <td>${user.name}</td>
                                         <td>${user.email}</td>
-                                        <td>${user.phone_no || 'N/A'}</td>
-                                        <td>${user.post_count}</td>
+                                        <td>${user.phone || 'N/A'}</td>
+                                        <td>${user.posts_count || 0}</td>
+                                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
                                         <td>
-                                            <span class="status-badge ${user.is_technician > 0 ? 'status-accepted' : 'status-pending'}">
-                                                ${user.is_technician > 0 ? 'Technician' : 'Customer'}
+                                            <span class="status-badge ${user.status === 'active' ? 'status-accepted' : 'status-pending'}">
+                                                ${user.status.toUpperCase()}
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" onclick="viewUserDetails(${user.user_id})">
+                                            <button class="btn btn-sm btn-primary" onclick="viewUserDetails(${user.id})">
                                                 View Details
                                             </button>
                                         </td>
@@ -1559,23 +1841,21 @@
                         </table>
                     `;
                 } else {
-                    container.innerHTML = `<div class="error">Error: ${result.message}</div>`;
+                    container.innerHTML = '<p style="color: var(--text-muted);">No users found.</p>';
                 }
             } catch (error) {
-                container.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Failed to load users</div>';
             }
         }
 
         async function loadAdminTechnicians() {
             const container = document.getElementById('admin-technicians-container');
-            container.innerHTML = '<div class="loading">Loading technicians...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading technicians...</p></div>';
 
             try {
-                const result = await apiCall('/admin.php?action=all_technicians');
+                const result = await apiCall('/admin/technicians');
                 
-                if (result.success) {
-                    const technicians = result.data;
-                    
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = `
                         <table class="table">
                             <thead>
@@ -1585,27 +1865,29 @@
                                     <th>Email</th>
                                     <th>Phone</th>
                                     <th>Skills</th>
-                                    <th>Tasks</th>
-                                    <th>Completion Rate</th>
+                                    <th>Completed Tasks</th>
+                                    <th>Rating</th>
+                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${technicians.map(tech => `
+                                ${result.data.map(tech => `
                                     <tr>
-                                        <td>${tech.technician_id}</td>
-                                        <td>${tech.Full_Name}</td>
+                                        <td>${tech.id}</td>
+                                        <td>${tech.name}</td>
                                         <td>${tech.email}</td>
-                                        <td>${tech.phone_no || 'N/A'}</td>
-                                        <td title="${tech.Skill_details}">${tech.Skill_details.substring(0, 30)}...</td>
-                                        <td>${tech.task_count}</td>
+                                        <td>${tech.phone}</td>
+                                        <td title="${tech.skills}">${tech.skills.substring(0, 30)}...</td>
+                                        <td>${tech.completed_tasks || 0}</td>
+                                        <td>${tech.rating || 'N/A'}/5</td>
                                         <td>
-                                            <span class="status-badge ${tech.completion_rate >= 90 ? 'status-accepted' : tech.completion_rate >= 70 ? 'status-pending' : 'status-cancelled'}">
-                                                ${Math.round(tech.completion_rate || 0)}%
+                                            <span class="status-badge ${tech.status === 'verified' ? 'status-accepted' : 'status-pending'}">
+                                                ${tech.status.toUpperCase()}
                                             </span>
                                         </td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" onclick="viewTechnicianDetails(${tech.technician_id})">
+                                            <button class="btn btn-sm btn-primary" onclick="viewTechnicianDetails(${tech.id})">
                                                 View Profile
                                             </button>
                                         </td>
@@ -1615,31 +1897,30 @@
                         </table>
                     `;
                 } else {
-                    container.innerHTML = `<div class="error">Error: ${result.message}</div>`;
+                    container.innerHTML = '<p style="color: var(--text-muted);">No technicians found.</p>';
                 }
             } catch (error) {
-                container.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Failed to load technicians</div>';
             }
         }
 
         async function loadAdminPosts() {
             const container = document.getElementById('admin-posts-container');
-            container.innerHTML = '<div class="loading">Loading posts...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading service requests...</p></div>';
 
             try {
-                const result = await apiCall('/admin.php?action=all_posts');
+                const result = await apiCall('/admin/posts');
                 
-                if (result.success) {
-                    const posts = result.data;
-                    
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = `
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Posted By</th>
+                                    <th>Customer</th>
                                     <th>Category</th>
                                     <th>Description</th>
+                                    <th>Budget</th>
                                     <th>Bids</th>
                                     <th>Status</th>
                                     <th>Date</th>
@@ -1647,23 +1928,24 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                ${posts.map(post => `
+                                ${result.data.map(post => `
                                     <tr>
-                                        <td>${post.post_id}</td>
-                                        <td>${post.posted_by}</td>
+                                        <td>${post.id}</td>
+                                        <td>${post.customer_name}</td>
                                         <td>
-                                            <span class="status-badge status-pending">${post.Category}</span>
+                                            <span class="status-badge status-pending">${post.category}</span>
                                         </td>
-                                        <td title="${post.Post_detail}">${post.Post_detail.substring(0, 40)}...</td>
-                                        <td>${post.bid_count}</td>
+                                        <td title="${post.description}">${post.description.substring(0, 40)}...</td>
+                                        <td>${post.budget}</td>
+                                        <td>${post.bids_count || 0}</td>
                                         <td>
-                                            <span class="status-badge ${post.is_accepted ? 'status-accepted' : 'status-pending'}">
-                                                ${post.is_accepted ? 'Accepted' : 'Open'}
+                                            <span class="status-badge ${post.status === 'completed' ? 'status-completed' : post.status === 'accepted' ? 'status-accepted' : 'status-pending'}">
+                                                ${post.status.toUpperCase()}
                                             </span>
                                         </td>
                                         <td>${new Date(post.created_at).toLocaleDateString()}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" onclick="viewPostDetails(${post.post_id})">
+                                            <button class="btn btn-sm btn-primary" onclick="viewPostDetails(${post.id})">
                                                 View Details
                                             </button>
                                         </td>
@@ -1673,29 +1955,27 @@
                         </table>
                     `;
                 } else {
-                    container.innerHTML = `<div class="error">Error: ${result.message}</div>`;
+                    container.innerHTML = '<p style="color: var(--text-muted);">No service requests found.</p>';
                 }
             } catch (error) {
-                container.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Failed to load service requests</div>';
             }
         }
 
         async function loadAdminTasks() {
             const container = document.getElementById('admin-tasks-container');
-            container.innerHTML = '<div class="loading">Loading tasks...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading tasks...</p></div>';
 
             try {
-                const result = await apiCall('/admin.php?action=all_tasks');
+                const result = await apiCall('/admin/tasks');
                 
-                if (result.success) {
-                    const tasks = result.data;
-                    
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = `
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Client</th>
+                                    <th>Customer</th>
                                     <th>Technician</th>
                                     <th>Category</th>
                                     <th>Price</th>
@@ -1705,23 +1985,23 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                ${tasks.map(task => `
+                                ${result.data.map(task => `
                                     <tr>
-                                        <td>${task.task_id}</td>
-                                        <td>${task.client_name}</td>
+                                        <td>${task.id}</td>
+                                        <td>${task.customer_name}</td>
                                         <td>${task.technician_name}</td>
                                         <td>
-                                            <span class="status-badge status-pending">${task.Category}</span>
+                                            <span class="status-badge status-pending">${task.category}</span>
                                         </td>
                                         <td>৳${task.price}</td>
                                         <td>
-                                            <span class="status-badge status-${task.task_status}">
-                                                ${task.task_status.charAt(0).toUpperCase() + task.task_status.slice(1)}
+                                            <span class="status-badge status-${task.status}">
+                                                ${task.status.toUpperCase()}
                                             </span>
                                         </td>
                                         <td>${new Date(task.created_at).toLocaleDateString()}</td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" onclick="viewTaskDetails(${task.task_id})">
+                                            <button class="btn btn-sm btn-primary" onclick="viewTaskDetails(${task.id})">
                                                 Manage
                                             </button>
                                         </td>
@@ -1731,17 +2011,63 @@
                         </table>
                     `;
                 } else {
-                    container.innerHTML = `<div class="error">Error: ${result.message}</div>`;
+                    container.innerHTML = '<p style="color: var(--text-muted);">No tasks found.</p>';
                 }
             } catch (error) {
-                container.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+                container.innerHTML = '<div class="error">Failed to load tasks</div>';
+            }
+        }
+
+        async function loadPendingApprovals() {
+            const container = document.getElementById('admin-approvals-container');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading pending approvals...</p></div>';
+
+            try {
+                const result = await apiCall('/admin/pending-approvals');
+                
+                if (result.success && result.data.length > 0) {
+                    container.innerHTML = result.data.map(approval => `
+                        <div class="post-card">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="flex: 1;">
+                                    <h4 style="color: var(--text-primary);">${approval.type}: ${approval.name}</h4>
+                                    <p style="color: var(--text-secondary); margin: 0.5rem 0;">
+                                        <strong>Email:</strong> ${approval.email}<br>
+                                        <strong>Phone:</strong> ${approval.phone}<br>
+                                        <strong>Applied:</strong> ${new Date(approval.created_at).toLocaleDateString()}
+                                    </p>
+                                    ${approval.type === 'Technician Application' ? `
+                                        <p style="color: var(--text-secondary);">
+                                            <strong>Skills:</strong> ${approval.skills}
+                                        </p>
+                                    ` : ''}
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-left: 1rem;">
+                                    <button class="btn btn-success btn-sm" onclick="approveApplication(${approval.id}, '${approval.type}')">
+                                        Approve
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" onclick="rejectApplication(${approval.id}, '${approval.type}')">
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-muted);">No pending approvals.</p>';
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="error">Failed to load pending approvals</div>';
             }
         }
 
         // User authentication functions
         async function logout() {
-            const result = await apiCall('/auth.php', 'POST', { action: 'logout' });
-            if (result.success || true) { // Always allow logout in demo
+            try {
+                await apiCall('/auth/logout', 'POST');
+            } catch (error) {
+                console.error('Logout error:', error);
+            } finally {
                 isLoggedIn = false;
                 userData = {};
                 updateNavigation();
@@ -1774,12 +2100,19 @@
             document.getElementById(`${tabName}-content`).classList.add('active');
 
             // Load data based on tab
-            if (tabName === 'posts') {
-                loadUserPosts();
-            } else if (tabName === 'tasks') {
-                loadAvailableTasks();
-            } else if (tabName === 'profile') {
-                loadProfileData();
+            switch (tabName) {
+                case 'posts':
+                    loadUserPosts();
+                    break;
+                case 'tasks':
+                    loadAvailableTasks();
+                    break;
+                case 'profile':
+                    loadProfileData();
+                    break;
+                case 'history':
+                    loadServiceHistory();
+                    break;
             }
         }
 
@@ -1789,22 +2122,28 @@
             const formData = new FormData(event.target);
             
             const data = {
-                action: 'login',
                 email: formData.get('email'),
                 password: formData.get('password')
             };
             
-            const result = await apiCall('/auth.php', 'POST', data);
-            
-            if (result.success) {
-                isLoggedIn = true;
-                userData = result.data;
+            try {
+                showNotification('Logging in...', 'info');
+                const result = await apiCall('http://localhost:3000/helplagbe/api/auth/login.php', 'POST', data);
+
                 
-                showNotification(currentLanguage === 'en' ? 'Login successful!' : 'লগইন সফল!');
-                updateNavigation();
-                showSection('dashboard');
-            } else {
-                showNotification(result.message, 'error');
+                if (result.success) {
+                    isLoggedIn = true;
+                    userData = result.data;
+                    
+                    showNotification(currentLanguage === 'en' ? 'Login successful!' : 'লগইন সফল!');
+                    updateNavigation();
+                    showSection('dashboard');
+                } else {
+                    showNotification(result.message || 'Invalid credentials', 'error');
+                }
+            } catch (error) {
+                showNotification('Login failed. Please check your connection.', 'error');
+                console.error('Login error:', error);
             }
         }
 
@@ -1813,25 +2152,30 @@
             const formData = new FormData(event.target);
             
             const data = {
-                action: 'register',
-                username: formData.get('username'),
+                name: formData.get('username'),
                 email: formData.get('email'),
                 phone: formData.get('phone'),
                 password: formData.get('password'),
                 address: formData.get('address')
             };
             
-            const result = await apiCall('/auth.php', 'POST', data);
-            
-            if (result.success) {
-                isLoggedIn = true;
-                userData = result.data;
+            try {
+                showNotification('Creating account...', 'info');
+                const result = await apiCall('api/auth/register.php', 'POST', data);
                 
-                showNotification(currentLanguage === 'en' ? 'Registration successful!' : 'রেজিস্ট্রেশন সফল!');
-                updateNavigation();
-                showSection('dashboard');
-            } else {
-                showNotification(result.message, 'error');
+                if (result.success) {
+                    isLoggedIn = true;
+                    userData = result.data;
+                    
+                    showNotification(currentLanguage === 'en' ? 'Registration successful!' : 'রেজিস্ট্রেশন সফল!');
+                    updateNavigation();
+                    showSection('dashboard');
+                } else {
+                    showNotification(result.message || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showNotification('Registration failed. Please check your connection.', 'error');
+                console.error('Registration error:', error);
             }
         }
 
@@ -1840,24 +2184,30 @@
             const formData = new FormData(event.target);
             
             const data = {
-                action: 'technician_register',
-                fullName: formData.get('fullName'),
-                nationalId: formData.get('nationalId'),
+                name: formData.get('fullName'),
+                national_id: formData.get('nationalId'),
                 email: formData.get('email'),
                 phone: formData.get('phone'),
                 skills: formData.get('skills')
             };
             
-            const result = await apiCall('/auth.php', 'POST', data);
-            
-            if (result.success) {
-                showNotification(currentLanguage === 'en' ? 
-                    'Technician application submitted! We will review and contact you soon.' : 
-                    'কারিগর আবেদন জমা দেওয়া হয়েছে! আমরা পর্যালোচনা করে শীঘ্রই যোগাযোগ করব।'
-                );
-                showAuthTab('login');
-            } else {
-                showNotification(result.message, 'error');
+            try {
+                showNotification('Submitting application...', 'info');
+                const result = await apiCall('/auth/technician-register', 'POST', data);
+                
+                if (result.success) {
+                    showNotification(currentLanguage === 'en' ? 
+                        'Technician application submitted! We will review and contact you within 48 hours.' : 
+                        'কারিগর আবেদন জমা দেওয়া হয়েছে! আমরা ৪৮ ঘন্টার মধ্যে পর্যালোচনা করে যোগাযোগ করব।'
+                    );
+                    showAuthTab('login');
+                    event.target.reset();
+                } else {
+                    showNotification(result.message || 'Application failed', 'error');
+                }
+            } catch (error) {
+                showNotification('Application failed. Please check your connection.', 'error');
+                console.error('Technician registration error:', error);
             }
         }
 
@@ -1866,87 +2216,194 @@
             const formData = new FormData(event.target);
             
             const data = {
-                action: 'create_post',
                 category: formData.get('category'),
                 description: formData.get('description'),
-                images: formData.get('images') ? 'placeholder.jpg' : '' // Handle file upload properly in production
+                preferred_time: formData.get('preferredTime'),
+                budget: formData.get('budget')
             };
             
-            const result = await apiCall('/posts.php', 'POST', data);
-            
-            if (result.success) {
-                showNotification(currentLanguage === 'en' ? 'Post created successfully!' : 'পোস্ট সফলভাবে তৈরি হয়েছে!');
-                showDashboardTab('posts');
-                event.target.reset();
-            } else {
-                showNotification(result.message, 'error');
+            try {
+                showNotification('Creating service request...', 'info');
+                const result = await apiCall('/posts/create', 'POST', data);
+                
+                if (result.success) {
+                    showNotification(currentLanguage === 'en' ? 'Service request created successfully!' : 'সেবার অনুরোধ সফলভাবে তৈরি হয়েছে!');
+                    showDashboardTab('posts');
+                    event.target.reset();
+                } else {
+                    showNotification(result.message || 'Failed to create service request', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to create service request. Please check your connection.', 'error');
+                console.error('Create post error:', error);
             }
         }
 
         async function handleProfileUpdate(event) {
             event.preventDefault();
-            showNotification(currentLanguage === 'en' ? 'Profile updated successfully!' : 'প্রোফাইল সফলভাবে আপডেট হয়েছে!');
+            const formData = new FormData(event.target);
+            
+            const data = {
+                name: formData.get('username'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                address: formData.get('address')
+            };
+
+            // Only include password if it's provided
+            const newPassword = formData.get('newPassword');
+            if (newPassword && newPassword.trim() !== '') {
+                data.password = newPassword;
+            }
+            
+            try {
+                showNotification('Updating profile...', 'info');
+                const result = await apiCall('/auth/profile', 'PUT', data);
+                
+                if (result.success) {
+                    userData = { ...userData, ...result.data };
+                    showNotification(currentLanguage === 'en' ? 'Profile updated successfully!' : 'প্রোফাইল সফলভাবে আপডেট হয়েছে!');
+                } else {
+                    showNotification(result.message || 'Failed to update profile', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to update profile. Please check your connection.', 'error');
+                console.error('Profile update error:', error);
+            }
         }
 
         // Data loading functions
         async function loadUserPosts() {
             const container = document.getElementById('posts-container');
-            container.innerHTML = '<div class="loading">Loading posts...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading your posts...</p></div>';
             
-            const result = await apiCall('/posts.php?action=user_posts');
-            
-            if (result.success) {
-                if (result.data.length === 0) {
-                    container.innerHTML = '<p>No posts found. Create your first post!</p>';
-                } else {
+            try {
+                const result = await apiCall('/posts/user-posts');
+                
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = result.data.map(post => `
                         <div class="post-card">
-                            <h4>${post.Post_detail.substring(0, 50)}...</h4>
-                            <p><strong>Category:</strong> ${post.Category}</p>
-                            <span class="status-badge status-${post.latest_status || 'pending'}">${post.latest_status || 'Pending'}</span>
-                            <p><strong>Bids Received:</strong> ${post.bid_count}</p>
-                            <div style="margin-top: 1rem;">
-                                <button class="btn btn-primary btn-sm" onclick="viewBids(${post.post_id})">View Bids</button>
-                                <button class="btn btn-secondary btn-sm" style="margin-left: 0.5rem;" onclick="editPost(${post.post_id})">Edit</button>
+                            <h4 style="color: var(--text-primary);">${post.category}</h4>
+                            <p style="color: var(--text-secondary);">${post.description}</p>
+                            <div style="margin: 1rem 0;">
+                                <span class="status-badge status-${post.status}">${post.status.toUpperCase()}</span>
+                                <span style="margin-left: 1rem; color: var(--text-muted);">Budget: ${post.budget}</span>
+                            </div>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                                <strong>Bids Received:</strong> ${post.bids_count || 0} | 
+                                <strong>Created:</strong> ${new Date(post.created_at).toLocaleDateString()}
+                            </p>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn btn-primary btn-sm" onclick="viewBids(${post.id})">View Bids</button>
+                                <button class="btn btn-outline btn-sm" onclick="editPost(${post.id})">Edit</button>
+                                <button class="btn btn-outline btn-sm" onclick="deletePost(${post.id})">Delete</button>
                             </div>
                         </div>
                     `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <p>No service requests found.</p>
+                            <button class="btn btn-primary" onclick="showDashboardTab('create')" style="margin-top: 1rem;">
+                                Create Your First Request
+                            </button>
+                        </div>
+                    `;
                 }
-            } else {
-                container.innerHTML = `<div class="error">Error loading posts: ${result.message}</div>`;
+            } catch (error) {
+                container.innerHTML = '<div class="error">Failed to load your posts. Please refresh the page.</div>';
             }
         }
 
         async function loadAvailableTasks() {
             const container = document.getElementById('tasks-container');
-            container.innerHTML = '<div class="loading">Loading tasks...</div>';
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading available tasks...</p></div>';
             
-            const result = await apiCall('/posts.php?action=available_tasks');
-            
-            if (result.success) {
-                if (result.data.length === 0) {
-                    container.innerHTML = '<p>No tasks available at the moment.</p>';
-                } else {
+            try {
+                const result = await apiCall('/posts/available-tasks');
+                
+                if (result.success && result.data.length > 0) {
                     container.innerHTML = result.data.map(task => `
                         <div class="task-card">
-                            <h4>${task.Post_detail.substring(0, 50)}...</h4>
-                            <p><strong>Category:</strong> ${task.Category}</p>
-                            <p><strong>Posted by:</strong> ${task.posted_by}</p>
-                            <p><strong>Current bids:</strong> ${task.bid_count}</p>
-                            <span class="status-badge status-pending">Open for Bids</span>
+                            <h4 style="color: var(--text-primary);">${task.category}</h4>
+                            <p style="color: var(--text-secondary);">${task.description}</p>
+                            <div style="margin: 1rem 0;">
+                                <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                    <strong>Customer:</strong> ${task.customer_name}<br>
+                                    <strong>Budget:</strong> ${task.budget}<br>
+                                    <strong>Preferred Time:</strong> ${new Date(task.preferred_time).toLocaleString()}<br>
+                                    <strong>Current Bids:</strong> ${task.bids_count || 0}
+                                </p>
+                                <span class="status-badge status-pending">Open for Bids</span>
+                            </div>
                             ${userData.is_technician ? `
-                                <div class="bid-form" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                                <div style="background: var(--bg-dark); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
                                     <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                        <input type="number" id="bid-${task.post_id}" placeholder="Enter your bid amount (৳)" min="1" style="flex: 1; padding: 0.5rem;">
-                                        <button class="btn btn-primary btn-sm" onclick="submitBid(${task.post_id})">Submit Bid</button>
+                                        <input type="number" id="bid-${task.id}" placeholder="Enter your bid amount (৳)" min="1" style="flex: 1; padding: 0.5rem; background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 5px; color: var(--text-primary);">
+                                        <button class="btn btn-primary btn-sm" onclick="submitBid(${task.id})">Submit Bid</button>
                                     </div>
                                 </div>
-                            ` : '<p style="margin-top: 1rem;"><em>Register as technician to bid on tasks</em></p>'}
+                            ` : `
+                                <p style="margin-top: 1rem; color: var(--text-muted); font-style: italic;">
+                                    Register as a technician to bid on tasks
+                                </p>
+                            `}
                         </div>
                     `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <p>No tasks available at the moment.</p>
+                            <p>Check back later for new opportunities!</p>
+                        </div>
+                    `;
                 }
-            } else {
-                container.innerHTML = `<div class="error">Error loading tasks: ${result.message}</div>`;
+            } catch (error) {
+                container.innerHTML = '<div class="error">Failed to load available tasks. Please refresh the page.</div>';
+            }
+        }
+
+        async function loadServiceHistory() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading service history...</p></div>';
+            
+            try {
+                const result = await apiCall('/posts/history');
+                
+                if (result.success && result.data.length > 0) {
+                    container.innerHTML = result.data.map(service => `
+                        <div class="post-card">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="flex: 1;">
+                                    <h4 style="color: var(--text-primary);">${service.category}</h4>
+                                    <p style="color: var(--text-secondary);">${service.description}</p>
+                                    <p style="color: var(--text-secondary); margin: 0.5rem 0;">
+                                        <strong>Technician:</strong> ${service.technician_name}<br>
+                                        <strong>Price:</strong> ৳${service.price}<br>
+                                        <strong>Date:</strong> ${new Date(service.completed_at).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="status-badge status-${service.status}">${service.status.toUpperCase()}</span>
+                                    ${service.status === 'completed' ? `
+                                        <div style="margin-top: 0.5rem;">
+                                            <button class="btn btn-outline btn-sm" onclick="rateTechnician(${service.id})">Rate Service</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <p>No service history found.</p>
+                            <p>Complete your first service to see history here.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = '<div class="error">Failed to load service history. Please refresh the page.</div>';
             }
         }
 
@@ -1957,7 +2414,7 @@
                 
                 inputs.forEach(input => {
                     const name = input.name;
-                    if (userData[name]) {
+                    if (userData[name] && name !== 'newPassword') {
                         input.value = userData[name];
                     }
                 });
@@ -1975,36 +2432,43 @@
             }
             
             const data = {
-                action: 'submit_bid',
                 post_id: postId,
                 price: bidAmount
             };
             
-            const result = await apiCall('/posts.php', 'POST', data);
-            
-            if (result.success) {
-                showNotification(currentLanguage === 'en' ? 
-                    `Bid of ৳${bidAmount} submitted successfully!` : 
-                    `৳${bidAmount} বিড সফলভাবে জমা দেওয়া হয়েছে!`
-                );
-                bidInput.value = '';
-                loadAvailableTasks();
-            } else {
-                showNotification(result.message, 'error');
+            try {
+                showNotification('Submitting bid...', 'info');
+                const result = await apiCall('/bids/submit', 'POST', data);
+                
+                if (result.success) {
+                    showNotification(currentLanguage === 'en' ? 
+                        `Bid of ৳${bidAmount} submitted successfully!` : 
+                        `৳${bidAmount} বিড সফলভাবে জমা দেওয়া হয়েছে!`
+                    );
+                    bidInput.value = '';
+                    loadAvailableTasks();
+                } else {
+                    showNotification(result.message || 'Failed to submit bid', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to submit bid. Please check your connection.', 'error');
+                console.error('Submit bid error:', error);
             }
         }
 
         async function viewBids(postId) {
-            const result = await apiCall(`/posts.php?action=post_bids&post_id=${postId}`);
-            
-            if (result.success) {
-                if (result.data.length === 0) {
-                    showNotification('No bids received yet.', 'error');
-                } else {
+            try {
+                showNotification('Loading bids...', 'info');
+                const result = await apiCall(`/posts/${postId}/bids`);
+                
+                if (result.success && result.data.length > 0) {
                     showBidModal(result.data, postId);
+                } else {
+                    showNotification('No bids received yet.', 'error');
                 }
-            } else {
-                showNotification(result.message, 'error');
+            } catch (error) {
+                showNotification('Failed to load bids. Please try again.', 'error');
+                console.error('View bids error:', error);
             }
         }
 
@@ -2013,23 +2477,25 @@
             const modalContent = document.getElementById('bid-modal-content');
             
             let bidsHtml = '<div style="max-height: 400px; overflow-y: auto;">';
-            bidsHtml += '<h4 style="margin-bottom: 1rem;">Bids for your post:</h4>';
+            bidsHtml += '<h4 style="margin-bottom: 1rem; color: var(--text-primary);">Bids for your service request:</h4>';
             
             bids.forEach(bid => {
                 bidsHtml += `
-                    <div style="background: #f8f9fa; padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid #667eea;">
+                    <div style="background: var(--bg-dark); padding: 1rem; margin: 0.5rem 0; border-radius: 8px; border-left: 4px solid var(--primary-color);">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="flex: 1;">
-                                <h5 style="margin: 0 0 0.5rem 0; color: #333;">${bid.Full_Name}</h5>
-                                <p style="margin: 0; color: #667eea; font-weight: bold; font-size: 1.2rem;">৳${bid.price}</p>
-                                <p style="margin: 0.25rem 0; color: #666;"><strong>Phone:</strong> ${bid.phone_no}</p>
-                                <p style="margin: 0.25rem 0; color: #666;"><strong>Skills:</strong> ${bid.Skill_details || 'N/A'}</p>
-                                <span class="status-badge status-${bid.task_status}" style="margin-top: 0.5rem;">${bid.task_status.charAt(0).toUpperCase() + bid.task_status.slice(1)}</span>
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">${bid.technician_name}</h5>
+                                <p style="margin: 0; color: var(--primary-color); font-weight: bold; font-size: 1.2rem;">৳${bid.price}</p>
+                                <p style="margin: 0.25rem 0; color: var(--text-secondary);"><strong>Phone:</strong> ${bid.phone}</p>
+                                <p style="margin: 0.25rem 0; color: var(--text-secondary);"><strong>Experience:</strong> ${bid.experience || 'N/A'}</p>
+                                <p style="margin: 0.25rem 0; color: var(--text-secondary);"><strong>Skills:</strong> ${bid.skills || 'N/A'}</p>
+                                <p style="margin: 0.25rem 0; color: var(--text-secondary);"><strong>Rating:</strong> ${bid.rating || 'New'}/5</p>
+                                <span class="status-badge status-${bid.status}" style="margin-top: 0.5rem;">${bid.status.charAt(0).toUpperCase() + bid.status.slice(1)}</span>
                             </div>
                             <div style="margin-left: 1rem;">
-                                ${bid.task_status === 'pending' ? 
-                                    `<button onclick="acceptBid(${bid.task_id}, ${postId})" class="btn btn-success btn-sm">Accept Bid</button>` : 
-                                    '<span style="color: #28a745; font-weight: bold; padding: 0.5rem 1rem; background: #d4edda; border-radius: 5px;">ACCEPTED</span>'
+                                ${bid.status === 'pending' ? 
+                                    `<button onclick="acceptBid(${bid.id}, ${postId})" class="btn btn-success btn-sm">Accept Bid</button>` : 
+                                    '<span style="color: var(--success-color); font-weight: bold; padding: 0.5rem 1rem; background: rgba(40, 167, 69, 0.1); border-radius: 5px; border: 1px solid var(--success-color);">ACCEPTED</span>'
                                 }
                             </div>
                         </div>
@@ -2042,93 +2508,22 @@
             modal.style.display = 'flex';
         }
 
-        async function acceptBid(taskId, postId) {
-            const result = await apiCall('/posts.php', 'POST', {
-                action: 'accept_bid',
-                task_id: taskId
-            });
-            
-            if (result.success) {
-                showNotification('Bid accepted successfully!');
-                closeBidModal();
-                loadUserPosts();
-            } else {
-                showNotification(result.message, 'error');
+        async function acceptBid(bidId, postId) {
+            try {
+                showNotification('Accepting bid...', 'info');
+                const result = await apiCall(`/bids/${bidId}/accept`, 'PUT');
+                
+                if (result.success) {
+                    showNotification('Bid accepted successfully! The technician will contact you soon.');
+                    closeBidModal();
+                    loadUserPosts();
+                } else {
+                    showNotification(result.message || 'Failed to accept bid', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to accept bid. Please try again.', 'error');
+                console.error('Accept bid error:', error);
             }
-        }
-
-        // Modal functions
-        async function viewUserDetails(userId) {
-            const modal = document.getElementById('user-modal');
-            const modalContent = document.getElementById('user-modal-content');
-            
-            modal.style.display = 'flex';
-            modalContent.innerHTML = '<div class="loading">Loading user details...</div>';
-
-            // Find user in mock data
-            const user = mockData.users.find(u => u.user_id === userId);
-            const userPosts = mockData.posts.filter(p => p.posted_by === user?.username);
-            
-            if (user) {
-                modalContent.innerHTML = `
-                    <div class="user-info">
-                        <h4>User Information</h4>
-                        <p><strong>Name:</strong> ${user.username}</p>
-                        <p><strong>Email:</strong> ${user.email}</p>
-                        <p><strong>Phone:</strong> ${user.phone_no || 'N/A'}</p>
-                        <p><strong>Address:</strong> ${user.address || 'N/A'}</p>
-                        <p><strong>Total Posts:</strong> ${user.post_count}</p>
-                        ${user.is_technician > 0 ? `
-                            <p><strong>Technician Name:</strong> ${user.technician_name || 'N/A'}</p>
-                            <p><strong>Skills:</strong> ${user.skills || 'N/A'}</p>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="user-posts" style="margin-top: 2rem;">
-                        <h4>User Posts (${userPosts.length})</h4>
-                        ${userPosts.length > 0 ? `
-                            <div style="margin-top: 1rem;">
-                                ${userPosts.map(post => `
-                                    <div class="post-card" style="margin-bottom: 1rem;">
-                                        <h5>Category: ${post.Category}</h5>
-                                        <p>${post.Post_detail}</p>
-                                        <span class="status-badge status-${post.latest_status || 'pending'}">
-                                            ${post.latest_status || 'Pending'}
-                                        </span>
-                                        <p><strong>Bids:</strong> ${post.bid_count}</p>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : '<p>No posts found for this user.</p>'}
-                    </div>
-                `;
-            } else {
-                modalContent.innerHTML = `<div class="error">User not found</div>`;
-            }
-        }
-
-        function viewTechnicianDetails(technicianId) {
-            showNotification('Technician details would be displayed here');
-        }
-
-        function viewPostDetails(postId) {
-            showNotification('Post details would be displayed here');
-        }
-
-        function viewTaskDetails(taskId) {
-            showNotification('Task management options would be displayed here');
-        }
-
-        function editPost(postId) {
-            showNotification('Post editing functionality would be implemented here');
-        }
-
-        function closeUserModal() {
-            document.getElementById('user-modal').style.display = 'none';
-        }
-
-        function closeBidModal() {
-            document.getElementById('bid-modal').style.display = 'none';
         }
 
         // Service request functions
@@ -2143,10 +2538,140 @@
             showDashboardTab('create');
             
             // Pre-select category
-            const categorySelect = document.querySelector('select[name="category"]');
-            if (categorySelect) {
-                categorySelect.value = category;
+            setTimeout(() => {
+                const categorySelect = document.querySelector('select[name="category"]');
+                if (categorySelect) {
+                    categorySelect.value = category;
+                }
+            }, 100);
+        }
+
+        // Admin approval functions
+        async function approveApplication(id, type) {
+            try {
+                showNotification('Processing approval...', 'info');
+                const result = await apiCall('/admin/approve-application', 'POST', { id, type });
+                
+                if (result.success) {
+                    showNotification(`${type} approved successfully!`);
+                    loadPendingApprovals();
+                    loadAdminStats();
+                } else {
+                    showNotification(result.message || 'Failed to approve application', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to approve application. Please try again.', 'error');
+                console.error('Approve application error:', error);
             }
+        }
+
+        async function rejectApplication(id, type) {
+            if (confirm('Are you sure you want to reject this application?')) {
+                try {
+                    showNotification('Processing rejection...', 'info');
+                    const result = await apiCall('/admin/reject-application', 'POST', { id, type });
+                    
+                    if (result.success) {
+                        showNotification(`${type} rejected successfully!`);
+                        loadPendingApprovals();
+                        loadAdminStats();
+                    } else {
+                        showNotification(result.message || 'Failed to reject application', 'error');
+                    }
+                } catch (error) {
+                    showNotification('Failed to reject application. Please try again.', 'error');
+                    console.error('Reject application error:', error);
+                }
+            }
+        }
+
+        // Utility functions
+        async function editPost(postId) {
+            try {
+                const result = await apiCall(`/posts/${postId}`);
+                if (result.success) {
+                    // Pre-fill the create form with existing data
+                    showDashboardTab('create');
+                    const form = document.querySelector('#create-content form');
+                    const data = result.data;
+                    
+                    form.querySelector('[name="category"]').value = data.category;
+                    form.querySelector('[name="description"]').value = data.description;
+                    form.querySelector('[name="budget"]').value = data.budget;
+                    
+                    // Change button text and form action
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    submitBtn.textContent = 'Update Service Request';
+                    submitBtn.setAttribute('data-post-id', postId);
+                }
+            } catch (error) {
+                showNotification('Failed to load post data for editing', 'error');
+            }
+        }
+
+        async function deletePost(postId) {
+            if (confirm('Are you sure you want to delete this service request?')) {
+                try {
+                    showNotification('Deleting post...', 'info');
+                    const result = await apiCall(`/posts/${postId}`, 'DELETE');
+                    
+                    if (result.success) {
+                        showNotification('Service request deleted successfully!');
+                        loadUserPosts();
+                    } else {
+                        showNotification(result.message || 'Failed to delete post', 'error');
+                    }
+                } catch (error) {
+                    showNotification('Failed to delete post. Please try again.', 'error');
+                    console.error('Delete post error:', error);
+                }
+            }
+        }
+
+        async function rateTechnician(serviceId) {
+            const rating = prompt('Rate this service (1-5 stars):');
+            if (rating && rating >= 1 && rating <= 5) {
+                try {
+                    const result = await apiCall('/services/rate', 'POST', { 
+                        service_id: serviceId, 
+                        rating: parseInt(rating) 
+                    });
+                    
+                    if (result.success) {
+                        showNotification('Thank you for rating this service!');
+                        loadServiceHistory();
+                    } else {
+                        showNotification(result.message || 'Failed to submit rating', 'error');
+                    }
+                } catch (error) {
+                    showNotification('Failed to submit rating. Please try again.', 'error');
+                }
+            }
+        }
+
+        // Modal functions
+        function viewUserDetails(userId) {
+            showNotification('User details functionality will be implemented');
+        }
+
+        function viewTechnicianDetails(technicianId) {
+            showNotification('Technician profile functionality will be implemented');
+        }
+
+        function viewPostDetails(postId) {
+            showNotification('Post details functionality will be implemented');
+        }
+
+        function viewTaskDetails(taskId) {
+            showNotification('Task management functionality will be implemented');
+        }
+
+        function closeBidModal() {
+            document.getElementById('bid-modal').style.display = 'none';
+        }
+
+        function closeServiceModal() {
+            document.getElementById('service-modal').style.display = 'none';
         }
 
         // Mobile menu toggle
@@ -2157,9 +2682,9 @@
 
         // Chat function
         function toggleChat() {
-            alert(currentLanguage === 'en' ? 
-                'Customer support chat would open here.\n\nFor demo purposes:\n- Live chat with support agents\n- FAQ section\n- Help documentation' : 
-                'গ্রাহক সেবা চ্যাট এখানে খুলবে।\n\nডেমোর জন্য:\n- সাপোর্ট এজেন্টদের সাথে লাইভ চ্যাট\n- FAQ বিভাগ\n- সহায়তা ডকুমেন্টেশন'
+            showNotification(currentLanguage === 'en' ? 
+                'Customer support chat will be available soon. For immediate assistance, call +880 1XXX-XXXXXX' : 
+                'গ্রাহক সেবা চ্যাট শীঘ্রই উপলব্ধ হবে। তাৎক্ষণিক সহায়তার জন্য কল করুন +৮৮০ ১XXX-XXXXXX'
             );
         }
 
@@ -2177,14 +2702,24 @@
             document.body.appendChild(notification);
             
             setTimeout(() => {
-                notification.remove();
+                if (notification.parentNode) {
+                    notification.remove();
+                }
             }, 4000);
         }
 
         // Check session on page load
         async function checkSession() {
-            // For demo purposes, we'll skip session checking
-            // In production, this would call your API to check if user is logged in
+            try {
+                const result = await apiCall('/auth/check-session');
+                if (result.success && result.data) {
+                    isLoggedIn = true;
+                    userData = result.data;
+                    updateNavigation();
+                }
+            } catch (error) {
+                console.log('No active session found');
+            }
         }
 
         // Initialize page
@@ -2206,38 +2741,76 @@
                 const navLinks = document.getElementById('navLinks');
                 const mobileMenu = document.querySelector('.mobile-menu');
                 
-                if (!navLinks.contains(event.target) && !mobileMenu.contains(event.target)) {
+                if (navLinks && mobileMenu && !navLinks.contains(event.target) && !mobileMenu.contains(event.target)) {
                     navLinks.classList.remove('active');
                 }
             });
 
             // Close modals when clicking outside
-            document.getElementById('user-modal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeUserModal();
-                }
-            });
-
             document.getElementById('bid-modal').addEventListener('click', function(e) {
                 if (e.target === this) {
                     closeBidModal();
                 }
             });
+
+            document.getElementById('service-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeServiceModal();
+                }
+            });
+
+            // Handle form submission for editing posts
+            document.querySelector('#create-content form').addEventListener('submit', function(e) {
+                const postId = e.target.querySelector('button[type="submit"]').getAttribute('data-post-id');
+                if (postId) {
+                    e.preventDefault();
+                    // Handle edit submission
+                    handleEditPost(e, postId);
+                }
+            });
         });
 
-        // Add CSS class for admin content sections
+        async function handleEditPost(event, postId) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            const data = {
+                category: formData.get('category'),
+                description: formData.get('description'),
+                preferred_time: formData.get('preferredTime'),
+                budget: formData.get('budget')
+            };
+            
+            try {
+                showNotification('Updating service request...', 'info');
+                const result = await apiCall(`/posts/${postId}`, 'PUT', data);
+                
+                if (result.success) {
+                    showNotification('Service request updated successfully!');
+                    
+                    // Reset form and button
+                    const submitBtn = event.target.querySelector('button[type="submit"]');
+                    submitBtn.textContent = 'Submit Service Request';
+                    submitBtn.removeAttribute('data-post-id');
+                    event.target.reset();
+                    
+                    showDashboardTab('posts');
+                } else {
+                    showNotification(result.message || 'Failed to update service request', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to update service request. Please check your connection.', 'error');
+                console.error('Edit post error:', error);
+            }
+        }
+
+        // Add CSS class for admin sections
         const style = document.createElement('style');
         style.textContent = `
             .admin-section {
                 display: none;
             }
             .admin-section.active {
-                display: block;
-            }
-            .admin-content {
-                display: none;
-            }
-            .admin-content.active {
                 display: block;
             }
         `;
