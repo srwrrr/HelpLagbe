@@ -1,3 +1,1 @@
-<?php
-echo "PHP is working!";
-?>
+<?php echo "mod_rewrite works!"; ?>

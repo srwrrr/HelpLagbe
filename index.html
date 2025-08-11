@@ -2127,7 +2127,7 @@
             
             try {
                 showNotification('Logging in...', 'info');
-                const result = await apiCall('http://localhost:3000/helplagbe/api/auth/login.php', 'POST', data);
+                const result = await apiCall('/auth/login.php', 'POST', data);
 
                 
                 if (result.success) {
@@ -2160,7 +2160,7 @@
             
             try {
                 showNotification('Creating account...', 'info');
-                const result = await apiCall('api/auth/register.php', 'POST', data);
+                const result = await apiCall('/auth/register.php', 'POST', data);
                 
                 if (result.success) {
                     isLoggedIn = true;
@@ -2682,8 +2682,8 @@
         // Chat function
         function toggleChat() {
             showNotification(currentLanguage === 'en' ? 
-                'Customer support chat will be available soon. For immediate assistance, call +880 1XXX-XXXXXX' : 
-                'গ্রাহক সেবা চ্যাট শীঘ্রই উপলব্ধ হবে। তাৎক্ষণিক সহায়তার জন্য কল করুন +৮৮০ ১XXX-XXXXXX'
+                'Customer support chat will be available soon. For immediate assistance, call +880 1325-409985' : 
+                'গ্রাহক সেবা চ্যাট শীঘ্রই উপলব্ধ হবে। তাৎক্ষণিক সহায়তার জন্য কল করুন +৮৮০ ১৩২৫-৪০৯৯৮৫'
             );
         }
 

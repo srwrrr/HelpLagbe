@@ -3,6 +3,14 @@
 # Enable URL rewriting
 RewriteEngine On
 
+# Route /api/... to /helplagbe/api/...
+RewriteRule ^api/(.*)$ helplagbe/api/$1 [L]
+
+# Set proper headers for CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+
 # Handle CORS preflight requests
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ $1 [R=200,L]

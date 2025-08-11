@@ -1,8 +1,10 @@
 <?php
-class JWTHelper {
+class JWTHelper
+{
     private static $secret_key = 'your-secret-key-here';
 
-    public static function generateToken($user_id, $email, $role = 'user') {
+    public static function generateToken($user_id, $email, $role = 'user')
+    {
         $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
         $payload = json_encode([
             'iss' => 'helplagbe',
@@ -23,9 +25,11 @@ class JWTHelper {
         return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
     }
 
-    public static function validateToken($token) {
+    public static function validateToken($token)
+    {
         $parts = explode('.', $token);
-        if (count($parts) !== 3) return false;
+        if (count($parts) !== 3)
+            return false;
 
         list($header, $payload, $signature) = $parts;
 
@@ -33,10 +37,12 @@ class JWTHelper {
             hash_hmac('sha256', $header . "." . $payload, self::$secret_key, true)
         ), '+/', '-_'), '=');
 
-        if (!hash_equals($expectedSignature, $signature)) return false;
+        if (!hash_equals($expectedSignature, $signature))
+            return false;
 
         $decodedPayload = json_decode(base64_decode(strtr($payload, '-_', '+/')), true);
-        if ($decodedPayload['exp'] < time()) return false;
+        if ($decodedPayload['exp'] < time())
+            return false;
 
         return $decodedPayload;
     }

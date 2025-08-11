@@ -19,15 +19,15 @@ try {
               JOIN technician tech ON t.technician_id = tech.technician_id
               WHERE p.user_id = :user_id AND t.task_status IN ('completed', 'cancelled')
               ORDER BY t.completed_at DESC";
-    
+
     $stmt = $db->prepare($query);
     $stmt->bindParam(':user_id', $user['user_id']);
     $stmt->execute();
-    
+
     $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     sendResponse(true, $history, 'Service history retrieved successfully');
-    
-} catch(PDOException $exception) {
+
+} catch (PDOException $exception) {
     error_log("Get history error: " . $exception->getMessage());
     sendResponse(false, null, 'Failed to get service history', 500);
 }
