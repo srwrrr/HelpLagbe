@@ -1,58 +1,52 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// api/posts/create.php
+include_once '../config/database.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    include_once '../config/database.php';
-    include_once '../utils/JWTHelper.php';
-    
-    // Get JWT token from header
-    $headers = getallheaders();
-    $token = isset($headers['Authorization']) ? str_replace('Bearer ', '', $headers['Authorization']) : null;
-    
-    if (!$token) {
-        http_response_code(401);
-        echo json_encode(["success" => false, "message" => "Authorization token required"]);
-        exit();
-    }
-    
-    $decoded = JWTHelper::validateToken($token);
-    if (!$decoded) {
-        http_response_code(401);
-        echo json_encode(["success" => false, "message" => "Invalid token"]);
-        exit();
-    }
-    
-    $database = new Database();
-    $db = $database->getConnection();
-    
-    $data = json_decode(file_get_contents("php://input"));
-    
-    if (!empty($data->post_detail) && !empty($data->category)) {
-        $query = "INSERT INTO posts (Post_detail, Image, Category, `Sub-Category`, user_id) VALUES (:post_detail, :image, :category, :sub_category, :user_id)";
-        $stmt = $db->prepare($query);
-        
-        $stmt->bindParam(':post_detail', $data->post_detail);
-        $stmt->bindParam(':image', $data->image ?? null);
-        $stmt->bindParam(':category', $data->category);
-        $stmt->bindParam(':sub_category', $data->sub_category ?? null);
-        $stmt->bindParam(':user_id', $decoded['user_id']);
-        
-        if ($stmt->execute()) {
-            http_response_code(201);
-            echo json_encode([
-                "success" => true,
-                "message" => "Post created successfully",
-                "post_id" => $db->lastInsertId()
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode(["success" => false, "message" => "Failed to create post"]);
-        }
-    } else {
-        http_response_code(400);
-        echo json_encode(["success" => false, "message" => "Post detail and category are required"]);
-    }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendResponse(false, null, 'Method not allowed', 405);
 }
+
+$user = requireAuth();
+$database = new Database();
+$db = $database->getConnection();
+
+$data = json_decode(file_get_contents("php://input"), true);
+
+if (!$data) {
+    sendResponse(false, null, 'Invalid JSON data', 400);
+}
+
+$required_fields = ['category', 'description'];
+$missing_fields = validateRequired($data, $required_fields);
+
+if (!empty($missing_fields)) {
+    sendResponse(false, null, 'Missing required fields: ' . implode(', ', $missing_fields), 400);
+}
+
+$category = sanitizeInput($data['category']);
+$description = sanitizeInput($data['description']);
+$subcategory = isset($data['subcategory']) ? sanitizeInput($data['subcategory']) : null;
+$budget = isset($data['budget']) ? sanitizeInput($data['budget']) : null;
+$preferred_time = isset($data['preferred_time']) ? $data['preferred_time'] : null;
+
+try {
+    $query = "INSERT INTO posts (Post_detail, Category, `Sub-Category`, user_id) 
+              VALUES (:description, :category, :subcategory, :user_id)";
+    $stmt = $db->prepare($query);
+    
+    $stmt->bindParam(':description', $description);
+    $stmt->bindParam(':category', $category);
+    $stmt->bindParam(':subcategory', $subcategory);
+    $stmt->bindParam(':user_id', $user['user_id']);
+    
+    if ($stmt->execute()) {
+        $post_id = $db->lastInsertId();
+        sendResponse(true, ['post_id' => $post_id], 'Post created successfully');
+    } else {
+        sendResponse(false, null, 'Failed to create post', 500);
+    }
+} catch(PDOException $exception) {
+    error_log("Create post error: " . $exception->getMessage());
+    sendResponse(false, null, 'Failed to create post', 500);
+}
+?>

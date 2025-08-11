@@ -1,63 +1,79 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// api/auth/register.php
+include_once '../config/database.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    include_once '../config/database.php';
-    include_once '../utils/JWTHelper.php';
-    
-    $database = new Database();
-    $db = $database->getConnection();
-    
-    $data = json_decode(file_get_contents("php://input"));
-    
-    if (!empty($data->username) && !empty($data->email) && !empty($data->password)) {
-        // Check if email already exists
-        $check_query = "SELECT user_id FROM users WHERE email = :email";
-        $check_stmt = $db->prepare($check_query);
-        $check_stmt->bindParam(':email', $data->email);
-        $check_stmt->execute();
-        
-        if ($check_stmt->rowCount() > 0) {
-            http_response_code(409);
-            echo json_encode(["success" => false, "message" => "Email already exists"]);
-            exit();
-        }
-        
-        $query = "INSERT INTO users (username, email, password, phone_no, address) VALUES (:username, :email, :password, :phone_no, :address)";
-        $stmt = $db->prepare($query);
-        
-        $hashed_password = password_hash($data->password, PASSWORD_DEFAULT);
-        
-        $stmt->bindParam(':username', $data->username);
-        $stmt->bindParam(':email', $data->email);
-        $stmt->bindParam(':password', $hashed_password);
-        $stmt->bindParam(':phone_no', $data->phone_no ?? null);
-        $stmt->bindParam(':address', $data->address ?? null);
-        
-        if ($stmt->execute()) {
-            $user_id = $db->lastInsertId();
-            $token = JWTHelper::generateToken($user_id, $data->email);
-            
-            http_response_code(201);
-            echo json_encode([
-                "success" => true,
-                "message" => "User registered successfully",
-                "token" => $token,
-                "user" => [
-                    "user_id" => $user_id,
-                    "username" => $data->username,
-                    "email" => $data->email
-                ]
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode(["success" => false, "message" => "Registration failed"]);
-        }
-    } else {
-        http_response_code(400);
-        echo json_encode(["success" => false, "message" => "Username, email and password are required"]);
-    }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendResponse(false, null, 'Method not allowed', 405);
 }
+
+$database = new Database();
+$db = $database->getConnection();
+
+if ($db === null) {
+    sendResponse(false, null, 'Database connection failed', 500);
+}
+
+$data = json_decode(file_get_contents("php://input"), true);
+
+if (!$data) {
+    sendResponse(false, null, 'Invalid JSON data', 400);
+}
+
+$required_fields = ['name', 'email', 'password'];
+$missing_fields = validateRequired($data, $required_fields);
+
+if (!empty($missing_fields)) {
+    sendResponse(false, null, 'Missing required fields: ' . implode(', ', $missing_fields), 400);
+}
+
+$name = sanitizeInput($data['name']);
+$email = sanitizeInput($data['email']);
+$password = password_hash($data['password'], PASSWORD_DEFAULT);
+$phone = isset($data['phone']) ? sanitizeInput($data['phone']) : null;
+$address = isset($data['address']) ? sanitizeInput($data['address']) : null;
+
+try {
+    // Check if email already exists
+    $check_query = "SELECT user_id FROM users WHERE email = :email";
+    $check_stmt = $db->prepare($check_query);
+    $check_stmt->bindParam(':email', $email);
+    $check_stmt->execute();
+    
+    if ($check_stmt->rowCount() > 0) {
+        sendResponse(false, null, 'Email already exists', 409);
+    }
+    
+    // Insert new user
+    $query = "INSERT INTO users (username, email, password, phone_no, address) VALUES (:username, :email, :password, :phone, :address)";
+    $stmt = $db->prepare($query);
+    
+    $stmt->bindParam(':username', $name);
+    $stmt->bindParam(':email', $email);
+    $stmt->bindParam(':password', $password);
+    $stmt->bindParam(':phone', $phone);
+    $stmt->bindParam(':address', $address);
+    
+    if ($stmt->execute()) {
+        $user_id = $db->lastInsertId();
+        
+        // Set session
+        $_SESSION['user_id'] = $user_id;
+        $_SESSION['username'] = $name;
+        $_SESSION['email'] = $email;
+        
+        sendResponse(true, [
+            'user_id' => $user_id,
+            'username' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'address' => $address,
+            'is_technician' => false
+        ], 'Registration successful');
+    } else {
+        sendResponse(false, null, 'Registration failed', 500);
+    }
+} catch(PDOException $exception) {
+    error_log("Registration error: " . $exception->getMessage());
+    sendResponse(false, null, 'Registration failed', 500);
+}
+?>

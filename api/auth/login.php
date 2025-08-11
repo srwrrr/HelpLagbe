@@ -1,54 +1,78 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// api/auth/login.php
+include_once '../config/database.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    include_once '../../config/database.php';
-    include_once '../../utils/JWTHelper.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendResponse(false, null, 'Method not allowed', 405);
+}
 
-    $database = new Database();
-    $db = $database->getConnection();
+$database = new Database();
+$db = $database->getConnection();
 
-    $data = json_decode(file_get_contents("php://input"));
+if ($db === null) {
+    sendResponse(false, null, 'Database connection failed', 500);
+}
 
-    if (!empty($data->email) && !empty($data->password)) {
-        $query = "SELECT user_id, username, email, password, phone_no, address, Image FROM users WHERE email = :email";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':email', $data->email);
-        $stmt->execute();
+$data = json_decode(file_get_contents("php://input"), true);
 
-        if ($stmt->rowCount() > 0) {
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$data) {
+    sendResponse(false, null, 'Invalid JSON data', 400);
+}
 
-            if (password_verify($data->password, $user['password'])) {
-                $token = JWTHelper::generateToken($user['user_id'], $user['email']);
+$required_fields = ['email', 'password'];
+$missing_fields = validateRequired($data, $required_fields);
 
-                http_response_code(200);
-                echo json_encode([
-                    "success" => true,
-                    "message" => "Login successful",
-                    "token" => $token,
-                    "user" => [
-                        "user_id" => $user['user_id'],
-                        "username" => $user['username'],
-                        "email" => $user['email'],
-                        "phone_no" => $user['phone_no'],
-                        "address" => $user['address'],
-                        "image" => $user['Image']
-                    ]
-                ]);
-            } else {
-                http_response_code(401);
-                echo json_encode(["success" => false, "message" => "Invalid credentials"]);
+if (!empty($missing_fields)) {
+    sendResponse(false, null, 'Missing required fields: ' . implode(', ', $missing_fields), 400);
+}
+
+$email = sanitizeInput($data['email']);
+$password = $data['password'];
+
+try {
+    // Check if user exists
+    $query = "SELECT user_id, username, email, password, phone_no, address FROM users WHERE email = :email";
+    $stmt = $db->prepare($query);
+    $stmt->bindParam(':email', $email);
+    $stmt->execute();
+    
+    if ($stmt->rowCount() > 0) {
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (password_verify($password, $user['password'])) {
+            // Set session
+            $_SESSION['user_id'] = $user['user_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['email'] = $user['email'];
+            
+            // Check if user is also a technician
+            $tech_query = "SELECT technician_id, status FROM technician WHERE user_id = :user_id";
+            $tech_stmt = $db->prepare($tech_query);
+            $tech_stmt->bindParam(':user_id', $user['user_id']);
+            $tech_stmt->execute();
+            
+            $is_technician = false;
+            if ($tech_stmt->rowCount() > 0) {
+                $tech_data = $tech_stmt->fetch(PDO::FETCH_ASSOC);
+                $is_technician = $tech_data['status'] === 'approved';
             }
+            
+            sendResponse(true, [
+                'user_id' => $user['user_id'],
+                'username' => $user['username'],
+                'email' => $user['email'],
+                'phone' => $user['phone_no'],
+                'address' => $user['address'],
+                'is_technician' => $is_technician
+            ], 'Login successful');
         } else {
-            http_response_code(404);
-            echo json_encode(["success" => false, "message" => "User not found"]);
+            sendResponse(false, null, 'Invalid email or password', 401);
         }
     } else {
-        http_response_code(400);
-        echo json_encode(["success" => false, "message" => "Email and password are required"]);
+        sendResponse(false, null, 'Invalid email or password', 401);
     }
+} catch(PDOException $exception) {
+    error_log("Login error: " . $exception->getMessage());
+    sendResponse(false, null, 'Login failed', 500);
 }
+?>

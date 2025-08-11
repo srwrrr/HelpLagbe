@@ -1,46 +1,27 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+session_start();
+include_once '../config/database.php';
+include_once '../helpers/functions.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-    include_once '../config/database.php';
-    include_once '../utils/JWTHelper.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    sendResponse(false, null, 'Method not allowed', 405);
+}
 
-    $headers = getallheaders();
-    $token = isset($headers['Authorization']) ? str_replace('Bearer ', '', $headers['Authorization']) : null;
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    sendResponse(false, null, 'Admin authentication required', 401);
+}
 
-    if (!$token) {
-        http_response_code(401);
-        echo json_encode(["success" => false, "message" => "Authorization token required"]);
-        exit();
-    }
+$database = new Database();
+$db = $database->getConnection();
 
-    $decoded = JWTHelper::validateToken($token);
-    if (!$decoded || $decoded['role'] !== 'admin') {
-        http_response_code(403);
-        echo json_encode(["success" => false, "message" => "Admin access required"]);
-        exit();
-    }
-
-    $database = new Database();
-    $db = $database->getConnection();
-
-    $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 50;
-    $offset = isset($_GET['offset']) ? (int) $_GET['offset'] : 0;
-
-    $query = "SELECT user_id, username, email, phone_no, address, created_at FROM users ORDER BY created_at DESC LIMIT :limit OFFSET :offset";
-    $stmt = $db->prepare($query);
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+try {
+    $stmt = $db->prepare("SELECT u.user_id as id, u.username as name, u.email, u.phone_no as phone, u.created_at, 'active' as status, COUNT(p.post_id) as posts_count FROM users u LEFT JOIN posts p ON u.user_id = p.user_id GROUP BY u.user_id ORDER BY u.created_at DESC");
     $stmt->execute();
 
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    sendResponse(true, $users, 'Users retrieved successfully');
 
-    http_response_code(200);
-    echo json_encode([
-        "success" => true,
-        "users" => $users
-    ]);
+} catch(PDOException $exception) {
+    error_log("Get admin users error: " . $exception->getMessage());
+    sendResponse(false, null, 'Failed to get users', 500);
 }
