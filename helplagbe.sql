@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 11, 2025 at 10:52 PM
+-- Generation Time: Aug 12, 2025 at 05:56 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -37,7 +37,8 @@ CREATE TABLE `admin` (
 --
 
 INSERT INTO `admin` (`admin_id`, `created_at`) VALUES
-(1, '2025-08-09 19:05:58');
+(1, '2025-08-09 19:05:58'),
+(2, '2025-08-12 14:41:38');
 
 -- --------------------------------------------------------
 
@@ -136,7 +137,8 @@ INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Categor
 (1, 'My AC is not cooling properly. Need urgent repair.', NULL, 'appliance', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (2, 'Kitchen sink is leaking. Need plumber immediately.', NULL, 'plumbing', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (3, 'Electrical outlet not working in bedroom.', NULL, 'electrical', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
-(4, 'checking if my site is working', NULL, 'maintenance', NULL, 6, '2025-08-11 20:41:29', '2025-08-11 20:41:29');
+(4, 'checking if my site is working', NULL, 'maintenance', NULL, 6, '2025-08-11 20:41:29', '2025-08-11 20:41:29'),
+(5, 'Testing my webpage', NULL, 'Electrical', 'Computer', 1, '2025-08-12 13:45:03', '2025-08-12 13:45:03');
 
 -- --------------------------------------------------------
 
@@ -195,17 +197,21 @@ CREATE TABLE `technician` (
   `status` enum('pending','approved','rejected') DEFAULT 'pending',
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `address` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `technician`
 --
 
-INSERT INTO `technician` (`technician_id`, `national_id`, `Full_Name`, `Required_Documents`, `Skill_details`, `status`, `user_id`, `created_at`, `updated_at`) VALUES
-(1, '1234567890123', 'Mohammad Rahman', NULL, 'AC repair, refrigerator maintenance, electrical work. 5 years experience.', 'approved', 2, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
-(2, '1234567890124', 'Abdul Karim', NULL, 'Plumbing, pipe fitting, water system installation. 8 years experience.', 'approved', 3, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
-(4, '21331123', 'Test tech', NULL, 'VERY VEREY GOOD', 'pending', 7, '2025-08-11 20:46:01', '2025-08-11 20:46:01');
+INSERT INTO `technician` (`technician_id`, `national_id`, `Full_Name`, `Required_Documents`, `Skill_details`, `status`, `user_id`, `created_at`, `updated_at`, `address`) VALUES
+(1, '1234567890123', 'Mohammad Rahman', NULL, 'AC repair, refrigerator maintenance, electrical work. 5 years experience.', 'approved', 2, '2025-08-09 19:05:58', '2025-08-09 19:05:58', NULL),
+(2, '1234567890124', 'Abdul Karim', NULL, 'Plumbing, pipe fitting, water system installation. 8 years experience.', 'approved', 3, '2025-08-09 19:05:58', '2025-08-09 19:05:58', NULL),
+(4, '21331123', 'Test tech', NULL, 'VERY VEREY GOOD', 'approved', 7, '2025-08-11 20:46:01', '2025-08-12 15:12:32', NULL),
+(5, '213111333', 'Samir tech', 'uploads/logo main.png', 'i am just figuring things out', 'approved', 9, '2025-08-12 13:50:49', '2025-08-12 15:12:34', NULL),
+(6, '23123123', 'Address', 'uploads/logo main.png', 'address', 'approved', 10, '2025-08-12 13:57:57', '2025-08-12 15:12:36', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi'),
+(7, '2312321', 'Pending', 'uploads/admin dash.png', 'idk man', 'approved', 14, '2025-08-12 15:44:58', '2025-08-12 15:45:16', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi');
 
 -- --------------------------------------------------------
 
@@ -248,7 +254,12 @@ INSERT INTO `users` (`user_id`, `username`, `email`, `phone_no`, `password`, `ad
 (2, 'jane_smith', 'jane@example.com', '+8801234567891', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gulshan, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (3, 'ahmed_khan', 'ahmed@example.com', '+8801234567892', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Uttara, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (6, 'Something', 'something@gmail.com', '01905576802', '$2y$10$hxpxtimgUGQxt1Updv3w0OMO/.IDbED7lLTALHJ07evbugYjAcoza', 'bangladesh dhaka', NULL, NULL, '2025-08-11 20:40:46', '2025-08-11 20:40:46'),
-(7, 'Test tech', 'testtech@gmail.com', '0145678922', '$2y$10$DuzM56C2b3QG8qm9yVhihezat8mitvYH/HdEThotukt/nG5mUvUbu', NULL, NULL, NULL, '2025-08-11 20:46:01', '2025-08-11 20:46:01');
+(7, 'Test tech', 'testtech@gmail.com', '0145678922', '$2y$10$DuzM56C2b3QG8qm9yVhihezat8mitvYH/HdEThotukt/nG5mUvUbu', NULL, NULL, NULL, '2025-08-11 20:46:01', '2025-08-11 20:46:01'),
+(8, 'helppls', 'helpls@gmail.com', '01325409985', '$2y$10$MBs6yPwbkSYZIBUKW1r/8ej/0k9sJy/H9xURKndQ2TbhORE3SUTlW', 'bangladesh dhaka', NULL, NULL, '2025-08-12 12:55:48', '2025-08-12 12:55:48'),
+(9, 'Samir tech', 'samirtech@gmail.com', '01869197806', '$2y$10$UP1omrPM5tN4seBhOR5IjuFqJTCtp7kxNciy5Ug6W7SzI5rL6MNnS', NULL, NULL, NULL, '2025-08-12 13:50:49', '2025-08-12 13:50:49'),
+(10, 'Address', 'address@gmail.com', '01869197806', '$2y$10$7YC6ihcWFkxYXX3LUsvzXeRVR97B7u087mjqmXF0E731xGCscqbWm', NULL, NULL, NULL, '2025-08-12 13:57:57', '2025-08-12 13:57:57'),
+(13, 'Sarwar', 'sarwar@example.com', '0123456789', '$2y$10$CwTycUXWue0Thq9StjUM0uJ8k2Ujy2Ry8H2PsFYYXxMOM6f9YU5LG', NULL, NULL, 2, '2025-08-12 14:41:57', '2025-08-12 14:41:57'),
+(14, 'Pending', 'pending@gmail.com', '01904476903', '$2y$10$oaAQhUbq4R5vw0qPTCrcw.nDE.csJoDlNxwD1BW2TR0/iL5O7Qtgi', NULL, NULL, NULL, '2025-08-12 15:44:58', '2025-08-12 15:44:58');
 
 -- --------------------------------------------------------
 
@@ -408,7 +419,7 @@ ALTER TABLE `website_feedback`
 -- AUTO_INCREMENT for table `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `admin_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `admin_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `admin_dashboard`
@@ -432,7 +443,7 @@ ALTER TABLE `payment`
 -- AUTO_INCREMENT for table `posts`
 --
 ALTER TABLE `posts`
-  MODIFY `post_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `post_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `tasks`
@@ -450,7 +461,7 @@ ALTER TABLE `task_feedback`
 -- AUTO_INCREMENT for table `technician`
 --
 ALTER TABLE `technician`
-  MODIFY `technician_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `technician_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `technician_dashboard`
@@ -462,7 +473,7 @@ ALTER TABLE `technician_dashboard`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `website_feedback`

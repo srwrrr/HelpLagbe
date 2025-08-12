@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HelpLagbe - Admin Login</title>
+<style>
+  /* ===== Global Styles ===== */
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1b1b1b;
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  a {
+    text-decoration: none;
+    color: white;
+    transition: color 0.3s;
+  }
+
+  a:hover {
+    color: #ff6b35;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+
+  /* ===== Header ===== */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #111;
+    padding: 15px 30px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 4px solid #ff6b35; /* orange line below header */
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+  }
+
+  .logo img {
+    height: 80px;
+  }
+
+  nav {
+    display: flex;
+    gap: 20px;
+  }
+
+  nav a {
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background-color 0.3s, color 0.3s;
+  }
+
+  nav a:hover {
+    background-color: #ff6b35;
+    color: white;
+  }
+
+  .contact-btn {
+    background-color: #ff6b35;
+    border: none;
+    padding: 10px 20px;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 5px;
+    transition: background 0.3s, transform 0.3s;
+  }
+
+  .contact-btn:hover {
+    background-color: #e05a2e;
+    transform: scale(1.05);
+  }
+
+  /* ===== Container ===== */
+  .container {
+    background-color: #111; /* darker */
+    border-radius: 15px;
+    padding: 40px 50px 50px;
+    width: 400px;
+    margin: 60px auto 40px;
+    box-shadow: 0 0 30px rgba(255, 107, 53, 0.5);
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Form headers */
+  .form-header {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ff6b35;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+
+  label {
+    display: block;
+    margin: 16px 0 8px;
+    font-weight: 600;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    background-color: #222;
+    color: white;
+    transition: background-color 0.3s ease;
+  }
+
+  input:focus {
+    outline: 2px solid #ff6b35;
+    background-color: #2a2a2a;
+  }
+
+  input::placeholder {
+    color: #bbb;
+  }
+
+  /* Submit button */
+  button.submit-btn {
+    margin-top: 40px;
+    width: 100%;
+    background-color: #ff6b35;
+    color: white;
+    border: none;
+    padding: 16px 0;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  button.submit-btn:hover {
+    background-color: #e05a2e;
+  }
+
+  /* ===== Footer ===== */
+  footer {
+      background-color: #111;
+      padding: 40px 10%;
+      color: white;
+      border-top: 4px solid #ff6b35; /* orange line above footer */
+    }
+    .footer-top {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 30px;
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    footer h3 {
+      color: #ff6b35;
+      margin-bottom: 10px;
+    }
+    footer p {
+      line-height: 1.5;
+      font-size: 0.95rem;
+      color: #ddd;
+      margin: 5px 0;
+    }
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    footer ul li {
+      margin: 8px 0;
+      color: white;
+      font-size: 0.95rem;
+    }
+    footer ul li a {
+      color: white;
+      font-size: 0.95rem;
+    }
+    footer ul li a:hover {
+      color: #ff6b35;
+    }
+    .footer-bottom {
+      text-align: center;
+      padding-top: 10px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+
+    /* Responsive tweaks */
+    @media (max-width: 768px) {
+      .section {
+        padding: 30px 5%;
+      }
+      header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      nav {
+        justify-content: center;
+        width: 100%;
+      }
+      .hero {
+        padding: 60px 5%;
+      }
+      .hero h1 {
+        font-size: 2rem;
+      }
+      .hero-buttons {
+        flex-direction: column;
+        gap: 15px;
+      }
+      .btn-primary, .btn-secondary {
+        width: 100%;
+        min-width: unset;
+      }
+    }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="logo">
+    <img src="logo.png" alt="HelpLagbe Logo" />
+  </div>
+  <nav>
+    <a href="homepage.html">Home</a>
+    <a href="#services">Services</a>
+    <a href="#about">About</a>
+    <a href="login.html">Login</a>
+  </nav>
+  <div style="display: flex; gap: 10px;">
+    <button class="contact-btn" onclick="location.href='admin.html'">Admin</button>
+    <button class="contact-btn" onclick="scrollToContact()">Contact</button>
+  </div>
+</header>
+
+<!-- ===== ADMIN LOGIN CONTAINER ===== -->
+<div class="container">
+  <div class="form-header">Admin Access</div>
+  <form action="admindash.php" method="POST" novalidate>
+    <label for="admin-username">Admin Username</label>
+    <input type="text" id="admin-username" placeholder="Enter your admin username" required />
+
+    <label for="admin-password">Password</label>
+    <input type="password" id="admin-password" placeholder="Enter your password" required />
+
+    <button type="submit" class="submit-btn">Login to Admin Panel</button>
+  </form>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer id="contact">
+    <div class="footer-top">
+      <div>
+        <h3>HelpLagbe</h3>
+        <p>Help Anytime, Anywhere</p>
+        <p>Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed.</p>
+      </div>
+      <div>
+        <h3>Services</h3>
+        <ul>
+          <li>Appliance Repair</li>
+          <li>Electrical Work</li>
+          <li>Plumbing Services</li>
+          <li>General Maintenance</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <ul>
+          <li><a href="#">About Us</a></li>
+          <li><a href="#">Our Services</a></li>
+          <li><a href="#">Join as Technician</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Contact</h3>
+        <ul>
+          <li>+880 1325-409985</li>
+          <li>support@helplagbe.com</li>
+          <li>Dhaka, Bangladesh</li>
+          <li>24/7 Customer Support</li>
+        </ul>
+      </div>
+    </div>
+    <hr />
+    <div class="footer-bottom">
+      © 2026 HelpLagbe. All rights reserved. | 
+      <a href="#">Privacy Policy</a> | 
+      <a href="#">Terms of Service</a>
+    </div>
+  </footer>
+
+<script>
+  // Scroll to contact section
+  function scrollToContact() {
+    document.getElementById("contact").scrollIntoView({ behavior: "smooth" });
+  }
+</script>
+
+</body>
+</html>

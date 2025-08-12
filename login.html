@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HelpLagbe - Login/Register</title>
+<style>
+  /* ===== Global Styles ===== */
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1b1b1b;
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  a {
+    text-decoration: none;
+    color: white;
+    transition: color 0.3s;
+  }
+
+  /* Changed nav a styles here: */
+  nav a {
+    font-weight: 600;
+    font-size: 1rem;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: color 0.3s;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border-bottom: 3px solid transparent;
+  }
+
+  nav a:hover {
+    color: #ff6b35;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  nav a.active {
+    color: #ff6b35;
+    border-bottom: 3px solid #ff6b35;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+
+  /* ===== Header ===== */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #111;
+    padding: 15px 30px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 4px solid #ff6b35; /* orange line below header */
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+  }
+
+  .logo img {
+    height: 80px;
+  }
+
+  nav {
+    display: flex;
+    gap: 20px;
+  }
+
+  .contact-btn {
+    background-color: #ff6b35;
+    border: none;
+    padding: 10px 20px;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 5px;
+    transition: background 0.3s, transform 0.3s;
+  }
+
+  .contact-btn:hover {
+    background-color: #e05a2e;
+    transform: scale(1.05);
+  }
+
+  /* ===== Container ===== */
+  .container {
+    background-color: #111; /* darker */
+    border-radius: 15px;
+    padding: 40px 50px 50px;
+    width: 600px; /* reduced from 420px */
+    margin: 60px auto 40px;
+    box-shadow: 0 0 30px rgba(255, 107, 53, 0.5);
+    min-height: 650px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Tabs container */
+  .tabs {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 35px;
+    background: #222; /* darker */
+    border-radius: 50px;
+    padding: 6px;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px 0;
+    cursor: pointer;
+    border-radius: 50px;
+    color: #aaa;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    user-select: none;
+    margin: 0 7px;
+    position: relative;
+    z-index: 1;
+    font-size: 1.05rem;
+  }
+
+  .tab:first-child {
+    margin-left: 0;
+  }
+
+  .tab:last-child {
+    margin-right: 0;
+  }
+
+  .tab.active {
+    color: white;
+    background-color: #ff6b35;
+    box-shadow: 0 0 12px #ff6b35;
+    z-index: 2;
+  }
+
+  /* Forms */
+  form {
+    display: none;
+    flex-grow: 1;
+    flex-direction: column;
+  }
+
+  form.active {
+    display: flex;
+  }
+
+  /* Form headers */
+  .form-header {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ff6b35;
+    margin-bottom: 25px;
+    text-align: center;
+  }
+
+  label {
+    display: block;
+    margin: 16px 0 8px;
+    font-weight: 600;
+  }
+
+  input, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    background-color: #222; /* darker input */
+    color: white;
+    transition: background-color 0.3s ease;
+  }
+
+  input:focus, textarea:focus {
+    outline: 2px solid #ff6b35;
+    background-color: #2a2a2a;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  input::placeholder, textarea::placeholder {
+    color: #bbb;
+  }
+
+  input[type="file"] {
+    background-color: #222;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 1rem;
+    color: white;
+    cursor: pointer;
+  }
+
+  input[type="file"]::-webkit-file-upload-button {
+    background-color: #ff6b35;
+    border: none;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-weight: 600;
+  }
+
+  input[type="file"]::-webkit-file-upload-button:hover {
+    background-color: #e05a2e;
+  }
+
+  /* Submit button */
+  button.submit-btn {
+    margin-top: 30px;
+    width: 100%;
+    background-color: #ff6b35;
+    color: white;
+    border: none;
+    padding: 16px 0;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  button.submit-btn:hover {
+    background-color: #e05a2e;
+  }
+
+  /* ===== Footer ===== */
+  footer {
+      background-color: #111;
+      padding: 40px 10%;
+      color: white;
+      border-top: 4px solid #ff6b35; /* orange line above footer */
+    }
+    .footer-top {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 30px;
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    footer h3 {
+      color: #ff6b35;
+      margin-bottom: 10px;
+    }
+    footer p {
+      line-height: 1.5;
+      font-size: 0.95rem;
+      color: #ddd;
+      margin: 5px 0;
+    }
+    footer ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    footer ul li {
+      margin: 8px 0;
+      color: white;
+      font-size: 0.95rem;
+    }
+    footer ul li a {
+      color: white;
+      font-size: 0.95rem;
+    }
+    footer ul li a:hover {
+      color: #ff6b35;
+    }
+    .footer-bottom {
+      text-align: center;
+      padding-top: 10px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+
+    /* Responsive tweaks */
+    @media (max-width: 768px) {
+      .section {
+        padding: 30px 5%;
+      }
+      header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      nav {
+        justify-content: center;
+        width: 100%;
+      }
+      .hero {
+        padding: 60px 5%;
+      }
+      .hero h1 {
+        font-size: 2rem;
+      }
+      .hero-buttons {
+        flex-direction: column;
+        gap: 15px;
+      }
+      .btn-primary, .btn-secondary {
+        width: 100%;
+        min-width: unset;
+      }
+    }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="logo">
+    <img src="logo.png" alt="HelpLagbe Logo" />
+  </div>
+  <nav>
+    <a href="homepage.html">Home</a>
+    <a href="#services">Services</a>
+    <a href="#about">About</a>
+    <a href="login.html" class="active">Login</a>
+  </nav>
+  <div style="display: flex; gap: 10px;">
+    <button class="contact-btn" onclick="location.href='admin.html'">Admin</button>
+    <button class="contact-btn" onclick="scrollToContact()">Contact</button>
+  </div>
+</header>
+
+<!-- ===== LOGIN/REGISTER CONTAINER ===== -->
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" data-target="login-form">Login</div>
+    <div class="tab" data-target="register-form">Register</div>
+    <div class="tab" data-target="technician-form">Join as Technician</div>
+  </div>
+
+  <!-- Login Form -->
+  <form id="login-form" class="active" method="POST" action="login.php">
+    <label for="login-email">Email</label>
+    <input type="email" id="login-email" name="email" placeholder="Enter your email" required />
+    
+    <label for="login-password">Password</label>
+    <input type="password" id="login-password" name="password" placeholder="Enter your password" required />
+    
+    <button type="submit" class="submit-btn">Login</button>
+</form>
+
+
+  <!-- Register Form -->
+  <form id="register-form" method="POST" action="register.php">
+    <label for="reg-fullname">Full Name</label>
+    <input type="text" id="reg-fullname" name="fullname" placeholder="Your full name" required />
+    
+    <label for="reg-email">Email</label>
+    <input type="email" id="reg-email" name="email" placeholder="Your email" required />
+    
+    <label for="reg-phone">Phone Number</label>
+    <input type="tel" id="reg-phone" name="phone" placeholder="Your phone number" required />
+    
+    <label for="reg-password">Password</label>
+    <input type="password" id="reg-password" name="password" placeholder="Create a password" required />
+    
+    <label for="reg-address">Address</label>
+    <textarea id="reg-address" name="address" rows="3" placeholder="Your address" required></textarea>
+    
+    <button type="submit" class="submit-btn">Register</button>
+</form>
+
+
+  <!-- Technician Form -->
+  <form id="technician-form" method="POST" action="register_technician.php" enctype="multipart/form-data">
+    <label for="tech-fullname">Full Name</label>
+    <input type="text" id="tech-fullname" name="fullname" placeholder="Your full name" required />
+    
+    <label for="tech-nid">National ID</label>
+    <input type="text" id="tech-nid" name="nid" placeholder="Your National ID" required />
+    
+    <label for="tech-email">Email</label>
+    <input type="email" id="tech-email" name="email" placeholder="Your email" required />
+    
+    <label for="tech-phone">Phone Number</label>
+    <input type="tel" id="tech-phone" name="phone" placeholder="Your phone number" required />
+
+    <label for="tech-address">Address</label>
+<textarea id="tech-address" name="address" rows="3" placeholder="Your address" required></textarea>
+
+    
+    <label for="tech-skills">Skills & Experience</label>
+    <textarea id="tech-skills" name="skills" rows="4" placeholder="Describe your technical skills and experience in detail" required></textarea>
+    
+    <label for="tech-docs">Upload Documents (NID, Certificates)</label>
+    <input type="file" id="tech-docs" name="documents" accept=".pdf,.jpg,.jpeg,.png" />
+    
+    <button type="submit" class="submit-btn">Join as Technician</button>
+</form>
+
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer id="contact">
+    <div class="footer-top">
+      <div>
+        <h3>HelpLagbe</h3>
+        <p>Help Anytime, Anywhere</p>
+        <p>Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed.</p>
+      </div>
+      <div>
+        <h3>Services</h3>
+        <ul>
+          <li>Appliance Repair</li>
+          <li>Electrical Work</li>
+          <li>Plumbing Services</li>
+          <li>General Maintenance</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <ul>
+          <li><a href="#">About Us</a></li>
+          <li><a href="#">Our Services</a></li>
+          <li><a href="#">Join as Technician</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Contact</h3>
+        <ul>
+          <li>+880 1325-409985</li>
+          <li>support@helplagbe.com</li>
+          <li>Dhaka, Bangladesh</li>
+          <li>24/7 Customer Support</li>
+        </ul>
+      </div>
+    </div>
+    <hr />
+    <div class="footer-bottom">
+      © 2026 HelpLagbe. All rights reserved. | 
+      <a href="#">Privacy Policy</a> | 
+      <a href="#">Terms of Service</a>
+    </div>
+  </footer>
+
+<script>
+  // Scroll to contact section
+  function scrollToContact() {
+    document.getElementById("contact").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // Tabs functionality
+  const tabs = document.querySelectorAll('.tab');
+  const forms = document.querySelectorAll('form');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      forms.forEach(f => f.classList.remove('active'));
+
+      tab.classList.add('active');
+      const target = tab.getAttribute('data-target');
+      document.getElementById(target).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
