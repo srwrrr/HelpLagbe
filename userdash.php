@@ -231,7 +231,7 @@ $conn->close();
             background-color: #111;
             border-radius: 15px;
             padding: 40px 50px 50px;
-            width: 700px;
+            width: 1400px;
             max-width: 95vw;
             margin: 60px auto 40px;
             box-shadow: 0 0 30px rgba(255, 107, 53, 0.5);
@@ -541,7 +541,7 @@ $conn->close();
             <a href="userdash.php" class="active">Dashboard</a>
         </nav>
         <div style="display:flex; gap:10px;">
-            <button class="contact-btn" onclick="location.href='admin.html'">Admin</button>
+            <button class="contact-btn" onclick="location.href='login.html'">Logout</button>
             <button class="contact-btn" onclick="scrollToContact()">Contact</button>
         </div>
     </header>
@@ -607,7 +607,8 @@ $conn->close();
                                 <td>
                                     <form method="POST" style="margin:0;"
                                         onsubmit="return confirm('Are you sure you want to delete this post?');">
-                                        <input type="hidden" name="delete_post_id" value="<?php echo (int) $post['post_id']; ?>">
+                                        <input type="hidden" name="delete_post_id"
+                                            value="<?php echo (int) $post['post_id']; ?>">
                                         <button type="submit" class="delete-btn">Delete</button>
                                     </form>
                                 </td>

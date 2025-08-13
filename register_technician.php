@@ -8,12 +8,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = $_POST['phone'];
     $skills = $_POST['skills'];
     $address = $_POST['address'];
-
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // <-- updated
 
     // Create user account
-    $password = password_hash("default123", PASSWORD_DEFAULT); // Default password or you can ask for one
     $stmt_user = $conn->prepare("INSERT INTO users (username, email, phone_no, password) VALUES (?, ?, ?, ?)");
     $stmt_user->bind_param("ssss", $fullname, $email, $phone, $password);
+
 
     if ($stmt_user->execute()) {
         $user_id = $stmt_user->insert_id;
