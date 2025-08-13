@@ -28,7 +28,7 @@ $perPage = 10;
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $offset = ($page - 1) * $perPage;
 
-$allowed_tabs = ['users', 'technicians', 'requests', 'tasks', 'approvals'];
+$allowed_tabs = ['overview', 'users', 'technicians', 'requests', 'tasks', 'approvals'];
 $tab = isset($_GET['tab']) && in_array($_GET['tab'], $allowed_tabs) ? $_GET['tab'] : 'users';
 
 function getCount($conn, $sql)
@@ -358,6 +358,8 @@ function getTotalPages($conn, $countSql, $perPage)
     <?php endif; ?>
 
     <div class="buttons-box">
+      <a href="?tab=overview" class="btn"
+        style="background-color: <?= $tab === 'overview' ? '#e05a2e' : '#ff6b35' ?>;">Overview</a>
       <a href="?tab=users" class="btn"
         style="background-color: <?= $tab === 'users' ? '#e05a2e' : '#ff6b35' ?>;">Users</a>
       <a href="?tab=technicians" class="btn"
@@ -370,7 +372,45 @@ function getTotalPages($conn, $countSql, $perPage)
         style="background-color: <?= $tab === 'approvals' ? '#e05a2e' : '#ff6b35' ?>;">Approvals</a>
     </div>
 
-    <?php if ($tab === 'users'):
+    <?php if ($tab === 'overview'):
+      // Fetch stats
+      $totalUsers = getCount($conn, "SELECT COUNT(*) AS count FROM users");
+      $totalTechnicians = getCount($conn, "SELECT COUNT(*) AS count FROM technician");
+      $pendingTechnicians = getCount($conn, "SELECT COUNT(*) AS count FROM technician WHERE status = 'pending'");
+      $totalTasks = getCount($conn, "SELECT COUNT(*) AS count FROM tasks");
+      $totalRequests = getCount($conn, "SELECT COUNT(*) AS count FROM posts");
+      ?>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 25px; margin-bottom: 30px;">
+        <div
+          style="background:#222; padding:20px; border-radius:12px; text-align:center; box-shadow:0 0 15px rgba(255,107,53,0.4);">
+          <h3>Total Users</h3>
+          <p style="font-size:1.5rem; font-weight:700;"><?= $totalUsers ?></p>
+        </div>
+        <div
+          style="background:#222; padding:20px; border-radius:12px; text-align:center; box-shadow:0 0 15px rgba(255,107,53,0.4);">
+          <h3>Total Technicians</h3>
+          <p style="font-size:1.5rem; font-weight:700;"><?= $totalTechnicians ?></p>
+        </div>
+        <div
+          style="background:#222; padding:20px; border-radius:12px; text-align:center; box-shadow:0 0 15px rgba(255,107,53,0.4);">
+          <h3>Pending Approvals</h3>
+          <p style="font-size:1.5rem; font-weight:700;"><?= $pendingTechnicians ?></p>
+        </div>
+        <div
+          style="background:#222; padding:20px; border-radius:12px; text-align:center; box-shadow:0 0 15px rgba(255,107,53,0.4);">
+          <h3>Total Tasks</h3>
+          <p style="font-size:1.5rem; font-weight:700;"><?= $totalTasks ?></p>
+        </div>
+        <div
+          style="background:#222; padding:20px; border-radius:12px; text-align:center; box-shadow:0 0 15px rgba(255,107,53,0.4);">
+          <h3>Total Requests</h3>
+          <p style="font-size:1.5rem; font-weight:700;"><?= $totalRequests ?></p>
+        </div>
+      </div>
+
+
+    <?php elseif ($tab === 'users'):
       $totalPages = getTotalPages($conn, "SELECT COUNT(*) AS count FROM users", $perPage);
       $result = $conn->query("SELECT user_id, username, email, phone_no, created_at FROM users ORDER BY created_at DESC LIMIT $perPage OFFSET $offset");
       ?>
