@@ -343,7 +343,7 @@ function getTotalPages($conn, $countSql, $perPage)
       <a href="#about">About</a>
     </nav>
     <div style="display:flex; gap:10px;">
-      <button class="btn" onclick="location.href='admin.html'">Admin</button>
+      <button class="btn" onclick="location.href='login.html'">Logout</button>
       <button class="btn"
         onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Contact</button>
     </div>
