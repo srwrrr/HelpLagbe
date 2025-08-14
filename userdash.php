@@ -17,6 +17,27 @@ function h($string)
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
 }
 
+function getPostBids($post_id, $conn)
+{
+    $bids = [];
+    $sql = "SELECT t.task_id, t.price, t.created_at, t.task_status, 
+                   tech.Full_Name AS technician_name, tech.national_id,
+                   u.username, u.phone_no, u.Image AS tech_image
+            FROM tasks t
+            JOIN technician tech ON t.technician_id = tech.technician_id
+            JOIN users u ON tech.user_id = u.user_id
+            WHERE t.post_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $post_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $bids[] = $row;
+    }
+    $stmt->close();
+    return $bids;
+}
+
 $errors = [];
 $success_message = "";
 
@@ -96,22 +117,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_post'])) {
     }
 }
 
-// Fetch user's posts
-$posts = [];
-$sql_posts = "SELECT post_id, Post_detail, Image, Category, `Sub-Category`, created_at
-              FROM posts 
-              WHERE user_id = ? 
-              ORDER BY created_at DESC";
-$stmt_posts = $conn->prepare($sql_posts);
-$stmt_posts->bind_param("i", $user_id);
-$stmt_posts->execute();
-$result_posts = $stmt_posts->get_result();
-while ($row = $result_posts->fetch_assoc()) {
-    $posts[] = $row;
-}
-$stmt_posts->close();
+// Handle Accept Bid
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accept_bid'])) {
+    $task_id = (int) $_POST['task_id'];
+    $post_id = (int) $_POST['post_id'];
 
-// Fetch user profile info
+    // First reject all other bids for this post
+    $stmt_reject = $conn->prepare("UPDATE tasks SET task_status = 'rejected' 
+                                  WHERE post_id = ? AND task_id != ?");
+    $stmt_reject->bind_param("ii", $post_id, $task_id);
+    $stmt_reject->execute();
+    $stmt_reject->close();
+
+    // Then accept the selected bid
+    $stmt_accept = $conn->prepare("UPDATE tasks SET task_status = 'accepted' 
+                                  WHERE task_id = ?");
+    $stmt_accept->bind_param("i", $task_id);
+    if ($stmt_accept->execute()) {
+        $success_message = "Bid accepted successfully!";
+    } else {
+        $errors[] = "Failed to accept bid.";
+    }
+    $stmt_accept->close();
+}
+
+// Handle Reject Bid
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reject_bid'])) {
+    $task_id = (int) $_POST['task_id'];
+    $stmt = $conn->prepare("UPDATE tasks SET task_status = 'rejected' 
+                           WHERE task_id = ?");
+    $stmt->bind_param("i", $task_id);
+    if ($stmt->execute()) {
+        $success_message = "Bid rejected successfully!";
+    } else {
+        $errors[] = "Failed to reject bid.";
+    }
+    $stmt->close();
+}
+
+// Fetch user profile info first (needed for profile update)
 $profile = [];
 $sql_profile = "SELECT username, email, phone_no, address, Image FROM users WHERE user_id = ?";
 $stmt_profile = $conn->prepare($sql_profile);
@@ -122,6 +166,91 @@ if ($result_profile->num_rows > 0) {
     $profile = $result_profile->fetch_assoc();
 }
 $stmt_profile->close();
+
+// Handle Profile Update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
+    $username_new = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone_no = trim($_POST['phone_no'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+
+    // Validate inputs
+    if (empty($username_new)) {
+        $errors[] = "Username is required";
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Invalid email format";
+    }
+
+    $image_path = $profile['Image'] ?? null;
+
+    // Handle image upload
+    if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
+        $allowed = ['image/jpeg', 'image/png', 'image/gif'];
+        if (in_array($_FILES['profile_image']['type'], $allowed)) {
+            $ext = pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION);
+            $new_filename = 'uploads/profile_' . $user_id . '_' . time() . '.' . $ext;
+
+            if (move_uploaded_file($_FILES['profile_image']['tmp_name'], $new_filename)) {
+                // Delete old image if it exists
+                if ($image_path && file_exists($image_path)) {
+                    @unlink($image_path);
+                }
+                $image_path = $new_filename;
+            } else {
+                $errors[] = "Failed to upload image";
+            }
+        } else {
+            $errors[] = "Only JPG, PNG, GIF images are allowed";
+        }
+    }
+
+    if (empty($errors)) {
+        $stmt = $conn->prepare("UPDATE users SET 
+                              username = ?, 
+                              email = ?, 
+                              phone_no = ?, 
+                              address = ?, 
+                              Image = ? 
+                              WHERE user_id = ?");
+        $stmt->bind_param("sssssi", $username_new, $email, $phone_no, $address, $image_path, $user_id);
+
+        if ($stmt->execute()) {
+            $_SESSION['username'] = $username_new;
+            $username = $username_new; // Update the display username
+            $success_message = "Profile updated successfully!";
+            // Refresh profile data
+            $profile = [
+                'username' => $username_new,
+                'email' => $email,
+                'phone_no' => $phone_no,
+                'address' => $address,
+                'Image' => $image_path
+            ];
+        } else {
+            $errors[] = "Failed to update profile: " . $stmt->error;
+        }
+        $stmt->close();
+    }
+}
+
+// Fetch user's posts with bids
+$posts = [];
+$sql_posts = "SELECT p.post_id, p.Post_detail, p.Image, p.Category, p.`Sub-Category`, p.created_at,
+              (SELECT COUNT(*) FROM tasks t WHERE t.post_id = p.post_id) AS bid_count
+              FROM posts p 
+              WHERE p.user_id = ? 
+              ORDER BY p.created_at DESC";
+$stmt_posts = $conn->prepare($sql_posts);
+$stmt_posts->bind_param("i", $user_id);
+$stmt_posts->execute();
+$result_posts = $stmt_posts->get_result();
+while ($row = $result_posts->fetch_assoc()) {
+    // Get bids for each post
+    $row['bids'] = getPostBids($row['post_id'], $conn);
+    $posts[] = $row;
+}
+$stmt_posts->close();
 
 // Fetch task history
 $history = [];
@@ -141,6 +270,7 @@ while ($row = $result_history->fetch_assoc()) {
 }
 $stmt_history->close();
 
+// Now close the connection
 $conn->close();
 ?>
 
@@ -333,6 +463,35 @@ $conn->close();
             display: block;
         }
 
+        .bid {
+            padding: 10px;
+            margin: 5px 0;
+            background: #333;
+            border-radius: 5px;
+        }
+
+        .bid p {
+            margin: 5px 0;
+        }
+
+        button[type="submit"] {
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button[name="accept_bid"] {
+            background: #4CAF50;
+            color: white;
+        }
+
+        button[name="reject_bid"] {
+            background: #f44336;
+            color: white;
+        }
+
         /* Table styles for posts & history */
         table {
             width: 100%;
@@ -378,6 +537,21 @@ $conn->close();
             background: #cc0000;
         }
 
+        .view-bids-btn {
+            background: #007bff;
+            border: none;
+            padding: 6px 12px;
+            color: white;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .view-bids-btn:hover {
+            background: #0056b3;
+        }
+
         /* Create post form */
         form#create-post-form {
             display: flex;
@@ -391,6 +565,7 @@ $conn->close();
         }
 
         form#create-post-form input[type="text"],
+        form#create-post-form input[type="email"],
         form#create-post-form textarea,
         form#create-post-form select {
             padding: 8px 10px;
@@ -400,7 +575,8 @@ $conn->close();
             resize: vertical;
         }
 
-        form#create-post-form textarea {
+        form#create-post-form textarea,
+        #myprofile textarea {
             min-height: 100px;
         }
 
@@ -408,7 +584,8 @@ $conn->close();
             color: #fff;
         }
 
-        form#create-post-form button {
+        form#create-post-form button,
+        #myprofile button {
             align-self: flex-start;
             background-color: #ff6b35;
             border: none;
@@ -420,8 +597,19 @@ $conn->close();
             transition: background 0.3s;
         }
 
-        form#create-post-form button:hover {
+        form#create-post-form button:hover,
+        #myprofile button:hover {
             background-color: #e05a2e;
+        }
+
+        #myprofile input,
+        #myprofile textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #333;
+            color: white;
         }
 
         /* Messages */
@@ -583,32 +771,60 @@ $conn->close();
                     <thead>
                         <tr>
                             <th>Post Detail</th>
-                            <th>Image</th>
                             <th>Category</th>
-                            <th>Sub-Category</th>
-                            <th>Created At</th>
+                            <th>Date Created</th>
+                            <th>Bids</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($posts as $post): ?>
                             <tr>
-                                <td><?php echo h($post['Post_detail']); ?></td>
                                 <td>
-                                    <?php if (!empty($post['Image'])): ?>
-                                        <img src="<?php echo h($post['Image']); ?>" alt="Post Image">
-                                    <?php else: ?>
-                                        No Image
+                                    <strong><?php echo h($post['Post_detail']); ?></strong>
+                                    <?php if (!empty($post['Sub-Category'])): ?>
+                                        <br><small>Sub-category: <?php echo h($post['Sub-Category']); ?></small>
                                     <?php endif; ?>
                                 </td>
                                 <td><?php echo h($post['Category']); ?></td>
-                                <td><?php echo h($post['Sub-Category']); ?></td>
-                                <td><?php echo h($post['created_at']); ?></td>
+                                <td><?php echo date('M d, Y', strtotime($post['created_at'])); ?></td>
                                 <td>
-                                    <form method="POST" style="margin:0;"
-                                        onsubmit="return confirm('Are you sure you want to delete this post?');">
-                                        <input type="hidden" name="delete_post_id"
-                                            value="<?php echo (int) $post['post_id']; ?>">
+                                    <?php if ($post['bid_count'] > 0): ?>
+                                        <button class="view-bids-btn" onclick="toggleBids(<?php echo $post['post_id']; ?>)">
+                                            View Bids (<?php echo $post['bid_count']; ?>)
+                                        </button>
+                                        <div id="bids-<?php echo $post['post_id']; ?>" style="display:none; margin-top:10px;">
+                                            <?php foreach ($post['bids'] as $bid): ?>
+                                                <div class="bid">
+                                                    <p><strong>Technician:</strong> <?php echo h($bid['technician_name']); ?></p>
+                                                    <p><strong>Username:</strong> <?php echo h($bid['username']); ?></p>
+                                                    <p><strong>Phone:</strong> <?php echo h($bid['phone_no']); ?></p>
+                                                    <p><strong>Price:</strong> ৳<?php echo h($bid['price']); ?></p>
+                                                    <p><strong>Status:</strong> <span
+                                                            style="color: <?php echo $bid['task_status'] == 'accepted' ? '#4CAF50' : ($bid['task_status'] == 'rejected' ? '#f44336' : '#ffa500'); ?>"><?php echo ucfirst(h($bid['task_status'])); ?></span>
+                                                    </p>
+                                                    <p><strong>Bid Date:</strong>
+                                                        <?php echo date('M d, Y H:i', strtotime($bid['created_at'])); ?></p>
+                                                    <?php if ($bid['task_status'] == 'pending'): ?>
+                                                        <form method="POST" style="display: inline-block;">
+                                                            <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
+                                                            <input type="hidden" name="task_id" value="<?php echo $bid['task_id']; ?>">
+                                                            <button type="submit" name="accept_bid">Accept</button>
+                                                            <button type="submit" name="reject_bid">Reject</button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <span style="color: #999;">No bids yet</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <form method="POST"
+                                        onsubmit="return confirm('Are you sure you want to delete this post? This action cannot be undone.');"
+                                        style="display: inline;">
+                                        <input type="hidden" name="delete_post_id" value="<?php echo $post['post_id']; ?>">
                                         <button type="submit" class="delete-btn">Delete</button>
                                     </form>
                                 </td>
@@ -617,25 +833,33 @@ $conn->close();
                     </tbody>
                 </table>
             <?php else: ?>
-                <p>You have no posts yet.</p>
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <h3>No Posts Yet</h3>
+                    <p>You haven't created any posts yet. Click on "Create Post" to get started!</p>
+                </div>
             <?php endif; ?>
         </div>
 
         <!-- Create Post -->
         <div id="createpost" class="tab-content">
+            <h3 style="color: #ff6b35; margin-bottom: 20px;">Create a New Service Request</h3>
             <form id="create-post-form" method="POST" enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="create_post" value="1">
-                <label for="post_detail">Post Detail *</label>
-                <textarea name="post_detail" id="post_detail" required></textarea>
 
-                <label for="category">Category *</label>
-                <input type="text" name="category" id="category" required>
+                <label for="post_detail">Describe your service need *</label>
+                <textarea name="post_detail" id="post_detail" required
+                    placeholder="Please provide a detailed description of the service you need..."></textarea>
 
-                <label for="sub_category">Sub-Category</label>
-                <input type="text" name="sub_category" id="sub_category">
+                <label for="category">Service Category *</label>
+                <input type="text" name="category" id="category" required
+                    placeholder="e.g., Electrical, Plumbing, Appliance Repair">
 
-                <label for="image">Upload Image (JPG, PNG, GIF)</label>
+                <label for="sub_category">Sub-Category (Optional)</label>
+                <input type="text" name="sub_category" id="sub_category" placeholder="e.g., AC Repair, Wiring, etc.">
+
+                <label for="image">Upload Image (Optional)</label>
                 <input type="file" name="image" id="image" accept="image/jpeg,image/png,image/gif">
+                <small style="color: #999;">Supported formats: JPG, PNG, GIF</small>
 
                 <button type="submit">Create Post</button>
             </form>
@@ -644,66 +868,95 @@ $conn->close();
         <!-- My Profile -->
         <div id="myprofile" class="tab-content">
             <?php if (!empty($profile)): ?>
-                <table>
-                    <tr>
-                        <th>Username</th>
-                        <td><?php echo h($profile['username']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Email</th>
-                        <td><?php echo h($profile['email']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Phone Number</th>
-                        <td><?php echo h($profile['phone_no']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Address</th>
-                        <td><?php echo h($profile['address']); ?></td>
-                    </tr>
-                    <tr>
-                        <th>Profile Image</th>
-                        <td>
-                            <?php if (!empty($profile['Image'])): ?>
-                                <img src="<?php echo h($profile['Image']); ?>" alt="Profile Image" style="max-width:120px;">
-                            <?php else: ?>
-                                No image uploaded
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                </table>
+                <h3 style="color: #ff6b35; margin-bottom: 20px;">Profile Information</h3>
+                <form method="POST" enctype="multipart/form-data">
+                    <table>
+                        <tr>
+                            <th style="width: 30%;">Username</th>
+                            <td><input type="text" name="username" value="<?php echo h($profile['username']); ?>" required>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Email</th>
+                            <td><input type="email" name="email" value="<?php echo h($profile['email']); ?>" required></td>
+                        </tr>
+                        <tr>
+                            <th>Phone Number</th>
+                            <td><input type="text" name="phone_no" value="<?php echo h($profile['phone_no']); ?>"></td>
+                        </tr>
+                        <tr>
+                            <th>Address</th>
+                            <td><textarea name="address"
+                                    placeholder="Enter your address..."><?php echo h($profile['address']); ?></textarea>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Profile Image</th>
+                            <td>
+                                <input type="file" name="profile_image" accept="image/jpeg,image/png,image/gif">
+                                <?php if (!empty($profile['Image'])): ?>
+                                    <br><br>
+                                    <div style="margin-top: 10px;">
+                                        <strong>Current Image:</strong><br>
+                                        <img src="<?php echo h($profile['Image']); ?>" alt="Profile Image"
+                                            style="max-width:120px; max-height:120px; border: 2px solid #ff6b35;">
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="text-align: center; padding-top: 20px;">
+                                <button type="submit" name="update_profile">Update Profile</button>
+                            </td>
+                        </tr>
+                    </table>
+                </form>
             <?php else: ?>
-                <p>Profile information not found.</p>
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <h3>Profile Not Found</h3>
+                    <p>Unable to load profile information. Please try refreshing the page.</p>
+                </div>
             <?php endif; ?>
         </div>
 
         <!-- History -->
         <div id="history" class="tab-content">
+            <h3 style="color: #ff6b35; margin-bottom: 20px;">Task History</h3>
             <?php if (count($history) > 0): ?>
                 <table>
                     <thead>
                         <tr>
                             <th>Task ID</th>
-                            <th>Task Status</th>
+                            <th>Related Post</th>
+                            <th>Status</th>
                             <th>Price</th>
-                            <th>Created At</th>
-                            <th>Related Post Detail</th>
+                            <th>Date</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($history as $task): ?>
                             <tr>
-                                <td><?php echo h($task['task_id']); ?></td>
-                                <td><?php echo h($task['task_status']); ?></td>
-                                <td><?php echo h($task['price']); ?></td>
-                                <td><?php echo h($task['created_at']); ?></td>
-                                <td><?php echo h($task['Post_detail']); ?></td>
+                                <td>#<?php echo h($task['task_id']); ?></td>
+                                <td><?php echo h(substr($task['Post_detail'], 0, 50)) . (strlen($task['Post_detail']) > 50 ? '...' : ''); ?>
+                                </td>
+                                <td>
+                                    <span
+                                        style="color: <?php echo $task['task_status'] == 'accepted' ? '#4CAF50' : ($task['task_status'] == 'rejected' ? '#f44336' : '#ffa500'); ?>; font-weight: bold;">
+                                        <?php echo ucfirst(h($task['task_status'])); ?>
+                                    </span>
+                                </td>
+                                <td>৳<?php echo h($task['price']); ?></td>
+                                <td><?php echo date('M d, Y H:i', strtotime($task['created_at'])); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             <?php else: ?>
-                <p>No past tasks found.</p>
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    <h4>No Task History</h4>
+                    <p>You don't have any task history yet. Once technicians bid on your posts and you accept/reject them,
+                        they will appear here.</p>
+                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -763,13 +1016,68 @@ $conn->close();
 
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
                 tabs.forEach(t => t.classList.remove('active'));
                 tabContents.forEach(tc => tc.classList.remove('active'));
 
+                // Add active class to clicked tab
                 tab.classList.add('active');
+
+                // Show corresponding content
                 const target = tab.getAttribute('data-target');
                 document.getElementById(target).classList.add('active');
             });
+        });
+
+        // Toggle bids visibility
+        function toggleBids(postId) {
+            const bidDiv = document.getElementById(`bids-${postId}`);
+            const button = bidDiv.previousElementSibling;
+
+            if (bidDiv.style.display === 'none' || bidDiv.style.display === '') {
+                bidDiv.style.display = 'block';
+                button.textContent = button.textContent.replace('View', 'Hide');
+            } else {
+                bidDiv.style.display = 'none';
+                button.textContent = button.textContent.replace('Hide', 'View');
+            }
+        }
+
+        // Form validation
+        document.getElementById('create-post-form').addEventListener('submit', function (e) {
+            const postDetail = document.getElementById('post_detail').value.trim();
+            const category = document.getElementById('category').value.trim();
+
+            if (!postDetail) {
+                alert('Please provide a detailed description of your service need.');
+                e.preventDefault();
+                return false;
+            }
+
+            if (!category) {
+                alert('Please specify the service category.');
+                e.preventDefault();
+                return false;
+            }
+
+            if (postDetail.length < 10) {
+                alert('Please provide a more detailed description (at least 10 characters).');
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Auto-hide success/error messages after 5 seconds
+        document.addEventListener('DOMContentLoaded', function () {
+            const messages = document.querySelector('.messages');
+            if (messages) {
+                setTimeout(function () {
+                    messages.style.opacity = '0';
+                    setTimeout(function () {
+                        messages.style.display = 'none';
+                    }, 300);
+                }, 5000);
+            }
         });
     </script>
 
