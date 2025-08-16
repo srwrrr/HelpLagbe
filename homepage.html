@@ -12,13 +12,14 @@
       background-color: #1b1b1b;
       color: white;
       overflow-x: hidden;
+      line-height: 1.6;
     }
 
     a {
       text-decoration: none;
       color: white;
-      transition: color 0.3s;
-      border-bottom: 3px solid transparent; /* default no underline */
+      transition: all 0.3s ease;
+      border-bottom: 3px solid transparent;
       padding-bottom: 4px;
     }
 
@@ -28,7 +29,6 @@
       box-shadow: none;
     }
 
-    /* Highlight and underline active nav link */
     nav a.active {
       color: #ff6b35;
       border-bottom: 3px solid #ff6b35;
@@ -39,7 +39,13 @@
     img {
       max-width: 100%;
       height: auto;
-      border-radius: 10px;
+      border-radius: 15px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    img:hover {
+      transform: scale(1.02);
+      box-shadow: 0 10px 30px rgba(255, 107, 53, 0.3);
     }
 
     /* ===== Animations ===== */
@@ -54,17 +60,81 @@
       transform: translateY(0);
     }
 
+    .slide-in-left {
+      opacity: 0;
+      transform: translateX(-50px);
+      transition: all 0.8s ease;
+    }
+
+    .slide-in-left.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .slide-in-right {
+      opacity: 0;
+      transform: translateX(50px);
+      transition: all 0.8s ease;
+    }
+
+    .slide-in-right.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .floating {
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* ===== Language Toggle ===== */
+    .language-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 107, 53, 0.1);
+      padding: 5px;
+      border-radius: 20px;
+      border: 1px solid #ff6b35;
+    }
+
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.9rem;
+    }
+
+    .lang-btn.active {
+      background: #ff6b35;
+      color: white;
+    }
+
+    .lang-btn:hover {
+      background: rgba(255, 107, 53, 0.3);
+    }
+
     /* ===== Header ===== */
     header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background-color: #111;
+      background: linear-gradient(135deg, #111, #222);
       padding: 15px 30px;
       position: sticky;
       top: 0;
       z-index: 100;
-      border-bottom: 4px solid #ff6b35; /* orange line below header */
+      border-bottom: 4px solid #ff6b35;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     }
 
     .logo {
@@ -72,10 +142,10 @@
       align-items: center;
     }
 
-    /* Logo bigger */
     .logo img {
-      height: 80px;  /* increased */
+      height: 80px;
       margin-right: 10px;
+      filter: drop-shadow(0 4px 8px rgba(255, 107, 53, 0.3));
     }
 
     nav {
@@ -86,249 +156,561 @@
     nav a {
       font-weight: 600;
       font-size: 1rem;
+      position: relative;
+      overflow: hidden;
     }
 
-    .contact-btn {
-      background-color: #ff6b35;
+    nav a::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -100%;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #ff6b35, transparent);
+      transition: left 0.5s ease;
+    }
+
+    nav a:hover::before {
+      left: 100%;
+    }
+
+    .contact-btn, .admin-btn {
+      background: linear-gradient(135deg, #ff6b35, #e05a2e);
       border: none;
-      padding: 10px 20px;
+      padding: 12px 25px;
       color: white;
       cursor: pointer;
       font-weight: bold;
-      border-radius: 5px;
-      transition: background 0.3s, transform 0.3s;
+      border-radius: 25px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+      position: relative;
+      overflow: hidden;
     }
 
-    .contact-btn:hover {
-      background-color: #e05a2e;
-      transform: scale(1.05);
+    .contact-btn::before, .admin-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s ease;
     }
 
-    /* Admin Button */
-    .admin-btn {
-      background-color: #ff6b35;
-      border: none;
-      padding: 10px 20px;
-      color: white;
-      cursor: pointer;
-      font-weight: bold;
-      border-radius: 5px;
-      transition: background 0.3s, transform 0.3s;
+    .contact-btn:hover::before, .admin-btn:hover::before {
+      left: 100%;
     }
 
-    .admin-btn:hover {
-      background-color: #e05a2e;
-      transform: scale(1.05);
+    .contact-btn:hover, .admin-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
     }
 
     /* ===== Hero Section ===== */
     .hero {
-      background: linear-gradient(135deg, #222, #111);
-      padding: 80px 10%;
+      background: linear-gradient(135deg, #222, #111), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="%23333" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+      padding: 100px 10%;
       text-align: center;
       color: white;
+      min-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
     }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at center, rgba(255, 107, 53, 0.1) 0%, transparent 70%);
+      z-index: 1;
+    }
+
+    .hero > * {
+      position: relative;
+      z-index: 2;
+    }
+
     .hero h1 {
-      font-size: 2.8rem;
+      font-size: 3.5rem;
       margin-bottom: 20px;
       color: #ff6b35;
       font-weight: 900;
       letter-spacing: 1.2px;
+      text-shadow: 0 4px 20px rgba(255, 107, 53, 0.5);
+      background: linear-gradient(45deg, #ff6b35, #ff8c5a);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
+
     .hero p {
-      font-size: 1.2rem;
-      max-width: 600px;
-      margin: 0 auto 40px auto;
-      line-height: 1.5;
+      font-size: 1.3rem;
+      max-width: 700px;
+      margin: 0 auto 50px auto;
+      line-height: 1.6;
       color: #ddd;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     }
+
     .hero-buttons {
       display: flex;
       justify-content: center;
       gap: 20px;
       flex-wrap: wrap;
+      margin-bottom: 50px;
     }
+
     .btn-primary, .btn-secondary {
       cursor: pointer;
-      padding: 15px 40px;
+      padding: 18px 45px;
       font-weight: 700;
       font-size: 1.1rem;
-      border-radius: 30px;
+      border-radius: 50px;
       border: none;
-      transition: background 0.3s, transform 0.3s;
-      min-width: 160px;
+      transition: all 0.3s ease;
+      min-width: 180px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
     }
+
     .btn-primary {
-      background-color: #ff6b35;
+      background: linear-gradient(135deg, #ff6b35, #e05a2e);
       color: white;
     }
+
     .btn-primary:hover {
-      background-color: #e05a2e;
-      transform: scale(1.05);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(255, 107, 53, 0.4);
     }
+
     .btn-secondary {
-      background-color: transparent;
+      background: transparent;
       border: 2px solid #ff6b35;
       color: #ff6b35;
+      backdrop-filter: blur(10px);
     }
+
     .btn-secondary:hover {
-      background-color: #ff6b35;
+      background: linear-gradient(135deg, #ff6b35, #e05a2e);
       color: white;
-      transform: scale(1.05);
+      transform: translateY(-3px);
+    }
+
+    .hero-image {
+      margin-top: 30px;
+      position: relative;
+    }
+
+    .hero-image img {
+      max-width: 500px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ===== Features Grid ===== */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+      padding: 80px 10%;
+      background: #222;
+    }
+
+    .feature-card {
+      background: linear-gradient(135deg, #333, #2a2a2a);
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 107, 53, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #ff6b35, #ff8c5a);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .feature-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 20px 40px rgba(255, 107, 53, 0.2);
+      border-color: #ff6b35;
+    }
+
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 20px;
+      color: #ff6b35;
+    }
+
+    .feature-card h3 {
+      color: #ff6b35;
+      margin-bottom: 15px;
+      font-size: 1.3rem;
     }
 
     /* ===== Body Section ===== */
     .section {
-      padding: 50px 10%;
+      padding: 80px 10%;
       display: flex;
       align-items: center;
-      gap: 30px;
+      gap: 50px;
       flex-wrap: wrap;
+      position: relative;
     }
 
     .section:nth-child(even) {
       flex-direction: row-reverse;
+      background: rgba(255, 107, 53, 0.05);
     }
 
     .section h2 {
       color: #ff6b35;
       width: 100%;
-      margin-bottom: 30px;
+      margin-bottom: 40px;
+      font-size: 2.5rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .section h2::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 4px;
+      background: linear-gradient(90deg, #ff6b35, #ff8c5a);
+      border-radius: 2px;
     }
 
     .section p {
-      line-height: 1.6;
+      line-height: 1.8;
+      font-size: 1.1rem;
+      color: #ddd;
+    }
+
+    .text-content {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .image-content {
+      flex: 1;
+      min-width: 300px;
+      position: relative;
+    }
+
+    .image-content img {
+      width: 100%;
+      height: 400px;
+      object-fit: cover;
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
     }
 
     /* Services detailed list */
     #services {
       flex-direction: column !important;
-      align-items: flex-start !important;
-      background: #222;
-      padding: 40px 30px;
-      border-radius: 15px;
-      box-shadow: 0 10px 25px rgba(255, 107, 53, 0.3);
-      margin-bottom: 50px;
+      align-items: center !important;
+      background: linear-gradient(135deg, #222, #1a1a1a);
+      padding: 80px 30px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(255, 107, 53, 0.1);
+      margin: 50px 5%;
     }
 
     #services > div.services-grid {
       width: 100%;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 25px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      margin-top: 30px;
     }
 
     #services .service-item {
-      background: #333;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(255, 107, 53, 0.15);
-      transition: transform 0.3s ease;
+      background: linear-gradient(135deg, #333, #2a2a2a);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: all 0.4s ease;
+      border: 1px solid rgba(255, 107, 53, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #services .service-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.1), transparent);
+      transition: left 0.5s ease;
+    }
+
+    #services .service-item:hover::before {
+      left: 100%;
     }
 
     #services .service-item:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 8px 20px rgba(255, 107, 53, 0.4);
+      transform: translateY(-10px) scale(1.02);
+      box-shadow: 0 20px 50px rgba(255, 107, 53, 0.2);
+      border-color: #ff6b35;
     }
 
     #services .service-item h3 {
       color: #ff6b35;
       margin-top: 0;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     #services .service-item p {
-      margin: 0 0 15px 0;
+      margin: 0 0 20px 0;
       color: #ccc;
+      line-height: 1.6;
     }
 
-    /* Make services image smaller */
-    #about .image img {
-      max-width: 300px;  /* smaller image */
+    .service-image {
       width: 100%;
-      height: auto;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 15px;
+      margin-bottom: 15px;
+    }
+
+    /* Gallery Section */
+    .gallery {
+      padding: 80px 10%;
+      background: #1a1a1a;
+    }
+
+    .gallery h2 {
+      text-align: center;
+      color: #ff6b35;
+      margin-bottom: 50px;
+      font-size: 2.5rem;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .gallery-item {
+      position: relative;
+      overflow: hidden;
+      border-radius: 15px;
+      aspect-ratio: 4/3;
+      cursor: pointer;
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .gallery-item:hover img {
+      transform: scale(1.1);
+    }
+
+    .gallery-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(45deg, rgba(255, 107, 53, 0.8), rgba(224, 90, 46, 0.8));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .gallery-item:hover .gallery-overlay {
+      opacity: 1;
+    }
+
+    /* Stats Section */
+    .stats {
+      background: linear-gradient(135deg, #ff6b35, #e05a2e);
+      padding: 80px 10%;
+      text-align: center;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .stat-item {
+      color: white;
+    }
+
+    .stat-number {
+      font-size: 3rem;
+      font-weight: 900;
       display: block;
-      margin-left: auto;
-      border-radius: 10px;
+      margin-bottom: 10px;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .stat-label {
+      font-size: 1.1rem;
+      opacity: 0.9;
     }
 
     /* Catchphrase Section */
     .catchphrase {
       text-align: center;
       background: linear-gradient(135deg, #222, #111);
-      padding: 50px 20px;
-      font-size: 1.8rem;
+      padding: 80px 20px;
+      font-size: 2.2rem;
       font-weight: bold;
       color: #ff6b35;
       letter-spacing: 1px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .catchphrase::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at center, rgba(255, 107, 53, 0.1) 0%, transparent 70%);
     }
 
     /* ===== Footer ===== */
     footer {
-      background-color: #111;
-      padding: 40px 10%;
+      background: linear-gradient(135deg, #111, #0a0a0a);
+      padding: 60px 10% 20px 10%;
       color: white;
-      border-top: 4px solid #ff6b35; /* orange line above footer */
+      border-top: 4px solid #ff6b35;
     }
+
     .footer-top {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 30px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 40px;
       text-align: left;
-      margin-bottom: 20px;
+      margin-bottom: 40px;
     }
+
     footer h3 {
       color: #ff6b35;
-      margin-bottom: 10px;
+      margin-bottom: 20px;
+      font-size: 1.3rem;
     }
+
     footer p {
-      line-height: 1.5;
+      line-height: 1.6;
       font-size: 0.95rem;
       color: #ddd;
-      margin: 5px 0;
+      margin: 8px 0;
     }
+
     footer ul {
       list-style: none;
       padding: 0;
       margin: 0;
     }
+
     footer ul li {
-      margin: 8px 0;
+      margin: 12px 0;
       color: white;
       font-size: 0.95rem;
+      transition: transform 0.3s ease;
     }
+
+    footer ul li:hover {
+      transform: translateX(10px);
+    }
+
     footer ul li a {
       color: white;
       font-size: 0.95rem;
     }
+
     footer ul li a:hover {
       color: #ff6b35;
     }
+
     .footer-bottom {
       text-align: center;
-      padding-top: 10px;
+      padding-top: 20px;
+      border-top: 1px solid #333;
       font-size: 0.9rem;
       color: #aaa;
+    }
+
+    /* Hidden class for language switching */
+    .hidden {
+      display: none;
     }
 
     /* Responsive tweaks */
     @media (max-width: 768px) {
       .section {
-        padding: 30px 5%;
+        padding: 50px 5%;
+        gap: 30px;
       }
       header {
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 15px;
+        padding: 15px 20px;
       }
       nav {
         justify-content: center;
         width: 100%;
+        gap: 15px;
       }
       .hero {
-        padding: 60px 5%;
+        padding: 80px 5%;
+        min-height: 60vh;
       }
       .hero h1 {
-        font-size: 2rem;
+        font-size: 2.5rem;
       }
       .hero-buttons {
         flex-direction: column;
@@ -337,6 +719,15 @@
       .btn-primary, .btn-secondary {
         width: 100%;
         min-width: unset;
+      }
+      .features-grid {
+        padding: 50px 5%;
+        grid-template-columns: 1fr;
+      }
+      .language-toggle {
+        order: -1;
+        width: 100%;
+        justify-content: center;
       }
     }
   </style>
@@ -348,148 +739,292 @@
       <img src="logo.png" alt="HelpLagbe Logo" />
     </div>
     <nav>
-      <a href="#home" class="active">Home</a>
-      <a href="#services">Services</a>
-      <a href="#about">About</a>
-      <a href="login.html">Login</a>
+      <a href="#home" class="active" data-en="Home" data-bn="হোম">Home</a>
+      <a href="#services" data-en="Services" data-bn="সেবা">Services</a>
+      <a href="#about" data-en="About" data-bn="সম্পর্কে">About</a>
+      <a href="login.html" data-en="Login" data-bn="লগইন">Login</a>
     </nav>
-    <div style="display: flex; gap: 10px;">
-      <button class="admin-btn" onclick="location.href='admin.html'">Admin</button>
-      <button class="contact-btn" onclick="scrollToContact()">Contact</button>
+    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+      <div class="language-toggle">
+        <button class="lang-btn active" onclick="switchLanguage('en')">EN</button>
+        <button class="lang-btn" onclick="switchLanguage('bn')">বাং</button>
+      </div>
+      <button class="admin-btn" onclick="location.href='admin.html'" data-en="Admin" data-bn="অ্যাডমিন">Admin</button>
+      <button class="contact-btn" onclick="scrollToContact()" data-en="Contact" data-bn="যোগাযোগ">Contact</button>
     </div>
   </header>
 
   <!-- ===== HERO SECTION ===== -->
   <section class="hero fade-in" id="home">
-    <h1>Find Expert Technicians</h1>
-    <p>Connect with skilled professionals for all your repair and maintenance needs across Bangladesh</p>
+    <h1 class="floating" data-en="Find Expert Technicians" data-bn="দক্ষ প্রযুক্তিবিদ খুঁজুন">Find Expert Technicians</h1>
+    <p data-en="Connect with skilled professionals for all your repair and maintenance needs across Bangladesh" data-bn="বাংলাদেশ জুড়ে আপনার সব মেরামত ও রক্ষণাবেক্ষণের প্রয়োজনে দক্ষ পেশাদারদের সাথে যুক্ত হন">Connect with skilled professionals for all your repair and maintenance needs across Bangladesh</p>
     <div class="hero-buttons">
-      <button class="btn-primary" onclick="location.href='login.html'">Get Started</button>
-      <button class="btn-secondary" onclick="location.href='#services'">Browse Services</button>
+      <button class="btn-primary" onclick="location.href='login.html'" data-en="Get Started" data-bn="শুরু করুন">Get Started</button>
+      <button class="btn-secondary" onclick="location.href='#services'" data-en="Browse Services" data-bn="সেবা দেখুন">Browse Services</button>
+    </div>
+    <div class="hero-image slide-in-right">
+      <img src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&h=300&fit=crop" alt="Professional technicians at work" />
     </div>
   </section>
 
-  <!-- ===== BODY ===== -->
-  <section class="section fade-in" id="about">
-    <div class="text" style="flex:1; min-width: 280px;">
-      <h2>About HelpLagbe</h2>
-      <p>
-        HelpLagbe is a user-friendly web platform that simplifies finding and hiring skilled professionals for repairs and technical services. 
-        Whether you need appliance repair, electrical work, or general maintenance, you can quickly post your job details and receive competitive bids from qualified technicians. 
-        This lets you easily compare offers based on expertise, availability, and pricing. Helping you choose the best professional for the job with confidence.
-      </p>
-      <p>
-        Designed with accessibility in mind, HelpLagbe supports multiple languages including Bangla and English, making the platform easy to use for everyone. 
-        Technicians can showcase their skills, connect directly with customers, and earn income flexibly, creating a seamless experience for both service providers and users.
-      </p>
-      <button class="contact-btn" onclick="scrollToContact()">Contact Us</button>
+  <!-- ===== FEATURES GRID ===== -->
+  <section class="features-grid fade-in">
+    <div class="feature-card">
+      <div class="feature-icon">🔧</div>
+      <h3 data-en="Expert Technicians" data-bn="দক্ষ প্রযুক্তিবিদ">Expert Technicians</h3>
+      <p data-en="Verified professionals with years of experience" data-bn="বছরের অভিজ্ঞতা সহ যাচাইকৃত পেশাদার">Verified professionals with years of experience</p>
     </div>
-    <div class="image" style="flex:1; min-width: 280px;">
-      <img src="help-service.jpg" alt="HelpLagbe Services"/>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3 data-en="Fast Response" data-bn="দ্রুত সাড়া">Fast Response</h3>
+      <p data-en="Quick booking and same-day service available" data-bn="দ্রুত বুকিং এবং একই দিনে সেবা উপলব্ধ">Quick booking and same-day service available</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💰</div>
+      <h3 data-en="Fair Pricing" data-bn="ন্যায্য মূল্য">Fair Pricing</h3>
+      <p data-en="Transparent pricing with no hidden charges" data-bn="কোন গোপন চার্জ ছাড়াই স্বচ্ছ মূল্য">Transparent pricing with no hidden charges</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3 data-en="Quality Guaranteed" data-bn="মানের নিশ্চয়তা">Quality Guaranteed</h3>
+      <p data-en="100% satisfaction guarantee on all services" data-bn="সব সেবায় ১০০% সন্তুষ্টির নিশ্চয়তা">100% satisfaction guarantee on all services</p>
     </div>
   </section>
 
+  <!-- ===== STATS SECTION ===== -->
+  <section class="stats fade-in">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <span class="stat-number">1000+</span>
+        <span class="stat-label" data-en="Happy Customers" data-bn="সন্তুষ্ট গ্রাহক">Happy Customers</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">500+</span>
+        <span class="stat-label" data-en="Expert Technicians" data-bn="দক্ষ প্রযুক্তিবিদ">Expert Technicians</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">50+</span>
+        <span class="stat-label" data-en="Cities Covered" data-bn="শহর কভারেজ">Cities Covered</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">24/7</span>
+        <span class="stat-label" data-en="Support Available" data-bn="সাপোর্ট উপলব্ধ">Support Available</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ABOUT SECTION ===== -->
+  <section class="section slide-in-left" id="about">
+    <h2 data-en="About HelpLagbe" data-bn="HelpLagbe সম্পর্কে">About HelpLagbe</h2>
+    <div class="text-content">
+      <p data-en="HelpLagbe is a user-friendly web platform that simplifies finding and hiring skilled professionals for repairs and technical services. Whether you need appliance repair, electrical work, or general maintenance, you can quickly post your job details and receive competitive bids from qualified technicians." data-bn="HelpLagbe একটি ব্যবহারকারী-বান্ধব ওয়েব প্ল্যাটফর্ম যা মেরামত ও প্রযুক্তিগত সেবার জন্য দক্ষ পেশাদার খোঁজা ও নিয়োগ দেওয়া সহজ করে। আপনার যন্ত্রপাতি মেরামত, বৈদ্যুতিক কাজ বা সাধারণ রক্ষণাবেক্ষণ যাই লাগুক না কেন, আপনি দ্রুত আপনার কাজের বিবরণ পোস্ট করতে পারেন এবং যোগ্য প্রযুক্তিবিদদের কাছ থেকে প্রতিযোগিতামূলক বিড পেতে পারেন।">HelpLagbe is a user-friendly web platform that simplifies finding and hiring skilled professionals for repairs and technical services. Whether you need appliance repair, electrical work, or general maintenance, you can quickly post your job details and receive competitive bids from qualified technicians.</p>
+      <p data-en="Designed with accessibility in mind, HelpLagbe supports multiple languages including Bangla and English, making the platform easy to use for everyone. Technicians can showcase their skills, connect directly with customers, and earn income flexibly, creating a seamless experience for both service providers and users." data-bn="প্রবেশগম্যতার কথা মাথায় রেখে ডিজাইন করা, HelpLagbe বাংলা ও ইংরেজি সহ একাধিক ভাষা সাপোর্ট করে, যা প্ল্যাটফর্মটি সবার জন্য ব্যবহার করা সহজ করে তোলে। প্রযুক্তিবিদরা তাদের দক্ষতা প্রদর্শন করতে পারেন, গ্রাহকদের সাথে সরাসরি যোগাযোগ করতে পারেন এবং নমনীয়ভাবে আয় করতে পারেন।">Designed with accessibility in mind, HelpLagbe supports multiple languages including Bangla and English, making the platform easy to use for everyone. Technicians can showcase their skills, connect directly with customers, and earn income flexibly, creating a seamless experience for both service providers and users.</p>
+      <button class="contact-btn" onclick="scrollToContact()" data-en="Contact Us" data-bn="যোগাযোগ করুন">Contact Us</button>
+    </div>
+    <div class="image-content">
+      <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=500&h=400&fit=crop" alt="Professional repair service"/>
+    </div>
+  </section>
+
+  <!-- ===== SERVICES SECTION ===== -->
   <section class="section fade-in" id="services">
-    <h2>Available Services</h2>
+    <h2 data-en="Available Services" data-bn="উপলব্ধ সেবা">Available Services</h2>
     <div class="services-grid">
       <div class="service-item">
-        <h3>🔧 Appliance Repair</h3>
-        <p>Refrigerators, ACs, Washing Machines, Microwaves, and more</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop" alt="Appliance Repair" class="service-image">
+        <h3><span>🔧</span><span data-en="Appliance Repair" data-bn="যন্ত্রপাতি মেরামত">Appliance Repair</span></h3>
+        <p data-en="Refrigerators, ACs, Washing Machines, Microwaves, and more" data-bn="রেফ্রিজারেটর, এসি, ওয়াশিং মেশিন, মাইক্রোওয়েভ এবং আরও">Refrigerators, ACs, Washing Machines, Microwaves, and more</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
       <div class="service-item">
-        <h3>⚡ Electrical Work</h3>
-        <p>Wiring, Outlets, Switches, Circuit Breakers, Installation</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=300&h=200&fit=crop" alt="Electrical Work" class="service-image">
+        <h3><span>⚡</span><span data-en="Electrical Work" data-bn="বৈদ্যুতিক কাজ">Electrical Work</span></h3>
+        <p data-en="Wiring, Outlets, Switches, Circuit Breakers, Installation" data-bn="ওয়্যারিং, আউটলেট, সুইচ, সার্কিট ব্রেকার, ইনস্টলেশন">Wiring, Outlets, Switches, Circuit Breakers, Installation</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
       <div class="service-item">
-        <h3>🚿 Plumbing Services</h3>
-        <p>Pipes, Faucets, Toilets, Water Heaters, Drainage</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=300&h=200&fit=crop" alt="Plumbing Services" class="service-image">
+        <h3><span>🚿</span><span data-en="Plumbing Services" data-bn="প্লাম্বিং সেবা">Plumbing Services</span></h3>
+        <p data-en="Pipes, Faucets, Toilets, Water Heaters, Drainage" data-bn="পাইপ, কল, টয়লেট, ওয়াটার হিটার, ড্রেনেজ">Pipes, Faucets, Toilets, Water Heaters, Drainage</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
       <div class="service-item">
-        <h3>🔨 General Maintenance</h3>
-        <p>Carpentry, Painting, Cleaning, Home Repairs</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1609081219090-a6d81d3085bf?w=300&h=200&fit=crop" alt="General Maintenance" class="service-image">
+        <h3><span>🔨</span><span data-en="General Maintenance" data-bn="সাধারণ রক্ষণাবেক্ষণ">General Maintenance</span></h3>
+        <p data-en="Carpentry, Painting, Cleaning, Home Repairs" data-bn="কাঠের কাজ, পেইন্টিং, পরিষ্কার, ঘর মেরামত">Carpentry, Painting, Cleaning, Home Repairs</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
       <div class="service-item">
-        <h3>❄️ AC Services</h3>
-        <p>AC Installation, Repair, Maintenance, Gas Refill</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1631889993959-41b4e9c6e3c5?w=300&h=200&fit=crop" alt="AC Services" class="service-image">
+        <h3><span>❄️</span><span data-en="AC Services" data-bn="এসি সেবা">AC Services</span></h3>
+        <p data-en="AC Installation, Repair, Maintenance, Gas Refill" data-bn="এসি ইনস্টলেশন, মেরামত, রক্ষণাবেক্ষণ, গ্যাস রিফিল">AC Installation, Repair, Maintenance, Gas Refill</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
       <div class="service-item">
-        <h3>📺 Electronics Repair</h3>
-        <p>TV, Mobile, Computer, Sound System Repairs</p>
-        <button class="contact-btn" onclick="location.href='login.html'">Request Service</button>
+        <img src="https://images.unsplash.com/photo-1555864326-5cf22ef123cf?w=300&h=200&fit=crop" alt="Electronics Repair" class="service-image">
+        <h3><span>📺</span><span data-en="Electronics Repair" data-bn="ইলেকট্রনিক্স মেরামত">Electronics Repair</span></h3>
+        <p data-en="TV, Mobile, Computer, Sound System Repairs" data-bn="টিভি, মোবাইল, কম্পিউটার, সাউন্ড সিস্টেম মেরামত">TV, Mobile, Computer, Sound System Repairs</p>
+        <button class="contact-btn" onclick="location.href='login.html'" data-en="Request Service" data-bn="সেবা চান">Request Service</button>
       </div>
     </div>
   </section>
 
-  <section class="catchphrase fade-in">
-    HelpLagbe - Help Anytime, Anywhere
+  <!-- ===== GALLERY SECTION ===== -->
+  <section class="gallery fade-in">
+    <h2 data-en="Our Work Gallery" data-bn="আমাদের কাজের গ্যালারি">Our Work Gallery</h2>
+    <div class="gallery-grid">
+      <div class="gallery-item">
+        <img src="light install.webp" alt="Electrical installation">
+        <div class="gallery-overlay" data-en="Electrical Installation" data-bn="বৈদ্যুতিক ইনস্টলেশন">Electrical Installation</div>
+      </div>
+      <div class="gallery-item">
+        <img src="washing-machine-repairing-services-500x500.webp" alt="Appliance repair">
+        <div class="gallery-overlay" data-en="Appliance Repair" data-bn="যন্ত্রপাতি মেরামত">Appliance Repair</div>
+      </div>
+      <div class="gallery-item">
+        <img src="plumbing-work.png" alt="Plumbing work">
+        <div class="gallery-overlay" data-en="Plumbing Services" data-bn="প্লাম্বিং সেবা">Plumbing Services</div>
+      </div>
+      <div class="gallery-item">
+        <img src="home clean.webp" alt="Home maintenance">
+        <div class="gallery-overlay" data-en="Home Maintenance" data-bn="ঘর রক্ষণাবেক্ষণ">Home Maintenance</div>
+      </div>
+      <div class="gallery-item">
+        <img src="Ac repair.webp" alt="AC servicing">
+        <div class="gallery-overlay" data-en="AC Servicing" data-bn="এসি সার্ভিসিং">AC Servicing</div>
+      </div>
+      <div class="gallery-item">
+        <img src="https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=300&h=225&fit=crop" alt="Electronics repair">
+        <div class="gallery-overlay" data-en="Electronics Repair" data-bn="ইলেকট্রনিক্স মেরামত">Electronics Repair</div>
+      </div>
+    </div>
   </section>
 
-  <!-- ===== FIXED FOOTER ===== -->
+  <!-- ===== CATCHPHRASE ===== -->
+  <section class="catchphrase fade-in">
+    <span data-en="HelpLagbe - Help Anytime, Anywhere" data-bn="HelpLagbe - সাহায্য সব সময়, সব জায়গায়">HelpLagbe - Help Anytime, Anywhere</span>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
   <footer id="contact">
     <div class="footer-top">
       <div>
         <h3>HelpLagbe</h3>
-        <p>Help Anytime, Anywhere</p>
-        <p>Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed.</p>
+        <p data-en="Help Anytime, Anywhere" data-bn="সাহায্য সব সময়, সব জায়গায়">Help Anytime, Anywhere</p>
+        <p data-en="Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed." data-bn="গ্রাহকদের যাচাইকৃত প্রযুক্তিবিদদের সাথে সংযুক্ত করার জন্য বাংলাদেশের বিশ্বস্ত প্ল্যাটফর্ম। মানসম্পন্ন সেবার নিশ্চয়তা।">Bangladesh's trusted platform for connecting customers with verified technicians. Quality service guaranteed.</p>
       </div>
       <div>
-        <h3>Services</h3>
+        <h3 data-en="Services" data-bn="সেবা">Services</h3>
         <ul>
-          <li>Appliance Repair</li>
-          <li>Electrical Work</li>
-          <li>Plumbing Services</li>
-          <li>General Maintenance</li>
+          <li data-en="Appliance Repair" data-bn="যন্ত্রপাতি মেরামত">Appliance Repair</li>
+          <li data-en="Electrical Work" data-bn="বৈদ্যুতিক কাজ">Electrical Work</li>
+          <li data-en="Plumbing Services" data-bn="প্লাম্বিং সেবা">Plumbing Services</li>
+          <li data-en="General Maintenance" data-bn="সাধারণ রক্ষণাবেক্ষণ">General Maintenance</li>
         </ul>
       </div>
       <div>
-        <h3>Company</h3>
+        <h3 data-en="Company" data-bn="কোম্পানি">Company</h3>
         <ul>
-          <li><a href="#">About Us</a></li>
-          <li><a href="#">Our Services</a></li>
-          <li><a href="#">Join as Technician</a></li>
+          <li><a href="#" data-en="About Us" data-bn="আমাদের সম্পর্কে">About Us</a></li>
+          <li><a href="#" data-en="Our Services" data-bn="আমাদের সেবা">Our Services</a></li>
+          <li><a href="#" data-en="Join as Technician" data-bn="প্রযুক্তিবিদ হিসেবে যোগ দিন">Join as Technician</a></li>
         </ul>
       </div>
       <div>
-        <h3>Contact</h3>
+        <h3 data-en="Contact" data-bn="যোগাযোগ">Contact</h3>
         <ul>
           <li>+880 1325-409985</li>
           <li>support@helplagbe.com</li>
-          <li>Dhaka, Bangladesh</li>
-          <li>24/7 Customer Support</li>
+          <li data-en="Dhaka, Bangladesh" data-bn="ঢাকা, বাংলাদেশ">Dhaka, Bangladesh</li>
+          <li data-en="24/7 Customer Support" data-bn="২৪/৭ গ্রাহক সাপোর্ট">24/7 Customer Support</li>
         </ul>
       </div>
     </div>
     <hr />
     <div class="footer-bottom">
-      © 2026 HelpLagbe. All rights reserved. | 
-      <a href="#">Privacy Policy</a> | 
-      <a href="#">Terms of Service</a>
+      <span data-en="© 2026 HelpLagbe. All rights reserved." data-bn="© ২০২৬ HelpLagbe। সকল অধিকার সংরক্ষিত।">© 2026 HelpLagbe. All rights reserved.</span> | 
+      <a href="#" data-en="Privacy Policy" data-bn="গোপনীয়তা নীতি">Privacy Policy</a> | 
+      <a href="#" data-en="Terms of Service" data-bn="সেবার শর্তাবলী">Terms of Service</a>
     </div>
   </footer>
 
   <script>
+    // Language switching functionality
+    let currentLang = 'en';
+
+    function switchLanguage(lang) {
+      currentLang = lang;
+      const elements = document.querySelectorAll('[data-en], [data-bn]');
+      
+      elements.forEach(element => {
+        const text = element.getAttribute('data-' + lang);
+        if (text) {
+          if (element.tagName === 'INPUT' && element.type === 'submit') {
+            element.value = text;
+          } else {
+            element.textContent = text;
+          }
+        }
+      });
+      
+      // Update active language button
+      document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      // Update document language
+      document.documentElement.lang = lang === 'en' ? 'en' : 'bn';
+    }
+
     function scrollToContact() {
       document.getElementById("contact").scrollIntoView({ behavior: "smooth" });
     }
-    const fadeEls = document.querySelectorAll(".fade-in");
-    window.addEventListener("scroll", () => {
+
+    // Scroll animations
+    const fadeEls = document.querySelectorAll(".fade-in, .slide-in-left, .slide-in-right");
+    
+    function checkScroll() {
       fadeEls.forEach((el) => {
         const rect = el.getBoundingClientRect();
         if (rect.top < window.innerHeight - 100) {
           el.classList.add("show");
         }
       });
+    }
+
+    window.addEventListener("scroll", checkScroll);
+    window.addEventListener("load", checkScroll);
+
+    // Smooth scrolling for navigation links
+    document.querySelectorAll('nav a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
     });
-    window.addEventListener("load", () => {
-      fadeEls.forEach((el) => {
-        const rect = el.getBoundingClientRect();
-        if (rect.top < window.innerHeight - 100) {
-          el.classList.add("show");
+
+    // Active navigation highlighting
+    window.addEventListener('scroll', () => {
+      const sections = document.querySelectorAll('section[id]');
+      const navLinks = document.querySelectorAll('nav a[href^="#"]');
+      
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 100;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
         }
       });
     });
