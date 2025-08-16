@@ -6,46 +6,93 @@
 <title>HelpLagbe - Login/Register</title>
 <style>
   /* ===== Global Styles ===== */
+  * {
+    box-sizing: border-box;
+  }
+
   body {
     margin: 0;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1b1b1b;
+    font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f0f0f 0%, #1b1b1b 50%, #2a1810 100%);
     color: white;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Animated background particles */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 20% 50%, rgba(255, 107, 53, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 53, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(255, 107, 53, 0.08) 0%, transparent 50%);
+    animation: float 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(30px, -30px) rotate(120deg); }
+    66% { transform: translate(-20px, 20px) rotate(240deg); }
   }
 
   a {
     text-decoration: none;
     color: white;
-    transition: color 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Changed nav a styles here: */
+  /* Enhanced nav styles */
   nav a {
-    font-weight: 600;
-    font-size: 1rem;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 6px;
-    transition: color 0.3s;
-    background-color: transparent !important;
-    box-shadow: none !important;
-    border-bottom: 3px solid transparent;
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 10px 16px;
+    border-radius: 25px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  nav a::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.2), transparent);
+    transition: left 0.5s;
   }
 
   nav a:hover {
     color: #ff6b35;
-    background-color: transparent;
-    box-shadow: none;
+    background: rgba(255, 107, 53, 0.1);
+    border-color: rgba(255, 107, 53, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+  }
+
+  nav a:hover::before {
+    left: 100%;
   }
 
   nav a.active {
     color: #ff6b35;
-    border-bottom: 3px solid #ff6b35;
-    background-color: transparent;
-    box-shadow: none;
+    background: rgba(255, 107, 53, 0.15);
+    border-color: rgba(255, 107, 53, 0.4);
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
   }
 
   img {
@@ -54,86 +101,164 @@
     border-radius: 10px;
   }
 
-  /* ===== Header ===== */
+  /* ===== Enhanced Header ===== */
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: #111;
+    background: rgba(17, 17, 17, 0.9);
+    backdrop-filter: blur(20px);
     padding: 15px 30px;
     position: sticky;
     top: 0;
-    z-index: 100;
-    border-bottom: 4px solid #ff6b35; /* orange line below header */
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 107, 53, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
 
   .logo {
     display: flex;
     align-items: center;
+    position: relative;
   }
 
   .logo img {
     height: 80px;
+    transition: transform 0.3s ease;
+    filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.3));
+  }
+
+  .logo:hover img {
+    transform: scale(1.05);
   }
 
   nav {
     display: flex;
-    gap: 20px;
+    gap: 15px;
   }
 
   .contact-btn {
-    background-color: #ff6b35;
+    background: linear-gradient(135deg, #ff6b35 0%, #e05a2e 100%);
     border: none;
-    padding: 10px 20px;
+    padding: 12px 24px;
     color: white;
     cursor: pointer;
-    font-weight: bold;
-    border-radius: 5px;
-    transition: background 0.3s, transform 0.3s;
+    font-weight: 600;
+    border-radius: 25px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+  }
+
+  .contact-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
   }
 
   .contact-btn:hover {
-    background-color: #e05a2e;
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #e05a2e 0%, #d04d23 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
   }
 
-  /* ===== Container ===== */
+  .contact-btn:hover::before {
+    left: 100%;
+  }
+
+  /* ===== Enhanced Container ===== */
   .container {
-    background-color: #111; /* darker */
-    border-radius: 15px;
-    padding: 40px 50px 50px;
-    width: 600px; /* reduced from 420px */
-    margin: 60px auto 40px;
-    box-shadow: 0 0 30px rgba(255, 107, 53, 0.5);
-    min-height: 650px;
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    border-radius: 20px;
+    padding: 50px;
+    width: 650px;
+    margin: 80px auto 60px;
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 107, 53, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    min-height: 700px;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 10;
+    animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Tabs container */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(60px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.5), transparent);
+  }
+
+  /* Enhanced tabs */
   .tabs {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 35px;
-    background: #222; /* darker */
-    border-radius: 50px;
-    padding: 6px;
+    margin-bottom: 40px;
+    background: rgba(34, 34, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
   }
 
   .tab {
     flex: 1;
     text-align: center;
-    padding: 12px 0;
+    padding: 15px 0;
     cursor: pointer;
-    border-radius: 50px;
-    color: #aaa;
-    font-weight: 600;
-    transition: all 0.3s ease;
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
-    margin: 0 7px;
+    margin: 0 4px;
     position: relative;
     z-index: 1;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
+    overflow: hidden;
+  }
+
+  .tab::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(224, 90, 46, 0.1));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: 12px;
+  }
+
+  .tab:hover::before {
+    opacity: 1;
   }
 
   .tab:first-child {
@@ -146,180 +271,356 @@
 
   .tab.active {
     color: white;
-    background-color: #ff6b35;
-    box-shadow: 0 0 12px #ff6b35;
+    background: linear-gradient(135deg, #ff6b35 0%, #e05a2e 100%);
+    box-shadow: 
+      0 8px 25px rgba(255, 107, 53, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
     z-index: 2;
+    transform: translateY(-2px);
   }
 
-  /* Forms */
+  /* Enhanced forms */
   form {
     display: none;
     flex-grow: 1;
     flex-direction: column;
+    animation: fadeIn 0.5s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   form.active {
     display: flex;
   }
 
-  /* Form headers */
-  .form-header {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #ff6b35;
-    margin-bottom: 25px;
-    text-align: center;
-  }
-
   label {
     display: block;
-    margin: 16px 0 8px;
-    font-weight: 600;
+    margin: 18px 0 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.95rem;
   }
 
   input, textarea {
     width: 100%;
-    padding: 11px 14px;
-    border-radius: 8px;
-    border: none;
+    padding: 15px 18px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 1rem;
-    background-color: #222; /* darker input */
+    background: rgba(34, 34, 34, 0.6);
+    backdrop-filter: blur(10px);
     color: white;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
   }
 
   input:focus, textarea:focus {
-    outline: 2px solid #ff6b35;
-    background-color: #2a2a2a;
+    outline: none;
+    border-color: rgba(255, 107, 53, 0.5);
+    background: rgba(42, 42, 42, 0.8);
+    box-shadow: 
+      0 0 0 3px rgba(255, 107, 53, 0.1),
+      0 8px 25px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
   }
 
   textarea {
     resize: vertical;
+    min-height: 100px;
   }
 
   input::placeholder, textarea::placeholder {
-    color: #bbb;
+    color: rgba(255, 255, 255, 0.4);
   }
 
+  /* Enhanced file input */
   input[type="file"] {
-    background-color: #222;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 1rem;
-    color: white;
+    background: rgba(34, 34, 34, 0.6);
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
+    border: 2px dashed rgba(255, 107, 53, 0.3);
+    transition: all 0.3s ease;
+  }
+
+  input[type="file"]:hover {
+    border-color: rgba(255, 107, 53, 0.5);
+    background: rgba(42, 42, 42, 0.8);
   }
 
   input[type="file"]::-webkit-file-upload-button {
-    background-color: #ff6b35;
+    background: linear-gradient(135deg, #ff6b35 0%, #e05a2e 100%);
     border: none;
     color: white;
-    padding: 8px 12px;
+    padding: 8px 16px;
     border-radius: 8px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
-    font-weight: 600;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    margin-right: 15px;
   }
 
   input[type="file"]::-webkit-file-upload-button:hover {
-    background-color: #e05a2e;
+    background: linear-gradient(135deg, #e05a2e 0%, #d04d23 100%);
+    transform: translateY(-1px);
   }
 
-  /* Submit button */
+  /* Enhanced submit button */
   button.submit-btn {
-    margin-top: 30px;
+    margin-top: 35px;
     width: 100%;
-    background-color: #ff6b35;
+    background: linear-gradient(135deg, #ff6b35 0%, #e05a2e 100%);
     color: white;
     border: none;
-    padding: 16px 0;
+    padding: 18px 0;
     font-size: 1.1rem;
-    font-weight: bold;
-    border-radius: 10px;
+    font-weight: 600;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+  }
+
+  button.submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.6s;
   }
 
   button.submit-btn:hover {
-    background-color: #e05a2e;
+    background: linear-gradient(135deg, #e05a2e 0%, #d04d23 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(255, 107, 53, 0.4);
   }
 
-  /* ===== Footer ===== */
+  button.submit-btn:hover::before {
+    left: 100%;
+  }
+
+  .contact-btn:active {
+    transform: translateY(-1px);
+  }
+
+  /* Language Toggle Styles */
+  .language-toggle {
+    display: flex;
+    background: rgba(34, 34, 34, 0.6);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .lang-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 8px 12px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 40px;
+  }
+
+  .lang-btn.active {
+    background: linear-gradient(135deg, #ff6b35 0%, #e05a2e 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+  }
+
+  .lang-btn:hover:not(.active) {
+    color: #ff6b35;
+    background: rgba(255, 107, 53, 0.1);
+  }
+
+  /* Bangla Font Support */
+  body.bangla {
+    font-family: "Kalpurush", "SolaimanLipi", "Mukti", "Vrinda", sans-serif;
+  }
+
+  /* ===== Enhanced Footer ===== */
   footer {
-      background-color: #111;
-      padding: 40px 10%;
-      color: white;
-      border-top: 4px solid #ff6b35; /* orange line above footer */
-    }
-    .footer-top {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 30px;
-      text-align: left;
-      margin-bottom: 20px;
-    }
-    footer h3 {
-      color: #ff6b35;
-      margin-bottom: 10px;
-    }
-    footer p {
-      line-height: 1.5;
-      font-size: 0.95rem;
-      color: #ddd;
-      margin: 5px 0;
-    }
-    footer ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    footer ul li {
-      margin: 8px 0;
-      color: white;
-      font-size: 0.95rem;
-    }
-    footer ul li a {
-      color: white;
-      font-size: 0.95rem;
-    }
-    footer ul li a:hover {
-      color: #ff6b35;
-    }
-    .footer-bottom {
-      text-align: center;
-      padding-top: 10px;
-      font-size: 0.9rem;
-      color: #aaa;
+    background: rgba(17, 17, 17, 0.9);
+    backdrop-filter: blur(20px);
+    padding: 50px 10% 30px;
+    color: white;
+    border-top: 1px solid rgba(255, 107, 53, 0.3);
+    position: relative;
+    z-index: 10;
+  }
+
+  footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.5), transparent);
+  }
+
+  .footer-top {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 40px;
+    text-align: left;
+    margin-bottom: 30px;
+  }
+
+  footer h3 {
+    color: #ff6b35;
+    margin-bottom: 15px;
+    font-weight: 600;
+    position: relative;
+  }
+
+  footer h3::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 30px;
+    height: 2px;
+    background: linear-gradient(90deg, #ff6b35, transparent);
+  }
+
+  footer p {
+    line-height: 1.6;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 8px 0;
+  }
+
+  footer ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  footer ul li {
+    margin: 10px 0;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    transition: color 0.3s ease;
+  }
+
+  footer ul li a {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  footer ul li a:hover {
+    color: #ff6b35;
+    transform: translateX(5px);
+  }
+
+  .footer-bottom {
+    text-align: center;
+    padding-top: 20px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .footer-bottom a {
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 0.3s ease;
+  }
+
+  .footer-bottom a:hover {
+    color: #ff6b35;
+  }
+
+  /* Loading animation for forms */
+  .loading {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .loading button.submit-btn {
+    background: linear-gradient(135deg, #666 0%, #444 100%);
+    cursor: not-allowed;
+  }
+
+  /* Enhanced responsive design */
+  @media (max-width: 768px) {
+    .container {
+      width: 95%;
+      padding: 30px 25px;
+      margin: 40px auto;
     }
 
-    /* Responsive tweaks */
-    @media (max-width: 768px) {
-      .section {
-        padding: 30px 5%;
-      }
-      header {
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      nav {
-        justify-content: center;
-        width: 100%;
-      }
-      .hero {
-        padding: 60px 5%;
-      }
-      .hero h1 {
-        font-size: 2rem;
-      }
-      .hero-buttons {
-        flex-direction: column;
-        gap: 15px;
-      }
-      .btn-primary, .btn-secondary {
-        width: 100%;
-        min-width: unset;
-      }
+    header {
+      flex-wrap: wrap;
+      gap: 15px;
+      padding: 15px 20px;
     }
+
+    nav {
+      justify-content: center;
+      width: 100%;
+      gap: 10px;
+    }
+
+    nav a {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+    }
+
+    .logo img {
+      height: 60px;
+    }
+
+    .tabs {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tab {
+      margin: 0;
+    }
+
+    footer {
+      padding: 40px 5% 20px;
+    }
+
+    .footer-top {
+      grid-template-columns: 1fr;
+      gap: 25px;
+      text-align: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .container {
+      padding: 25px 20px;
+    }
+
+    input, textarea {
+      padding: 12px 15px;
+    }
+
+    button.submit-btn {
+      padding: 15px 0;
+      font-size: 1rem;
+    }
+  }
 </style>
 </head>
 <body>
@@ -330,89 +631,88 @@
     <img src="logo.png" alt="HelpLagbe Logo" />
   </div>
   <nav>
-    <a href="homepage.html">Home</a>
-    <a href="#services">Services</a>
-    <a href="#about">About</a>
-    <a href="login.html" class="active">Login</a>
+    <a href="homepage.html" data-en="Home" data-bn="হোম">Home</a>
+    <a href="#services" data-en="Services" data-bn="সেবা">Services</a>
+    <a href="#about" data-en="About" data-bn="সম্পর্কে">About</a>
+    <a href="login.html" class="active" data-en="Login" data-bn="লগইন">Login</a>
   </nav>
-  <div style="display: flex; gap: 10px;">
-    <button class="contact-btn" onclick="location.href='admin.html'">Admin</button>
-    <button class="contact-btn" onclick="scrollToContact()">Contact</button>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <div class="language-toggle">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="bn">বাং</button>
+    </div>
+    <button class="contact-btn" onclick="location.href='admin.html'" data-en="Admin" data-bn="অ্যাডমিন">Admin</button>
+    <button class="contact-btn" onclick="scrollToContact()" data-en="Contact" data-bn="যোগাযোগ">Contact</button>
   </div>
 </header>
 
 <!-- ===== LOGIN/REGISTER CONTAINER ===== -->
 <div class="container">
   <div class="tabs">
-    <div class="tab active" data-target="login-form">Login</div>
-    <div class="tab" data-target="register-form">Register</div>
-    <div class="tab" data-target="technician-form">Join as Technician</div>
+    <div class="tab active" data-target="login-form" data-en="Login" data-bn="লগইন">Login</div>
+    <div class="tab" data-target="register-form" data-en="Register" data-bn="নিবন্ধন">Register</div>
+    <div class="tab" data-target="technician-form" data-en="Join as Technician" data-bn="টেকনিশিয়ান হিসেবে যোগ দিন">Join as Technician</div>
   </div>
 
   <!-- Login Form -->
   <form id="login-form" class="active" method="POST" action="login.php">
-    <label for="login-email">Email</label>
-    <input type="email" id="login-email" name="email" placeholder="Enter your email" required />
+    <label for="login-email" data-en="Email" data-bn="ইমেইল">Email</label>
+    <input type="email" id="login-email" name="email" data-placeholder-en="Enter your email" data-placeholder-bn="আপনার ইমেইল লিখুন" placeholder="Enter your email" required />
     
-    <label for="login-password">Password</label>
-    <input type="password" id="login-password" name="password" placeholder="Enter your password" required />
+    <label for="login-password" data-en="Password" data-bn="পাসওয়ার্ড">Password</label>
+    <input type="password" id="login-password" name="password" data-placeholder-en="Enter your password" data-placeholder-bn="আপনার পাসওয়ার্ড লিখুন" placeholder="Enter your password" required />
     
-    <button type="submit" class="submit-btn">Login</button>
-</form>
-
+    <button type="submit" class="submit-btn" data-en="Login" data-bn="লগইন">Login</button>
+  </form>
 
   <!-- Register Form -->
   <form id="register-form" method="POST" action="register.php">
-    <label for="reg-fullname">Full Name</label>
-    <input type="text" id="reg-fullname" name="fullname" placeholder="Your full name" required />
+    <label for="reg-fullname" data-en="Full Name" data-bn="পূর্ণ নাম">Full Name</label>
+    <input type="text" id="reg-fullname" name="fullname" data-placeholder-en="Your full name" data-placeholder-bn="আপনার পূর্ণ নাম" placeholder="Your full name" required />
     
-    <label for="reg-email">Email</label>
-    <input type="email" id="reg-email" name="email" placeholder="Your email" required />
+    <label for="reg-email" data-en="Email" data-bn="ইমেইল">Email</label>
+    <input type="email" id="reg-email" name="email" data-placeholder-en="Your email" data-placeholder-bn="আপনার ইমেইল" placeholder="Your email" required />
     
-    <label for="reg-phone">Phone Number</label>
-    <input type="tel" id="reg-phone" name="phone" placeholder="Your phone number" required />
+    <label for="reg-phone" data-en="Phone Number" data-bn="ফোন নম্বর">Phone Number</label>
+    <input type="tel" id="reg-phone" name="phone" data-placeholder-en="Your phone number" data-placeholder-bn="আপনার ফোন নম্বর" placeholder="Your phone number" required />
     
-    <label for="reg-password">Password</label>
-    <input type="password" id="reg-password" name="password" placeholder="Create a password" required />
+    <label for="reg-password" data-en="Password" data-bn="পাসওয়ার্ড">Password</label>
+    <input type="password" id="reg-password" name="password" data-placeholder-en="Create a password" data-placeholder-bn="একটি পাসওয়ার্ড তৈরি করুন" placeholder="Create a password" required />
     
-    <label for="reg-address">Address</label>
-    <textarea id="reg-address" name="address" rows="3" placeholder="Your address" required></textarea>
+    <label for="reg-address" data-en="Address" data-bn="ঠিকানা">Address</label>
+    <textarea id="reg-address" name="address" rows="3" data-placeholder-en="Your address" data-placeholder-bn="আপনার ঠিকানা" placeholder="Your address" required></textarea>
     
-    <button type="submit" class="submit-btn">Register</button>
-</form>
-
+    <button type="submit" class="submit-btn" data-en="Register" data-bn="নিবন্ধন করুন">Register</button>
+  </form>
 
   <!-- Technician Form -->
   <form id="technician-form" method="POST" action="register_technician.php" enctype="multipart/form-data">
-    <label for="tech-fullname">Full Name</label>
-    <input type="text" id="tech-fullname" name="fullname" placeholder="Your full name" required />
+    <label for="tech-fullname" data-en="Full Name" data-bn="পূর্ণ নাম">Full Name</label>
+    <input type="text" id="tech-fullname" name="fullname" data-placeholder-en="Your full name" data-placeholder-bn="আপনার পূর্ণ নাম" placeholder="Your full name" required />
     
-    <label for="tech-nid">National ID</label>
-    <input type="text" id="tech-nid" name="nid" placeholder="Your National ID" required />
+    <label for="tech-nid" data-en="National ID" data-bn="জাতীয় পরিচয়পত্র">National ID</label>
+    <input type="text" id="tech-nid" name="nid" data-placeholder-en="Your National ID" data-placeholder-bn="আপনার জাতীয় পরিচয়পত্র নম্বর" placeholder="Your National ID" required />
     
-    <label for="tech-email">Email</label>
-    <input type="email" id="tech-email" name="email" placeholder="Your email" required />
+    <label for="tech-email" data-en="Email" data-bn="ইমেইল">Email</label>
+    <input type="email" id="tech-email" name="email" data-placeholder-en="Your email" data-placeholder-bn="আপনার ইমেইল" placeholder="Your email" required />
 
-    <label for="tech-password">Password</label>
-<input type="password" id="tech-password" name="password" placeholder="Create a password" required />
-
+    <label for="tech-password" data-en="Password" data-bn="পাসওয়ার্ড">Password</label>
+    <input type="password" id="tech-password" name="password" data-placeholder-en="Create a password" data-placeholder-bn="একটি পাসওয়ার্ড তৈরি করুন" placeholder="Create a password" required />
     
-    <label for="tech-phone">Phone Number</label>
-    <input type="tel" id="tech-phone" name="phone" placeholder="Your phone number" required />
+    <label for="tech-phone" data-en="Phone Number" data-bn="ফোন নম্বর">Phone Number</label>
+    <input type="tel" id="tech-phone" name="phone" data-placeholder-en="Your phone number" data-placeholder-bn="আপনার ফোন নম্বর" placeholder="Your phone number" required />
 
-    <label for="tech-address">Address</label>
-<textarea id="tech-address" name="address" rows="3" placeholder="Your address" required></textarea>
-
+    <label for="tech-address" data-en="Address" data-bn="ঠিকানা">Address</label>
+    <textarea id="tech-address" name="address" rows="3" data-placeholder-en="Your address" data-placeholder-bn="আপনার ঠিকানা" placeholder="Your address" required></textarea>
     
-    <label for="tech-skills">Skills & Experience</label>
-    <textarea id="tech-skills" name="skills" rows="4" placeholder="Describe your technical skills and experience in detail" required></textarea>
+    <label for="tech-skills" data-en="Skills & Experience" data-bn="দক্ষতা ও অভিজ্ঞতা">Skills & Experience</label>
+    <textarea id="tech-skills" name="skills" rows="4" data-placeholder-en="Describe your technical skills and experience in detail" data-placeholder-bn="আপনার প্রযুক্তিগত দক্ষতা ও অভিজ্ঞতার বিস্তারিত বর্ণনা দিন" placeholder="Describe your technical skills and experience in detail" required></textarea>
     
-    <label for="tech-docs">Upload Documents (NID, Certificates)</label>
+    <label for="tech-docs" data-en="Upload Documents (NID, Certificates)" data-bn="নথি আপলোড করুন (এনআইডি, সার্টিফিকেট)">Upload Documents (NID, Certificates)</label>
     <input type="file" id="tech-docs" name="documents" accept=".pdf,.jpg,.jpeg,.png" />
     
-    <button type="submit" class="submit-btn">Join as Technician</button>
-</form>
-
+    <button type="submit" class="submit-btn" data-en="Join as Technician" data-bn="টেকনিশিয়ান হিসেবে যোগ দিন">Join as Technician</button>
+  </form>
 </div>
 
 <!-- ===== FOOTER ===== -->
@@ -450,7 +750,6 @@
         </ul>
       </div>
     </div>
-    <hr />
     <div class="footer-bottom">
       © 2026 HelpLagbe. All rights reserved. | 
       <a href="#">Privacy Policy</a> | 
@@ -464,18 +763,93 @@
     document.getElementById("contact").scrollIntoView({ behavior: "smooth" });
   }
 
-  // Tabs functionality
+  // Enhanced tabs functionality with smooth transitions
   const tabs = document.querySelectorAll('.tab');
   const forms = document.querySelectorAll('form');
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
+      // Remove active states
       tabs.forEach(t => t.classList.remove('active'));
       forms.forEach(f => f.classList.remove('active'));
 
+      // Add active state to clicked tab
       tab.classList.add('active');
+      
+      // Show corresponding form with delay for smooth transition
       const target = tab.getAttribute('data-target');
-      document.getElementById(target).classList.add('active');
+      setTimeout(() => {
+        document.getElementById(target).classList.add('active');
+      }, 150);
+    });
+  });
+
+  // Add form submission animation
+  const submitBtns = document.querySelectorAll('.submit-btn');
+  submitBtns.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      const form = this.closest('form');
+      if (form.checkValidity()) {
+        form.classList.add('loading');
+        this.innerHTML = 'Processing...';
+      }
+    });
+  });
+
+  // Add input focus animations
+  const inputs = document.querySelectorAll('input, textarea');
+  inputs.forEach(input => {
+    input.addEventListener('focus', function() {
+      this.parentElement.style.transform = 'translateY(-2px)';
+    });
+    
+    input.addEventListener('blur', function() {
+      this.parentElement.style.transform = 'translateY(0)';
+    });
+  });
+
+  // Parallax effect for background
+  window.addEventListener('scroll', () => {
+    const scrolled = window.pageYOffset;
+    const rate = scrolled * -0.5;
+    document.body.style.backgroundPosition = `center ${rate}px`;
+  });
+
+  // Language toggle functionality
+  const langBtns = document.querySelectorAll(".lang-btn");
+  const translatable = document.querySelectorAll("[data-en]");
+
+  langBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      // remove active state
+      langBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const lang = btn.getAttribute("data-lang");
+
+      // toggle Bangla font
+      if (lang === "bn") {
+        document.body.classList.add("bangla");
+      } else {
+        document.body.classList.remove("bangla");
+      }
+
+      // update all text + placeholders
+      translatable.forEach(el => {
+        if (lang === "bn") {
+          if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+            el.placeholder = el.getAttribute("data-placeholder-bn") || el.placeholder;
+          } else {
+            el.textContent = el.getAttribute("data-bn");
+          }
+        } else {
+          if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+            el.placeholder = el.getAttribute("data-placeholder-en") || el.placeholder;
+          } else {
+            el.textContent = el.getAttribute("data-en");
+          }
+        }
+      });
     });
   });
 </script>
