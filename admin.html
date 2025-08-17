@@ -6,20 +6,49 @@
 <title>HelpLagbe - Admin Login</title>
 <style>
   /* ===== Global Styles ===== */
-  body {
+  * {
     margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1b1b1b;
+    background: linear-gradient(135deg, #1b1b1b 0%, #0f0f0f 100%);
     color: white;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Subtle animated background elements */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    background: 
+      radial-gradient(circle at 15% 40%, rgba(255, 107, 53, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 85% 70%, rgba(255, 107, 53, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 50% 20%, rgba(255, 107, 53, 0.05) 0%, transparent 40%);
+    animation: subtleFloat 15s ease-in-out infinite;
+  }
+
+  @keyframes subtleFloat {
+    0%, 100% { transform: translateY(0px); opacity: 0.8; }
+    50% { transform: translateY(-10px); opacity: 1; }
   }
 
   a {
     text-decoration: none;
     color: white;
-    transition: color 0.3s;
+    transition: color 0.3s ease;
   }
 
   a:hover {
@@ -37,12 +66,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: #111;
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 107, 53, 0.1);
+    border-bottom: 4px solid #ff6b35;
     padding: 15px 30px;
     position: sticky;
     top: 0;
     z-index: 100;
-    border-bottom: 4px solid #ff6b35; /* orange line below header */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
 
   .logo {
@@ -52,6 +85,11 @@
 
   .logo img {
     height: 80px;
+    transition: transform 0.3s ease;
+  }
+
+  .logo img:hover {
+    transform: scale(1.05);
   }
 
   nav {
@@ -65,41 +103,80 @@
     color: white;
     padding: 8px 12px;
     border-radius: 6px;
-    transition: background-color 0.3s, color 0.3s;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
   }
 
   nav a:hover {
     background-color: #ff6b35;
     color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
   }
 
   .contact-btn {
-    background-color: #ff6b35;
+    background: linear-gradient(135deg, #ff6b35, #e05a2e);
     border: none;
     padding: 10px 20px;
     color: white;
     cursor: pointer;
     font-weight: bold;
     border-radius: 5px;
-    transition: background 0.3s, transform 0.3s;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
   }
 
   .contact-btn:hover {
-    background-color: #e05a2e;
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #e05a2e, #d14d26);
+    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
   }
 
   /* ===== Container ===== */
   .container {
-    background-color: #111; /* darker */
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 107, 53, 0.2);
     border-radius: 15px;
     padding: 40px 50px 50px;
     width: 400px;
     margin: 60px auto 40px;
-    box-shadow: 0 0 30px rgba(255, 107, 53, 0.5);
+    box-shadow: 
+      0 0 30px rgba(255, 107, 53, 0.3),
+      0 25px 50px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
     min-height: 400px;
     display: flex;
     flex-direction: column;
+    position: relative;
+    animation: slideInUp 0.8s ease;
+  }
+
+  @keyframes slideInUp {
+    0% { 
+      opacity: 0; 
+      transform: translateY(30px); 
+    }
+    100% { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+
+  .container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.5), transparent);
+    border-radius: 15px 15px 0 0;
   }
 
   /* Form headers */
@@ -109,28 +186,48 @@
     color: #ff6b35;
     margin-bottom: 40px;
     text-align: center;
+    text-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+    position: relative;
+  }
+
+  .form-header::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff6b35, transparent);
   }
 
   label {
     display: block;
     margin: 16px 0 8px;
     font-weight: 600;
+    color: white;
   }
 
   input {
     width: 100%;
     padding: 12px 14px;
     border-radius: 8px;
-    border: none;
+    border: 1px solid rgba(255, 107, 53, 0.2);
     font-size: 1rem;
-    background-color: #222;
+    background: rgba(34, 34, 34, 0.8);
+    backdrop-filter: blur(10px);
     color: white;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
   }
 
   input:focus {
-    outline: 2px solid #ff6b35;
-    background-color: #2a2a2a;
+    outline: none;
+    border: 2px solid #ff6b35;
+    background: rgba(42, 42, 42, 0.9);
+    box-shadow: 
+      0 0 0 3px rgba(255, 107, 53, 0.2),
+      0 4px 15px rgba(255, 107, 53, 0.1);
+    transform: translateY(-1px);
   }
 
   input::placeholder {
@@ -141,97 +238,189 @@
   button.submit-btn {
     margin-top: 40px;
     width: 100%;
-    background-color: #ff6b35;
+    background: linear-gradient(135deg, #ff6b35, #e05a2e);
     color: white;
-    border: none;
+    border: 1px solid rgba(255, 107, 53, 0.3);
     padding: 16px 0;
     font-size: 1.2rem;
     font-weight: bold;
     border-radius: 10px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
   }
 
   button.submit-btn:hover {
-    background-color: #e05a2e;
+    background: linear-gradient(135deg, #e05a2e, #d14d26);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(255, 107, 53, 0.5);
+  }
+
+  button.submit-btn:active {
+    transform: translateY(0);
+  }
+
+  button.submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+  }
+
+  button.submit-btn:hover::before {
+    left: 100%;
   }
 
   /* ===== Footer ===== */
   footer {
-      background-color: #111;
-      padding: 40px 10%;
-      color: white;
-      border-top: 4px solid #ff6b35; /* orange line above footer */
-    }
-    .footer-top {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 30px;
-      text-align: left;
-      margin-bottom: 20px;
-    }
-    footer h3 {
-      color: #ff6b35;
-      margin-bottom: 10px;
-    }
-    footer p {
-      line-height: 1.5;
-      font-size: 0.95rem;
-      color: #ddd;
-      margin: 5px 0;
-    }
-    footer ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    footer ul li {
-      margin: 8px 0;
-      color: white;
-      font-size: 0.95rem;
-    }
-    footer ul li a {
-      color: white;
-      font-size: 0.95rem;
-    }
-    footer ul li a:hover {
-      color: #ff6b35;
-    }
-    .footer-bottom {
-      text-align: center;
-      padding-top: 10px;
-      font-size: 0.9rem;
-      color: #aaa;
-    }
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 107, 53, 0.1);
+    border-top: 4px solid #ff6b35;
+    padding: 40px 10%;
+    color: white;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+    margin-top: auto;
+  }
 
-    /* Responsive tweaks */
-    @media (max-width: 768px) {
-      .section {
-        padding: 30px 5%;
-      }
-      header {
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      nav {
-        justify-content: center;
-        width: 100%;
-      }
-      .hero {
-        padding: 60px 5%;
-      }
-      .hero h1 {
-        font-size: 2rem;
-      }
-      .hero-buttons {
-        flex-direction: column;
-        gap: 15px;
-      }
-      .btn-primary, .btn-secondary {
-        width: 100%;
-        min-width: unset;
-      }
+  .footer-top {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px;
+    text-align: left;
+    margin-bottom: 20px;
+  }
+
+  footer h3 {
+    color: #ff6b35;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px rgba(255, 107, 53, 0.3);
+  }
+
+  footer p {
+    line-height: 1.5;
+    font-size: 0.95rem;
+    color: #ddd;
+    margin: 5px 0;
+  }
+
+  footer ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  footer ul li {
+    margin: 8px 0;
+    color: white;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+  }
+
+  footer ul li:hover {
+    color: #ff6b35;
+    transform: translateX(3px);
+  }
+
+  footer ul li a {
+    color: white;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+  }
+
+  footer ul li a:hover {
+    color: #ff6b35;
+  }
+
+  footer hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 107, 53, 0.5), transparent);
+    margin: 20px 0;
+  }
+
+  .footer-bottom {
+    text-align: center;
+    padding-top: 10px;
+    font-size: 0.9rem;
+    color: #aaa;
+  }
+
+  .footer-bottom a {
+    color: #aaa;
+    transition: color 0.3s ease;
+  }
+
+  .footer-bottom a:hover {
+    color: #ff6b35;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width: 768px) {
+    header {
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 15px 20px;
     }
+    
+    nav {
+      justify-content: center;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    
+    .container {
+      width: 90%;
+      padding: 30px;
+      margin: 30px auto;
+    }
+    
+    .form-header {
+      font-size: 1.7rem;
+    }
+    
+    footer {
+      padding: 30px 5%;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .container {
+      padding: 25px;
+    }
+    
+    input, button.submit-btn {
+      padding: 12px;
+    }
+    
+    .form-header {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* Interactive enhancements */
+  .container:hover {
+    box-shadow: 
+      0 0 40px rgba(255, 107, 53, 0.4),
+      0 30px 60px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+  }
+
+  /* Subtle mouse tracking effect */
+  @media (hover: hover) {
+    .container {
+      transition: all 0.3s ease;
+    }
+  }
 </style>
 </head>
 <body>
@@ -258,10 +447,10 @@
   <div class="form-header">Admin Access</div>
   <form action="admindash.php" method="POST" novalidate>
     <label for="admin-username">Admin Username</label>
-    <input type="text" id="admin-username" placeholder="Enter your admin username" required />
+    <input type="text" id="admin-username" name="admin-username" placeholder="Enter your admin username" required />
 
     <label for="admin-password">Password</label>
-    <input type="password" id="admin-password" placeholder="Enter your password" required />
+    <input type="password" id="admin-password" name="admin-password" placeholder="Enter your password" required />
 
     <button type="submit" class="submit-btn">Login to Admin Panel</button>
   </form>
@@ -315,6 +504,79 @@
   function scrollToContact() {
     document.getElementById("contact").scrollIntoView({ behavior: "smooth" });
   }
+
+  // Enhanced form functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const inputs = document.querySelectorAll('input');
+    
+    // Add subtle focus effects
+    inputs.forEach(input => {
+      input.addEventListener('focus', function() {
+        this.style.transform = 'translateY(-1px)';
+      });
+      
+      input.addEventListener('blur', function() {
+        this.style.transform = 'translateY(0)';
+      });
+    });
+
+    // Form submission with validation
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('admin-username').value.trim();
+      const password = document.getElementById('admin-password').value.trim();
+      
+      if (!username || !password) {
+        alert('Please fill in all fields');
+        return;
+      }
+      
+      // Add loading state
+      const submitBtn = document.querySelector('.submit-btn');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Logging in...';
+      submitBtn.style.opacity = '0.8';
+      submitBtn.disabled = true;
+      
+      // Simulate loading and redirect (replace with actual form submission)
+      setTimeout(() => {
+        // In real implementation, this would actually submit to admindash.php
+        // For demo purposes, we'll just redirect
+        window.location.href = 'admindash.php';
+      }, 1500);
+    });
+  });
+
+  // Subtle mouse tracking effect
+  let mouseX = 0;
+  let mouseY = 0;
+
+  document.addEventListener('mousemove', function(e) {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    
+    const container = document.querySelector('.container');
+    const rect = container.getBoundingClientRect();
+    
+    if (mouseX >= rect.left && mouseX <= rect.right && 
+        mouseY >= rect.top && mouseY <= rect.bottom) {
+      
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const deltaX = (mouseX - centerX) / 30;
+      const deltaY = (mouseY - centerY) / 30;
+      
+      container.style.transform = `perspective(1000px) rotateY(${deltaX * 0.3}deg) rotateX(${-deltaY * 0.3}deg) translateY(-2px)`;
+    }
+  });
+
+  document.addEventListener('mouseleave', function() {
+    const container = document.querySelector('.container');
+    container.style.transform = 'perspective(1000px) rotateY(0deg) rotateX(0deg) translateY(0px)';
+  });
 </script>
 
 </body>
