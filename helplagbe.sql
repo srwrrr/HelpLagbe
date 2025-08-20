@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 13, 2025 at 08:14 PM
+-- Generation Time: Aug 20, 2025 at 09:35 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -137,9 +137,9 @@ INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Categor
 (1, 'My AC is not cooling properly. Need urgent repair.', NULL, 'appliance', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (2, 'Kitchen sink is leaking. Need plumber immediately.', NULL, 'plumbing', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (3, 'Electrical outlet not working in bedroom.', NULL, 'electrical', NULL, 1, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
-(4, 'checking if my site is working', NULL, 'maintenance', NULL, 6, '2025-08-11 20:41:29', '2025-08-11 20:41:29'),
 (5, 'Testing my webpage', NULL, 'Electrical', 'Computer', 1, '2025-08-12 13:45:03', '2025-08-12 13:45:03'),
-(6, 'I need a guy who can come and help me build my pc', 'uploads/postimg_689cb4bacfa8f8.83345508.png', 'Electrical', 'Computer', 15, '2025-08-13 15:52:26', '2025-08-13 15:52:26');
+(6, 'I need a guy who can come and help me build my pc', 'uploads/postimg_689cb4bacfa8f8.83345508.png', 'Electrical', 'Computer', 15, '2025-08-13 15:52:26', '2025-08-13 15:52:26'),
+(7, 'Need to fix my showerhead', NULL, 'Plumbing', 'Repair', 21, '2025-08-20 18:31:57', '2025-08-20 18:31:57');
 
 -- --------------------------------------------------------
 
@@ -165,8 +165,10 @@ CREATE TABLE `tasks` (
 
 INSERT INTO `tasks` (`task_id`, `task_status`, `price`, `post_id`, `technician_id`, `accepted_at`, `completed_at`, `created_at`, `updated_at`) VALUES
 (1, 'accepted', 500.00, 3, 2, NULL, NULL, '2025-08-09 19:33:23', '2025-08-09 19:42:42'),
-(3, 'pending', 500.00, 6, 8, NULL, NULL, '2025-08-13 16:49:30', '2025-08-13 16:49:30'),
-(4, 'pending', 200.00, 6, 9, NULL, NULL, '2025-08-13 18:10:10', '2025-08-13 18:10:10');
+(3, 'completed', 500.00, 6, 8, '2025-08-14 08:55:50', '2025-08-14 08:55:55', '2025-08-13 16:49:30', '2025-08-14 08:55:55'),
+(5, '', 200.00, 5, 8, NULL, NULL, '2025-08-14 09:05:56', '2025-08-14 22:10:05'),
+(7, 'completed', 32323.00, 5, 10, '2025-08-14 22:10:20', '2025-08-14 22:10:28', '2025-08-14 22:09:22', '2025-08-14 22:10:28'),
+(9, 'pending', 200.00, 1, 8, NULL, NULL, '2025-08-17 16:40:47', '2025-08-20 18:36:42');
 
 -- --------------------------------------------------------
 
@@ -211,12 +213,10 @@ CREATE TABLE `technician` (
 INSERT INTO `technician` (`technician_id`, `national_id`, `Full_Name`, `Required_Documents`, `Skill_details`, `status`, `user_id`, `created_at`, `updated_at`, `address`) VALUES
 (1, '1234567890123', 'Mohammad Rahman', NULL, 'AC repair, refrigerator maintenance, electrical work. 5 years experience.', 'approved', 2, '2025-08-09 19:05:58', '2025-08-09 19:05:58', NULL),
 (2, '1234567890124', 'Abdul Karim', NULL, 'Plumbing, pipe fitting, water system installation. 8 years experience.', 'approved', 3, '2025-08-09 19:05:58', '2025-08-09 19:05:58', NULL),
-(4, '21331123', 'Test tech', NULL, 'VERY VEREY GOOD', 'approved', 7, '2025-08-11 20:46:01', '2025-08-12 15:12:32', NULL),
-(5, '213111333', 'Samir tech', 'uploads/logo main.png', 'i am just figuring things out', 'approved', 9, '2025-08-12 13:50:49', '2025-08-12 15:12:34', NULL),
-(6, '23123123', 'Address', 'uploads/logo main.png', 'address', 'approved', 10, '2025-08-12 13:57:57', '2025-08-12 15:12:36', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi'),
-(7, '2312321', 'Pending', 'uploads/admin dash.png', 'idk man', 'approved', 14, '2025-08-12 15:44:58', '2025-08-12 15:45:16', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi'),
 (8, '433434422', 'Naef Babar', 'uploads/DSC02727.JPG', 'I am really good with electrical works', 'approved', 16, '2025-08-13 15:54:04', '2025-08-13 15:55:07', 'Dhanmondi, Dhaka'),
-(9, '232131231', 'Bomboclaat', 'uploads/0795b24a-557c-4f83-92f5-5c1fa907210d.png', 'BOMBOCLAAAAAAT RICH BILLIONAIRE', 'approved', 17, '2025-08-13 18:09:17', '2025-08-13 18:09:35', 'bangladesh dhaka');
+(10, '323232323', 'Nawaf Babar', 'uploads/ef9f6f37-27c5-4cee-89bb-14b4fdc23666.png', 'BOMBOCLAAAAAAT RICH BILLIONAIRE', 'approved', 18, '2025-08-14 22:08:42', '2025-08-14 22:09:06', 'Dhanmondi, Dhaka'),
+(12, '2333221', 'Mahmood Hossain', 'uploads/logo.png', 'Very good at day to day small works', 'approved', 22, '2025-08-20 18:33:10', '2025-08-20 19:19:33', 'Mirpur 2'),
+(13, '2323232', 'Shihab Rahman', 'uploads/logo.png', '10 years experience truck driving', 'approved', 23, '2025-08-20 19:11:42', '2025-08-20 19:18:52', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi');
 
 -- --------------------------------------------------------
 
@@ -255,19 +255,17 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `username`, `email`, `phone_no`, `password`, `address`, `Image`, `admin_id`, `created_at`, `updated_at`) VALUES
-(1, 'john_doe', 'john@example.com', '+8801234567890', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhanmondi, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
+(1, 'john_doe', 'john@example.com', '01234567890', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dhanmondi, Dhaka update', 'uploads/profile_1_1755209047.png', NULL, '2025-08-09 19:05:58', '2025-08-14 22:04:07'),
 (2, 'jane_smith', 'jane@example.com', '+8801234567891', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Gulshan, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
 (3, 'ahmed_khan', 'ahmed@example.com', '+8801234567892', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Uttara, Dhaka', NULL, NULL, '2025-08-09 19:05:58', '2025-08-09 19:05:58'),
-(6, 'Something', 'something@gmail.com', '01905576802', '$2y$10$hxpxtimgUGQxt1Updv3w0OMO/.IDbED7lLTALHJ07evbugYjAcoza', 'bangladesh dhaka', NULL, NULL, '2025-08-11 20:40:46', '2025-08-11 20:40:46'),
-(7, 'Test tech', 'testtech@gmail.com', '0145678922', '$2y$10$DuzM56C2b3QG8qm9yVhihezat8mitvYH/HdEThotukt/nG5mUvUbu', NULL, NULL, NULL, '2025-08-11 20:46:01', '2025-08-11 20:46:01'),
-(8, 'helppls', 'helpls@gmail.com', '01325409985', '$2y$10$MBs6yPwbkSYZIBUKW1r/8ej/0k9sJy/H9xURKndQ2TbhORE3SUTlW', 'bangladesh dhaka', NULL, NULL, '2025-08-12 12:55:48', '2025-08-12 12:55:48'),
-(9, 'Samir tech', 'samirtech@gmail.com', '01869197806', '$2y$10$UP1omrPM5tN4seBhOR5IjuFqJTCtp7kxNciy5Ug6W7SzI5rL6MNnS', NULL, NULL, NULL, '2025-08-12 13:50:49', '2025-08-12 13:50:49'),
-(10, 'Address', 'address@gmail.com', '01869197806', '$2y$10$7YC6ihcWFkxYXX3LUsvzXeRVR97B7u087mjqmXF0E731xGCscqbWm', NULL, NULL, NULL, '2025-08-12 13:57:57', '2025-08-12 13:57:57'),
 (13, 'Sarwar', 'sarwar@example.com', '0123456789', '$2y$10$CwTycUXWue0Thq9StjUM0uJ8k2Ujy2Ry8H2PsFYYXxMOM6f9YU5LG', NULL, NULL, 2, '2025-08-12 14:41:57', '2025-08-12 14:41:57'),
-(14, 'Pending', 'pending@gmail.com', '01904476903', '$2y$10$oaAQhUbq4R5vw0qPTCrcw.nDE.csJoDlNxwD1BW2TR0/iL5O7Qtgi', NULL, NULL, NULL, '2025-08-12 15:44:58', '2025-08-12 15:44:58'),
 (15, 'Jaman Hossain', 'customer1@gmail.com', '015510232102', '$2y$10$XdcwOMp3FaHhcESC7r9O6e/1PyKa0x0sQzr7IFPCy1sZLxm7AzmKS', '38/1, Haji Abul Khair Nibas, Tenari Mor, Jigatola, Dhanmondi', NULL, NULL, '2025-08-13 15:51:24', '2025-08-13 15:51:24'),
 (16, 'Naef Babar', 'technician1@gmail.com', '01325409985', '$2y$10$lvSBsbPpr4GE/0txZG/Q0eZt1dmIoDCVB3IdTugP6fw0VOaFz6pLe', NULL, NULL, NULL, '2025-08-13 15:54:04', '2025-08-13 15:54:04'),
-(17, 'Bomboclaat', 'richbillionaire@gmail.com', '01869197806', '$2y$10$deyT9xFn3SQj4ehiXMNsPuryXfgNHQLCcO8kYh2rjofPbEow6Axaa', NULL, NULL, NULL, '2025-08-13 18:09:17', '2025-08-13 18:09:17');
+(18, 'Nawaf Babar', 'technician2@gmail.com', '01325409985', '$2y$10$JWqXJdBxewChwEVwXqjOFeHxkPMrgb8BQCOkb1gF0zLAOwxq9AFX6', NULL, NULL, NULL, '2025-08-14 22:08:42', '2025-08-14 22:08:42'),
+(19, 'Saima Ani', 'saima@example.com', '01325408893', '$2y$10$SnfrPyXjW8OXThmQjsampelwUcW.d0vpB4Hn0e463XvKq1BaBsZXS', 'Dohar Dhaka', NULL, NULL, '2025-08-16 21:54:55', '2025-08-16 21:54:55'),
+(21, 'Kazi Junaid', 'kazi@gmail.com', '01908822099', '$2y$10$tucPiOtcoKuV88RtazNTT.1Fv8Ovoy/TpKGX1fqXGjrM3/uHACaz6', 'Mirpur 1 Delta medical hospital', NULL, NULL, '2025-08-20 18:31:10', '2025-08-20 18:31:10'),
+(22, 'Mahmood Hossain', 'mahmood@gmail.com', '01869197806', '$2y$10$wC6AZg1GmGiEn.zoUBMK3exVut.y3fGJw3uDKkEaukgGiQibw/Eu6', NULL, NULL, NULL, '2025-08-20 18:33:10', '2025-08-20 18:33:10'),
+(23, 'Shihab Rahman', 'shihab@gmail.com', '01904476903', '$2y$10$xKJmklZWiDCJUb2EuAs0S.7gUZfLN.8W.ArHdJPKCc0Z49vC7onWO', NULL, NULL, NULL, '2025-08-20 19:11:42', '2025-08-20 19:11:42');
 
 -- --------------------------------------------------------
 
@@ -451,13 +449,13 @@ ALTER TABLE `payment`
 -- AUTO_INCREMENT for table `posts`
 --
 ALTER TABLE `posts`
-  MODIFY `post_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `post_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `task_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `task_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `task_feedback`
@@ -469,7 +467,7 @@ ALTER TABLE `task_feedback`
 -- AUTO_INCREMENT for table `technician`
 --
 ALTER TABLE `technician`
-  MODIFY `technician_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `technician_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `technician_dashboard`
@@ -481,7 +479,7 @@ ALTER TABLE `technician_dashboard`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `website_feedback`
