@@ -4,24 +4,25 @@ session_start();
 require_once 'db.php';  // <- This includes your PDO $pdo connection
 
 // Function to create default admin user if it doesn't exist
-function createDefaultAdmin($pdo) {
+function createDefaultAdmin($pdo)
+{
     try {
         // Check if default admin already exists
         $stmt = $pdo->prepare("SELECT * FROM users WHERE username = 'admin' AND admin_id IS NOT NULL LIMIT 1");
         $stmt->execute();
         $existingAdmin = $stmt->fetch();
-        
+
         if (!$existingAdmin) {
             // First, create an entry in the admin table
             $stmt = $pdo->prepare("INSERT INTO admin (created_at) VALUES (NOW())");
             $stmt->execute();
             $adminTableId = $pdo->lastInsertId();
-            
+
             // Create default admin user
             $defaultUsername = 'admin';
             $defaultPassword = 'admin123';
             $hashedPassword = password_hash($defaultPassword, PASSWORD_DEFAULT);
-            
+
             // Insert default admin user with proper column names from your database
             $stmt = $pdo->prepare("INSERT INTO users (username, email, phone_no, password, admin_id, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
@@ -31,10 +32,10 @@ function createDefaultAdmin($pdo) {
                 $hashedPassword,
                 $adminTableId
             ]);
-            
+
             return true; // Admin created successfully
         }
-        
+
         return false; // Admin already exists
     } catch (PDOException $e) {
         error_log("Error creating default admin: " . $e->getMessage());
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['admin_username'] = $admin['username'];
                     $_SESSION['admin_email'] = $admin['email'];
                     $_SESSION['admin_logged_in'] = true;
-                    
+
                     // Log admin login in admin_dashboard table (optional)
                     try {
                         $stmt = $pdo->prepare("INSERT INTO admin_dashboard (admin_id, user_id, Type, action, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
@@ -86,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Log error but don't fail login
                         error_log("Error logging admin login: " . $e->getMessage());
                     }
-                    
+
                     // Redirect to admin dashboard
                     header("Location: admindash.php");
                     exit();
@@ -104,6 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // If we reach here, either it's a GET request or login failed
-// Include the frontend
-include 'admin-login-frontend.php';
+// Include the existing admin login page.
+include 'admin.html';
 ?>

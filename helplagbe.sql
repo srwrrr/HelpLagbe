@@ -149,7 +149,7 @@ INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Categor
 
 CREATE TABLE `tasks` (
   `task_id` int(11) NOT NULL,
-  `task_status` enum('pending','accepted','in_progress','completed','cancelled') DEFAULT 'pending',
+  `task_status` enum('pending','accepted','rejected','in_progress','completed','cancelled') DEFAULT 'pending',
   `price` decimal(10,2) NOT NULL,
   `post_id` int(11) NOT NULL,
   `technician_id` int(11) NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE `tasks` (
 INSERT INTO `tasks` (`task_id`, `task_status`, `price`, `post_id`, `technician_id`, `accepted_at`, `completed_at`, `created_at`, `updated_at`) VALUES
 (1, 'accepted', 500.00, 3, 2, NULL, NULL, '2025-08-09 19:33:23', '2025-08-09 19:42:42'),
 (3, 'completed', 500.00, 6, 8, '2025-08-14 08:55:50', '2025-08-14 08:55:55', '2025-08-13 16:49:30', '2025-08-14 08:55:55'),
-(5, '', 200.00, 5, 8, NULL, NULL, '2025-08-14 09:05:56', '2025-08-14 22:10:05'),
+(5, 'pending', 200.00, 5, 8, NULL, NULL, '2025-08-14 09:05:56', '2025-08-14 22:10:05'),
 (7, 'completed', 32323.00, 5, 10, '2025-08-14 22:10:20', '2025-08-14 22:10:28', '2025-08-14 22:09:22', '2025-08-14 22:10:28'),
 (9, 'pending', 200.00, 1, 8, NULL, NULL, '2025-08-17 16:40:47', '2025-08-20 18:36:42');
 
