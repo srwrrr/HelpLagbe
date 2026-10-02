@@ -2,27 +2,67 @@ import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import cors from 'cors'
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import mysql from 'mysql2/promise'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 
 const app = express()
 const port = Number(process.env.PORT || 4000)
-const jwtSecret = process.env.JWT_SECRET || 'helplagbe-school-project-secret'
+const isProduction = process.env.NODE_ENV === 'production'
+if (isProduction && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
+  throw new Error('JWT_SECRET must be set to at least 32 characters in production.')
+}
+const jwtSecret = process.env.JWT_SECRET || 'helplagbe-local-development-secret'
 const rawConfiguredOrigins = process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://localhost:4173'
 const allowedOrigins = [...new Set(rawConfiguredOrigins.split(',').map((value) => value.trim()).filter(Boolean))]
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
 
+const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  host: databaseUrl ? databaseUrl.hostname : process.env.DB_HOST,
+  port: Number(databaseUrl ? databaseUrl.port || 3306 : process.env.DB_PORT || 3306),
+  database: databaseUrl ? decodeURIComponent(databaseUrl.pathname.slice(1)) : process.env.DB_NAME,
+  user: databaseUrl ? decodeURIComponent(databaseUrl.username) : process.env.DB_USER,
+  password: databaseUrl ? decodeURIComponent(databaseUrl.password) : process.env.DB_PASSWORD,
+  ...(process.env.DB_SSL === 'true' ? {
+    ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' },
+  } : {}),
   waitForConnections: true,
   connectionLimit: 10,
 })
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests. Please wait a few moments and try again.' },
+  statusCode: 429,
+})
+
+function sanitizeText(value, maxLength = 250) {
+  if (typeof value !== 'string') return ''
+  return value.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, maxLength)
+}
+
+function isValidEmail(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+}
+
+function isValidPassword(value) {
+  return typeof value === 'string' && value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value)
+}
+
+function parsePagination(request, defaultLimit = 20) {
+  const page = Math.max(1, Number.parseInt(request.query.page || '1', 10) || 1)
+  const limit = Math.min(50, Math.max(1, Number.parseInt(request.query.limit || String(defaultLimit), 10) || defaultLimit))
+  const offset = (page - 1) * limit
+  return { page, limit, offset }
+}
 
 async function ensureNotificationTable() {
   await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
@@ -106,6 +146,7 @@ app.use(cors({
   credentials: true,
 }))
 app.use(express.json({ limit: '8mb' }))
+app.use('/api', apiRateLimiter)
 app.use('/uploads', express.static(resolve(process.cwd(), '../uploads')))
 
 function authenticate(request, response, next) {
@@ -221,32 +262,75 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
   }
 })
 
-app.get('/api/posts', async (_request, response) => {
+app.get('/api/posts', async (request, response) => {
   try {
+    const { page, limit, offset } = parsePagination(request, 12)
+    const category = sanitizeText(request.query.category || '', 60)
+    const search = sanitizeText(request.query.search || '', 120)
+    const filters = []
+    const values = []
+
+    if (category) {
+      filters.push('LOWER(p.Category) = LOWER(?)')
+      values.push(category)
+    }
+    if (search) {
+      filters.push('(LOWER(p.Post_detail) LIKE LOWER(?) OR LOWER(p.Category) LIKE LOWER(?))')
+      values.push(`%${search}%`, `%${search}%`)
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
     const [rows] = await pool.execute(
-      'SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.`Sub-Category` AS subCategory, p.Image AS image, p.created_at AS createdAt FROM posts p ORDER BY p.created_at DESC LIMIT 30',
+      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt, COUNT(t.task_id) AS bidCount
+       FROM posts p LEFT JOIN tasks t ON t.post_id = p.post_id ${whereClause}
+       GROUP BY p.post_id, p.Post_detail, p.Category, p.\`Sub-Category\`, p.Image, p.created_at
+       ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
     )
-    response.json(rows)
+    const [totalRows] = await pool.execute(
+      `SELECT COUNT(*) AS total FROM posts p ${whereClause}`,
+      values,
+    )
+    response.json({ items: rows, pagination: { page, limit, total: Number(totalRows[0]?.total || 0) } })
   } catch (error) {
     response.status(500).json({ message: 'Could not load service requests.' })
   }
 })
 
-app.get('/api/technicians', async (_request, response) => {
+app.get('/api/technicians', async (request, response) => {
   try {
+    const { page, limit, offset } = parsePagination(request, 12)
+    const search = sanitizeText(request.query.search || '', 100)
+    const location = sanitizeText(request.query.location || '', 100)
+    const filters = ['tech.status = ?']
+    const values = ['approved']
+
+    if (search) {
+      filters.push('(LOWER(tech.Full_Name) LIKE LOWER(?) OR LOWER(tech.Skill_details) LIKE LOWER(?))')
+      values.push(`%${search}%`, `%${search}%`)
+    }
+    if (location) {
+      filters.push('(LOWER(tech.address) LIKE LOWER(?) OR LOWER(tech.Skill_details) LIKE LOWER(?))')
+      values.push(`%${location}%`, `%${location}%`)
+    }
+
+    const whereClause = `WHERE ${filters.join(' AND ')}`
     const [rows] = await pool.execute(
-            `SELECT tech.technician_id AS id, tech.Full_Name AS name,
-              tech.Skill_details AS skills, COUNT(CASE WHEN t.task_status = 'completed' THEN 1 END) AS completedJobs,
-              ROUND(AVG(tf.consumer_rating), 1) AS averageRating,
-              COUNT(tf.consumer_rating) AS reviewCount
+      `SELECT tech.technician_id AS id, tech.Full_Name AS name, tech.Skill_details AS skills,
+              tech.address AS location, COUNT(CASE WHEN t.task_status = 'completed' THEN 1 END) AS completedJobs,
+              ROUND(AVG(tf.consumer_rating), 1) AS averageRating, COUNT(tf.consumer_rating) AS reviewCount
        FROM technician tech
        LEFT JOIN tasks t ON t.technician_id = tech.technician_id
-             LEFT JOIN task_feedback tf ON tf.task_id = t.task_id
-       WHERE tech.status = 'approved'
-       GROUP BY tech.technician_id, tech.Full_Name, tech.Skill_details
-       ORDER BY completedJobs DESC, tech.Full_Name ASC LIMIT 50`,
+       LEFT JOIN task_feedback tf ON tf.task_id = t.task_id ${whereClause}
+       GROUP BY tech.technician_id, tech.Full_Name, tech.Skill_details, tech.address
+       ORDER BY completedJobs DESC, tech.Full_Name ASC LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
     )
-    response.json(rows)
+    const [totalRows] = await pool.execute(
+      `SELECT COUNT(*) AS total FROM technician tech ${whereClause}`,
+      values,
+    )
+    response.json({ items: rows, pagination: { page, limit, total: Number(totalRows[0]?.total || 0) } })
   } catch (error) {
     response.status(500).json({ message: 'Could not load technicians.' })
   }
@@ -290,7 +374,7 @@ app.get('/api/technician/requests', authenticate, async (request, response) => {
 
   try {
     const [rows] = await pool.execute(
-      'SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.`Sub-Category` AS subCategory, p.Image AS image, p.created_at AS createdAt FROM posts p WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN (\'accepted\', \'in_progress\', \'completed\')) ORDER BY p.created_at DESC LIMIT 30',
+      'SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt FROM posts p WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN (\'accepted\', \'in_progress\', \'completed\')) ORDER BY p.created_at DESC LIMIT 30',
     )
     response.json(rows)
   } catch (error) {
@@ -448,17 +532,86 @@ app.get('/api/admin/overview', authenticate, requireAdmin, async (_request, resp
   }
 })
 
-app.get('/api/admin/audit-log', authenticate, requireAdmin, async (_request, response) => {
+app.get('/api/admin/audit-log', authenticate, requireAdmin, async (request, response) => {
   try {
+    const search = sanitizeText(request.query.search || '', 120)
+    const action = sanitizeText(request.query.action || '', 80)
+    const whereClauses = []
+    const values = []
+
+    if (search) {
+      whereClauses.push('(LOWER(a.action) LIKE LOWER(?) OR LOWER(a.details) LIKE LOWER(?) OR LOWER(u.username) LIKE LOWER(?))')
+      values.push(`%${search}%`, `%${search}%`, `%${search}%`)
+    }
+    if (action) {
+      whereClauses.push('LOWER(a.action) = LOWER(?)')
+      values.push(action)
+    }
+
+    const whereClause = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
     const [rows] = await pool.execute(
       `SELECT a.audit_id AS id, a.action, a.target_type AS targetType, a.target_id AS targetId,
               a.details, a.created_at AS createdAt, u.username AS adminName
-       FROM admin_audit_log a JOIN users u ON u.user_id = a.admin_id
-       ORDER BY a.created_at DESC LIMIT 50`,
+       FROM admin_audit_log a JOIN users u ON u.user_id = a.admin_id ${whereClause}
+       ORDER BY a.created_at DESC LIMIT 100`,
+      values,
     )
     response.json(rows)
   } catch (error) {
     response.status(500).json({ message: 'Could not load audit log.' })
+  }
+})
+
+app.get('/api/admin/users', authenticate, requireAdmin, async (request, response) => {
+  try {
+    const search = sanitizeText(request.query.search || '', 120)
+    const role = sanitizeText(request.query.role || '', 20)
+    const filters = []
+    const values = []
+
+    if (search) {
+      filters.push('(LOWER(u.username) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?))')
+      values.push(`%${search}%`, `%${search}%`)
+    }
+    if (role) {
+      filters.push("CASE WHEN u.admin_id IS NOT NULL THEN 'admin' WHEN tech.technician_id IS NOT NULL THEN 'technician' ELSE 'customer' END = ?")
+      values.push(role)
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
+    const [rows] = await pool.execute(
+      `SELECT u.user_id AS id, u.username AS name, u.email, u.phone_no AS phone,
+              CASE WHEN u.admin_id IS NOT NULL THEN 'admin'
+                   WHEN tech.technician_id IS NOT NULL THEN 'technician'
+                   ELSE 'customer' END AS role,
+              COALESCE(controls.status, 'active') AS accountStatus,
+              u.created_at AS createdAt
+       FROM users u LEFT JOIN technician tech ON tech.user_id = u.user_id
+       LEFT JOIN admin_user_controls controls ON controls.user_id = u.user_id ${whereClause}
+       ORDER BY u.created_at DESC LIMIT 100`,
+      values,
+    )
+    response.json(rows)
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load user directory.' })
+  }
+})
+
+app.get('/api/admin/reports/export', authenticate, requireAdmin, async (_request, response) => {
+  try {
+    const [users] = await pool.execute(`SELECT user_id AS id, username AS name, email, role = 'admin' AS isAdmin FROM users`)
+    const [taskRows] = await pool.execute(`SELECT task_status AS status, COUNT(*) AS total FROM tasks GROUP BY task_status`)
+    const rows = [
+      ['type', 'total'],
+      ...taskRows.map((row) => [row.status, String(row.total)]),
+      ['users', String(users.length)],
+    ]
+    const csv = rows.map((row) => row.join(',')).join('\n')
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    response.setHeader('Content-Disposition', 'attachment; filename="helplagbe-report.csv"')
+    response.send(csv)
+  } catch (error) {
+    response.status(500).json({ message: 'Could not export report.' })
   }
 })
 
@@ -593,6 +746,29 @@ app.get('/api/admin/archived-users', authenticate, requireAdmin, async (_request
     response.json(rows)
   } catch (error) {
     response.status(500).json({ message: 'Could not load archived users.' })
+  }
+})
+
+app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireAdmin, async (request, response) => {
+  try {
+    const [archiveRows] = await pool.execute(
+      'SELECT original_user_id, username, email, role, snapshot FROM archived_users WHERE archive_id = ? LIMIT 1',
+      [request.params.archiveId],
+    )
+    if (!archiveRows[0]) return response.status(404).json({ message: 'Archived user not found.' })
+    const archive = archiveRows[0]
+    const [existing] = await pool.execute('SELECT user_id FROM users WHERE email = ? LIMIT 1', [archive.email])
+    if (existing[0]) return response.status(409).json({ message: 'A live account already exists with that email.' })
+
+    const [result] = await pool.execute(
+      'INSERT INTO users (user_id, username, email, password, phone_no, address, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      [archive.original_user_id, archive.username, archive.email, 'archived-user-restored', null, null],
+    )
+    await pool.execute('DELETE FROM archived_users WHERE archive_id = ?', [request.params.archiveId])
+    await createAudit(request.user.userId, 'user_restored', 'archive', archive.original_user_id, `${archive.username} restored from archive`)
+    response.json({ message: 'Archived user restored.', userId: result.insertId || archive.original_user_id })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not restore archived user.' })
   }
 })
 
@@ -755,10 +931,17 @@ app.post('/api/auth/register-technician', async (request, response) => {
 })
 
 app.post('/api/auth/login', async (request, response) => {
-  const { email, password } = request.body
+  const email = typeof request.body?.email === 'string' ? request.body.email.trim() : ''
+  const password = typeof request.body?.password === 'string' ? request.body.password : ''
 
   if (!email || !password) {
     return response.status(400).json({ message: 'Email and password are required.' })
+  }
+  if (!isValidEmail(email)) {
+    return response.status(400).json({ message: 'Enter a valid email address.' })
+  }
+  if (!isValidPassword(password)) {
+    return response.status(400).json({ message: 'Password must be at least 8 characters and include letters and numbers.' })
   }
 
   try {
@@ -768,7 +951,7 @@ app.post('/api/auth/login', async (request, response) => {
        FROM users u LEFT JOIN technician t ON t.user_id = u.user_id
        LEFT JOIN admin_user_controls controls ON controls.user_id = u.user_id
        WHERE u.email = ? LIMIT 1`,
-      [email.trim().toLowerCase()],
+      [email.toLowerCase()],
     )
     const user = rows[0]
 
@@ -785,9 +968,13 @@ app.post('/api/auth/login', async (request, response) => {
   }
 })
 
-ensureNotificationTable()
-  .then(() => app.listen(port, () => console.log(`HelpLagbe API listening on port ${port}`)))
-  .catch((error) => {
-    console.error('Could not initialize notifications table.', error.message)
-    process.exitCode = 1
-  })
+if (isDirectRun) {
+  ensureNotificationTable()
+    .then(() => app.listen(port, () => console.log(`HelpLagbe API listening on port ${port}`)))
+    .catch((error) => {
+      console.error('Could not initialize notifications table.', error.message)
+      process.exitCode = 1
+    })
+}
+
+export { app }
