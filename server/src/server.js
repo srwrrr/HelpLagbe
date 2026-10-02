@@ -5,6 +5,7 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import mysql from 'mysql2/promise'
+import { readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -22,6 +23,9 @@ const allowedOrigins = [...new Set(rawConfiguredOrigins.split(',').map((value) =
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
 
 const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null
+const databaseCa = process.env.DB_SSL_CA_PATH
+  ? readFileSync(process.env.DB_SSL_CA_PATH, 'utf8')
+  : process.env.DB_SSL_CA || undefined
 const pool = mysql.createPool({
   host: databaseUrl ? databaseUrl.hostname : process.env.DB_HOST,
   port: Number(databaseUrl ? databaseUrl.port || 3306 : process.env.DB_PORT || 3306),
@@ -29,7 +33,10 @@ const pool = mysql.createPool({
   user: databaseUrl ? decodeURIComponent(databaseUrl.username) : process.env.DB_USER,
   password: databaseUrl ? decodeURIComponent(databaseUrl.password) : process.env.DB_PASSWORD,
   ...(process.env.DB_SSL === 'true' ? {
-    ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' },
+    ssl: {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ...(databaseCa ? { ca: databaseCa } : {}),
+    },
   } : {}),
   waitForConnections: true,
   connectionLimit: 10,

@@ -25,6 +25,8 @@ services:
         sync: false
       - key: DB_SSL
         value: "true"
+      - key: DB_SSL_CA
+        sync: false
 
   - type: web
     name: helplagbe-client
