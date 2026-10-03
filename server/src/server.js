@@ -526,7 +526,8 @@ app.get('/api/admin/overview', authenticate, requireAdmin, async (_request, resp
             COUNT(t.task_id) AS bidCount
        FROM posts p JOIN users u ON u.user_id = p.user_id
        LEFT JOIN tasks t ON t.post_id = p.post_id
-       GROUP BY p.post_id ORDER BY p.created_at DESC LIMIT 50`,
+        GROUP BY p.post_id, p.Post_detail, p.Category, p.created_at, u.username
+        ORDER BY p.created_at DESC LIMIT 50`,
      )
      const [technicians] = await pool.query(
       `SELECT technician_id AS id, Full_Name AS name, national_id AS nationalId,

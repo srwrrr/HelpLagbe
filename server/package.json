@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "admin:reset-password": "node scripts/reset-admin-password.js",
     "seed:demo": "node scripts/seed-demo-data.js",
     "seed:realistic": "node scripts/seed-demo-data.js",
     "test": "node --test tests/**/*.test.js"
