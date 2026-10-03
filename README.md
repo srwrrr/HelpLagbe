@@ -161,6 +161,16 @@ npm run build
 npm run lint
 ```
 
+The optional database integration test creates and deletes test users, posts, bids, notifications, and archive entries. Run it only against a disposable test database, never a live customer database:
+
+```powershell
+Set-Location 'C:\path\to\HelpLagbe\server'
+$env:RUN_DATABASE_INTEGRATION_TESTS = '1'
+$env:INTEGRATION_DB_IS_DISPOSABLE = '1'
+npm run test:integration
+Remove-Item Env:RUN_DATABASE_INTEGRATION_TESTS,Env:INTEGRATION_DB_IS_DISPOSABLE
+```
+
 ## Legacy files
 
 The original PHP files remain as legacy/reference material. The active application uses the React client and Express API.

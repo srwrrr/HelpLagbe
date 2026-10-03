@@ -1,13 +1,24 @@
 import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import mysql from 'mysql2/promise'
+import { readFileSync } from 'node:fs'
 
+const databaseUrl = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL) : null
+const databaseCa = process.env.DB_SSL_CA_PATH
+  ? readFileSync(process.env.DB_SSL_CA_PATH, 'utf8')
+  : process.env.DB_SSL_CA || undefined
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 3306),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  host: databaseUrl ? databaseUrl.hostname : process.env.DB_HOST,
+  port: Number(databaseUrl ? databaseUrl.port || 3306 : process.env.DB_PORT || 3306),
+  database: databaseUrl ? decodeURIComponent(databaseUrl.pathname.slice(1)) : process.env.DB_NAME,
+  user: databaseUrl ? decodeURIComponent(databaseUrl.username) : process.env.DB_USER,
+  password: databaseUrl ? decodeURIComponent(databaseUrl.password) : process.env.DB_PASSWORD,
+  ...(process.env.DB_SSL === 'true' ? {
+    ssl: {
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+      ...(databaseCa ? { ca: databaseCa } : {}),
+    },
+  } : {}),
   waitForConnections: true,
   connectionLimit: 5,
 })
@@ -55,15 +66,28 @@ const technicianProfiles = [
   ['Rahima Khatun', 'rahima.khatun@helplagbe.com', '0181002008', 'RahimaFix246!'],
 ]
 
+let usesTiDBSequences = false
+
+async function nextTiDBId(connection, sequenceName) {
+  if (!usesTiDBSequences) return null
+  const [rows] = await connection.query(`SELECT NEXTVAL(\`${sequenceName}\`) AS generatedId`)
+  return Number(rows[0]?.generatedId)
+}
+
 async function getOrCreateUser(connection, username, email, password, phone) {
   const [existing] = await connection.execute('SELECT user_id AS id FROM users WHERE email = ? LIMIT 1', [email])
   if (existing[0]) return existing[0].id
   const passwordHash = await bcrypt.hash(password, 10)
+  const userId = await nextTiDBId(connection, 'helplagbe_users_user_id_seq')
   const [result] = await connection.execute(
-    'INSERT INTO users (username, email, phone_no, password, address) VALUES (?, ?, ?, ?, ?)',
-    [username, email, phone, passwordHash, 'Dhaka'],
+    userId
+      ? 'INSERT INTO users (user_id, username, email, phone_no, password, address) VALUES (?, ?, ?, ?, ?, ?)'
+      : 'INSERT INTO users (username, email, phone_no, password, address) VALUES (?, ?, ?, ?, ?)',
+    userId
+      ? [userId, username, email, phone, passwordHash, 'Dhaka']
+      : [username, email, phone, passwordHash, 'Dhaka'],
   )
-  return result.insertId
+  return result.insertId || userId
 }
 
 async function clearLegacyDemoData(connection) {
@@ -119,8 +143,34 @@ async function clearLegacyDemoData(connection) {
 }
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
+    throw new Error('Refusing destructive seed in production. Set ALLOW_DESTRUCTIVE_SEED=true only for a disposable database.')
+  }
+
   const connection = await pool.getConnection()
   try {
+    const [versionRows] = await connection.query('SELECT VERSION() AS version')
+    usesTiDBSequences = String(versionRows[0]?.version || '').toLowerCase().includes('tidb')
+    if (usesTiDBSequences) {
+      for (const [tableName, columnName] of [
+        ['users', 'user_id'],
+        ['technician', 'technician_id'],
+        ['posts', 'post_id'],
+        ['tasks', 'task_id'],
+      ]) {
+        const sequenceName = `helplagbe_${tableName}_${columnName}_seq`
+        const [columns] = await connection.execute(
+          `SELECT COLUMN_DEFAULT AS columnDefault FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+          [tableName, columnName],
+        )
+        if (!String(columns[0]?.columnDefault || '').toLowerCase().includes(sequenceName.toLowerCase())) {
+          const [maxRows] = await connection.query(`SELECT COALESCE(MAX(\`${columnName}\`), 0) + 1 AS nextId FROM \`${tableName}\``)
+          await connection.query(`CREATE SEQUENCE IF NOT EXISTS \`${sequenceName}\` START WITH ${Number(maxRows[0]?.nextId || 1)} CACHE 1`)
+          await connection.query(`ALTER TABLE \`${tableName}\` ALTER COLUMN \`${columnName}\` SET DEFAULT (NEXT VALUE FOR \`${sequenceName}\`)`)
+        }
+      }
+    }
     await connection.beginTransaction()
     await clearLegacyDemoData(connection)
 
@@ -138,12 +188,18 @@ async function seed() {
       if (existing[0]) {
         technicianIds.push(existing[0].id)
       } else {
+        const technicianId = await nextTiDBId(connection, 'helplagbe_technician_technician_id_seq')
         const [result] = await connection.execute(
-          `INSERT INTO technician (national_id, Full_Name, Skill_details, status, user_id, address)
-           VALUES (?, ?, ?, 'approved', ?, 'Dhaka')`,
-          [`T-${String(index + 1).padStart(4, '0')}`, fullName, `${categories[index % categories.length][0]} specialist with verified experience and local service coverage.`, userId],
+          technicianId
+            ? `INSERT INTO technician (technician_id, national_id, Full_Name, Skill_details, status, user_id, address)
+               VALUES (?, ?, ?, ?, 'approved', ?, 'Dhaka')`
+            : `INSERT INTO technician (national_id, Full_Name, Skill_details, status, user_id, address)
+               VALUES (?, ?, ?, 'approved', ?, 'Dhaka')`,
+          technicianId
+            ? [technicianId, `T-${String(index + 1).padStart(4, '0')}`, fullName, `${categories[index % categories.length][0]} specialist with verified experience and local service coverage.`, userId]
+            : [`T-${String(index + 1).padStart(4, '0')}`, fullName, `${categories[index % categories.length][0]} specialist with verified experience and local service coverage.`, userId],
         )
-        technicianIds.push(result.insertId)
+        technicianIds.push(result.insertId || technicianId)
       }
     }
 
@@ -153,10 +209,16 @@ async function seed() {
     for (let index = 1; index <= 40; index += 1) {
       const [category, subCategory] = categories[(index - 1) % categories.length]
       const customerId = customerIds[(index - 1) % customerIds.length]
+      const postId = await nextTiDBId(connection, 'helplagbe_posts_post_id_seq')
       const [postResult] = await connection.execute(
-        'INSERT INTO posts (Post_detail, Category, `Sub-Category`, user_id) VALUES (?, ?, ?, ?)',
-        [`${seedTag} ${category} request ${index}: ${customerProfiles[(index - 1) % customerProfiles.length][0]} needs dependable ${subCategory.toLowerCase()} support in Dhaka.`, category, subCategory, customerId],
+        postId
+          ? 'INSERT INTO posts (post_id, Post_detail, Category, `Sub-Category`, user_id) VALUES (?, ?, ?, ?, ?)'
+          : 'INSERT INTO posts (Post_detail, Category, `Sub-Category`, user_id) VALUES (?, ?, ?, ?)',
+        postId
+          ? [postId, `${seedTag} ${category} request ${index}: ${customerProfiles[(index - 1) % customerProfiles.length][0]} needs dependable ${subCategory.toLowerCase()} support in Dhaka.`, category, subCategory, customerId]
+          : [`${seedTag} ${category} request ${index}: ${customerProfiles[(index - 1) % customerProfiles.length][0]} needs dependable ${subCategory.toLowerCase()} support in Dhaka.`, category, subCategory, customerId],
       )
+      const createdPostId = postResult.insertId || postId
       postCount += 1
       const bidCount = index % 3 === 0 ? 3 : 2
       for (let bidIndex = 0; bidIndex < bidCount; bidIndex += 1) {
@@ -167,7 +229,7 @@ async function seed() {
         await connection.execute(
           `INSERT INTO tasks (task_status, price, post_id, technician_id, accepted_at, completed_at)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [status, 350 + ((index + bidIndex) * 125) % 1800, postResult.insertId, technicianId, acceptedAt, completedAt],
+          [status, 350 + ((index + bidIndex) * 125) % 1800, createdPostId, technicianId, acceptedAt, completedAt],
         )
         taskCount += 1
       }

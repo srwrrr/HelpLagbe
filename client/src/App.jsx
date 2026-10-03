@@ -188,8 +188,20 @@ function AdminTools() {
 function ArchivedUsersPanel() {
   const [archives, setArchives] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { request('/admin/archived-users').then(setArchives).catch(() => setArchives([])).finally(() => setLoading(false)) }, [])
-  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Data retention</p><h2>Archived accounts</h2></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}</div></section>
+  const [message, setMessage] = useState('')
+  const load = () => request('/admin/archived-users').then(setArchives).catch((error) => setMessage(error.message)).finally(() => setLoading(false))
+  useEffect(() => { load() }, [])
+  const restore = async (archiveId) => {
+    if (!window.confirm('Restore this archived account and its saved history?')) return
+    try {
+      const result = await request(`/admin/archived-users/${archiveId}/restore`, { method: 'PATCH' })
+      setMessage(result.message)
+      load()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Data retention</p><h2>Archived accounts</h2></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th><th>Action</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td><td><button className="quiet-button" type="button" onClick={() => restore(archive.id)}>Restore</button></td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}{message && <p className="form-message">{message}</p>}</div></section>
 }
 
 function MessagesPanel() {
