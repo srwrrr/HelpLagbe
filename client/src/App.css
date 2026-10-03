@@ -140,4 +140,10 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }h1 { margin: 0; font-siz
 :root[data-theme='light'] .auth-panel input, :root[data-theme='light'] .auth-panel textarea, :root[data-theme='light'] .request-form input, :root[data-theme='light'] .request-form textarea, :root[data-theme='light'] .request-form select, :root[data-theme='light'] .bid-row input, :root[data-theme='light'] .admin-select { background: rgba(255, 255, 255, .8); color: var(--ink); }
 :root[data-theme='light'] .site-footer { color: var(--muted); }
 
+.password-input-wrap { position: relative; margin-top: 7px; }
+.auth-panel .password-input-wrap input { margin-top: 0; padding-right: 66px; }
+.password-toggle { position: absolute; top: 50%; right: 8px; min-width: 48px; transform: translateY(-50%); border: 0; border-radius: 5px; padding: 6px 7px; background: transparent; color: var(--orange); font-size: .72rem; font-weight: 700; }
+.password-toggle:hover { background: rgba(255, 107, 53, .1); }
+.password-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 1px; }
+
 @media (max-width: 900px) { .site-nav .theme-toggle { display: inline-flex !important; } }
