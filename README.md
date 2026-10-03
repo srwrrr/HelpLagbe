@@ -169,6 +169,8 @@ The original PHP files remain as legacy/reference material. The active applicati
 
 The repository includes `render.yaml`, which describes a static frontend and a Node API. The API requires a separately hosted MySQL-compatible database; Render does not provide that database through this Blueprint. Free-plan availability and limits vary by provider and can change.
 
+This Blueprint pins the API to Render's free compute plan, and Render static sites are free. TiDB Cloud Starter's documented free tier does not require a payment card; it includes a monthly usage quota and blocks new connections if a free instance exceeds its quota. Do not add a payment method, select a paid/scalable database plan, or enable paid overages. If a provider asks you for a card to continue, stop rather than entering payment details.
+
 ### Before you begin
 
 1. Push the project to a GitHub repository. Do not commit either `.env` file or database credentials.
@@ -178,7 +180,7 @@ The repository includes `render.yaml`, which describes a static frontend and a N
 ### Create the Render services
 
 1. Sign in to Render, select **New +** then **Blueprint**, connect the GitHub repository, and use its `render.yaml`.
-2. When prompted for environment values, enter the database provider's `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`. Set `DB_SSL=true` if the provider requires TLS; otherwise use `false`. If you do not yet know the generated service URLs, enter temporary values for `CLIENT_ORIGIN` and `VITE_API_URL` and replace them in the next steps. Render generates `JWT_SECRET`; keep it private and do not replace it with a short/example value.
+2. When prompted for environment values, enter the database provider's `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`. For TiDB Starter use port `4000`, `DB_SSL=true`, and the TiDB CA certificate in `DB_SSL_CA`. If you do not yet know the generated service URLs, enter temporary values for `CLIENT_ORIGIN` and `VITE_API_URL` and replace them in the next steps. Render generates `JWT_SECRET`; keep it private and do not replace it with a short/example value.
 3. Apply the Blueprint. Render builds the API and static client; the first deploy can take several minutes.
 4. In the API service settings, set `CLIENT_ORIGIN` to the exact static-site origin shown by Render, for example `https://your-client-name.onrender.com`. Use only the origin, with no path or trailing slash, then save and redeploy the API.
 5. In the static site's settings, set the build environment variable `VITE_API_URL` to the API URL ending in `/api`, for example `https://your-api-name.onrender.com/api`. Save and redeploy the static site so Vite includes the hosted API URL in its build.
