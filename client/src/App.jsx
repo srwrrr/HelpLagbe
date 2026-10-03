@@ -278,11 +278,97 @@ function CustomerDashboard({ user }) {
   const [imageData, setImageData] = useState('')
   const [imageName, setImageName] = useState('')
   const [message, setMessage] = useState('')
-  const load = () => request('/customer/posts').then(setPosts).catch(() => setPosts([]))
-  useEffect(() => { load() }, [])
-  const submit = async (event) => { event.preventDefault(); setMessage('Posting request...'); try { await request('/posts', { method: 'POST', body: JSON.stringify({ ...form, imageData }) }); setForm({ detail: '', category: 'Appliance', subCategory: '' }); setImageData(''); setImageName(''); setMessage('Request posted successfully.'); load() } catch (error) { setMessage(error.message) } }
-  const updateBid = async (taskId, status) => { try { await request(`/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); load() } catch (error) { setMessage(error.message) } }
-  return <DashboardLayout user={user} eyebrow="Customer workspace" title="Get the help you need." description="Post a job, compare offers, and keep every request in one place."><section className="dashboard-grid page-width"><div className="dashboard-main"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button>{message && <p className="form-message">{message}</p>}</form></div><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Your activity</p><h2>Requests and bids</h2></div><span className="count-badge">{posts.length}</span></div>{posts.length ? <div className="activity-list">{posts.map((post) => <article className="activity-item" key={`${post.id}-${post.taskId || 'none'}`}><div>{post.image && <img className="activity-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h3>{post.detail}</h3></div>{post.taskId ? <div className="activity-meta"><strong>{post.technicianName || 'Technician'}</strong><span>Price: {post.price} &middot; <em>{post.status}</em></span>{post.status === 'pending' && <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(post.taskId, 'accepted')}>Accept bid</button><button className="quiet-button" type="button" onClick={() => updateBid(post.taskId, 'rejected')}>Reject</button></div>}</div> : <span className="muted-label">Waiting for bids</span>}</article>)}</div> : <EmptyState text="Your posted requests will appear here." />}</div></div><aside className="dashboard-aside"><div className="aside-card orange-card"><span className="aside-icon">01</span><h3>Post your next job</h3><p>Clear details help the right technician find you faster.</p></div><div className="aside-card"><p className="eyebrow">Need a hand?</p><h3>Browse local requests</h3><p>See what people nearby are looking for.</p><button className="text-button" type="button" onClick={() => go('/requests')}>Browse marketplace -&gt;</button></div></aside></section></DashboardLayout>
+  const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+
+  const load = async () => {
+    try {
+      setPosts(await request('/customer/posts'))
+      setLoadError('')
+    } catch (error) {
+      setLoadError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => {
+    request('/customer/posts').then(setPosts).catch((error) => setLoadError(error.message)).finally(() => setLoading(false))
+  }, [])
+
+  const groupedPosts = [...new Map(posts.map((post) => [post.id, post])).values()]
+  const counts = {
+    requests: groupedPosts.length,
+    attention: posts.filter((post) => post.status === 'pending').length,
+    active: posts.filter((post) => ['accepted', 'in_progress'].includes(post.status)).length,
+    completed: posts.filter((post) => post.status === 'completed').length,
+  }
+  const visiblePosts = groupedPosts.filter((post) => {
+    const terms = `${post.detail} ${post.category} ${post.technicianName || ''}`.toLowerCase()
+    const matchesSearch = terms.includes(search.trim().toLowerCase())
+    const matchesFilter = filter === 'all'
+      || (filter === 'attention' && posts.some((bid) => bid.id === post.id && bid.status === 'pending'))
+      || (filter === 'active' && posts.some((bid) => bid.id === post.id && ['accepted', 'in_progress'].includes(bid.status)))
+      || (filter === 'completed' && posts.some((bid) => bid.id === post.id && bid.status === 'completed'))
+    return matchesSearch && matchesFilter
+  })
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setMessage('Posting request...')
+    try {
+      await request('/posts', { method: 'POST', body: JSON.stringify({ ...form, imageData }) })
+      setForm({ detail: '', category: 'Appliance', subCategory: '' })
+      setImageData('')
+      setImageName('')
+      setMessage('Request posted successfully.')
+      setShowForm(false)
+      await load()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  const updateBid = async (taskId, status) => {
+    try {
+      await request(`/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
+      setMessage(status === 'accepted' ? 'Bid accepted.' : 'Bid declined.')
+      await load()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
+  return <DashboardLayout user={user} eyebrow="Customer workspace" title="Your service requests." description="Track offers, active work, and completed jobs in one place.">
+    <section className="customer-dashboard page-width">
+      <div className="dashboard-summary" aria-label="Request summary">
+        <div><strong>{counts.requests}</strong><span>Requests</span></div>
+        <div><strong>{counts.attention}</strong><span>Bids to review</span></div>
+        <div><strong>{counts.active}</strong><span>Active jobs</span></div>
+        <div><strong>{counts.completed}</strong><span>Completed</span></div>
+      </div>
+      <div className="dashboard-toolbar">
+        <div className="dashboard-filter-group" role="group" aria-label="Filter requests">
+          {[['all', 'All'], ['attention', 'Needs attention'], ['active', 'Active'], ['completed', 'Completed']].map(([value, label]) => <button key={value} type="button" className={filter === value ? 'filter-chip is-active' : 'filter-chip'} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}
+        </div>
+        <label className="dashboard-search">Search requests<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Description or category" /></label>
+        <button className="primary-button" type="button" onClick={() => { setShowForm((visible) => !visible); setMessage('') }}>{showForm ? 'Close form' : 'New request'}</button>
+      </div>
+      {showForm && <div className="panel request-create-panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" maxLength="2000" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button></form></div>}
+      {message && <p className="form-message" role="status">{message}</p>}
+      {loading ? <LoadingState text="Loading your requests..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : visiblePosts.length ? <div className="customer-request-list">{visiblePosts.map((post) => {
+        const bids = posts.filter((bid) => bid.id === post.id && bid.taskId)
+        const hasAttention = bids.some((bid) => bid.status === 'pending')
+        const state = bids.find((bid) => ['accepted', 'in_progress'].includes(bid.status))?.status || (bids.some((bid) => bid.status === 'completed') ? 'completed' : 'waiting')
+        return <article className="customer-request-item" key={post.id}>
+          <div className="customer-request-heading"><div>{post.image && <img className="activity-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h2>{post.detail}</h2><span className="muted-label">{bids.length} {bids.length === 1 ? 'bid' : 'bids'}</span></div><span className={`dashboard-status status-${state}`}>{hasAttention ? 'Review bids' : state === 'waiting' ? 'Waiting for bids' : state.replace('_', ' ')}</span></div>
+          {bids.length > 0 && <div className="customer-bid-list">{bids.map((bid) => <div className="customer-bid-row" key={bid.taskId}><div><strong>{bid.technicianName || 'Verified technician'}</strong><span>{bid.technicianSkills || 'Approved technician'}{bid.technicianStatus ? ` · ${bid.technicianStatus}` : ''}</span></div><strong className="bid-price">৳{bid.price}</strong>{bid.status === 'pending' ? <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(bid.taskId, 'accepted')}>Accept</button><button className="quiet-button" type="button" onClick={() => updateBid(bid.taskId, 'rejected')}>Decline</button></div> : <span className={`table-status status-${bid.status}`}>{bid.status.replace('_', ' ')}</span>}</div>)}</div>}
+        </article>
+      })}</div> : <EmptyState text={posts.length ? 'No requests match your filters.' : 'Your requests will appear here after you post one.'} />}
+    </section>
+  </DashboardLayout>
 }
 
 function TechnicianDashboard({ user }) {
@@ -290,11 +376,51 @@ function TechnicianDashboard({ user }) {
   const [tasks, setTasks] = useState([])
   const [prices, setPrices] = useState({})
   const [message, setMessage] = useState('')
-  const load = () => Promise.all([request('/technician/requests'), request('/technician/tasks')]).then(([available, current]) => { setRequests(available); setTasks(current) }).catch(() => { setRequests([]); setTasks([]) })
-  useEffect(() => { load() }, [])
-  const bid = async (postId) => { try { await request('/tasks/bid', { method: 'POST', body: JSON.stringify({ postId, price: prices[postId] }) }); setMessage('Bid placed successfully.'); load() } catch (error) { setMessage(error.message) } }
-  const updateTask = async (taskId, status) => { try { await request(`/technician/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); load() } catch (error) { setMessage(error.message) } }
-  return <DashboardLayout user={user} eyebrow="Technician workspace" title="Turn your skills into work." description="Find open jobs, make clear offers, and keep accepted work moving."><section className="dashboard-grid page-width"><div className="dashboard-main"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Open marketplace</p><h2>Requests waiting for a bid.</h2></div><span className="count-badge">{requests.length}</span></div>{requests.length ? <div className="request-grid compact-grid">{requests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}</span><h3>{item.detail}</h3><p>{item.postedBy}</p><div className="bid-row"><input type="number" min="0" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /><button className="small-button" type="button" onClick={() => bid(item.id)}>Place bid</button></div></article>)}</div> : <EmptyState text="There are no open requests right now." />}</div><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Your work</p><h2>Task lifecycle</h2></div></div>{tasks.length ? <div className="activity-list">{tasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Bid: ৳{task.price}</span></div><div className="activity-meta"><strong className={`status-${task.status}`}>{task.status.replace('_', ' ')}</strong>{task.status === 'accepted' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start task</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark completed</button>}</div></article>)}</div> : <EmptyState text="Accepted tasks will appear here." />}</div>{message && <p className="form-message">{message}</p>}</div><aside className="dashboard-aside"><div className="aside-card orange-card"><span className="aside-icon">02</span><h3>Make every offer count</h3><p>Transparent prices and clear skills build customer trust.</p></div><div className="aside-card"><p className="eyebrow">Your profile</p><h3>Keep it current</h3><p>Add the details customers need to choose you confidently.</p></div></aside></section></DashboardLayout>
+  const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('all')
+  const load = async () => {
+    try {
+      const [available, current] = await Promise.all([request('/technician/requests'), request('/technician/tasks')])
+      setRequests(available)
+      setTasks(current)
+      setLoadError('')
+    } catch (error) {
+      setLoadError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => {
+    Promise.all([request('/technician/requests'), request('/technician/tasks')])
+      .then(([available, current]) => { setRequests(available); setTasks(current) })
+      .catch((error) => setLoadError(error.message))
+      .finally(() => setLoading(false))
+  }, [])
+  const bid = async (postId) => {
+    const price = Number(prices[postId])
+    if (!Number.isFinite(price) || price <= 0 || Math.round(price * 100) !== price * 100) { setMessage('Enter a positive price with at most two decimal places.'); return }
+    try { await request('/tasks/bid', { method: 'POST', body: JSON.stringify({ postId, price }) }); setMessage('Bid placed successfully.'); await load() } catch (error) { setMessage(error.message) }
+  }
+  const updateTask = async (taskId, status) => { try { await request(`/technician/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(status === 'completed' ? 'Job marked complete.' : 'Job started.'); await load() } catch (error) { setMessage(error.message) } }
+  const categories = ['all', ...new Set(requests.map((item) => item.category).filter(Boolean))]
+  const visibleRequests = requests.filter((item) => `${item.detail} ${item.category} ${item.subCategory || ''}`.toLowerCase().includes(query.trim().toLowerCase()) && (category === 'all' || item.category === category))
+  const pendingBids = tasks.filter((task) => task.status === 'pending')
+  const activeTasks = tasks.filter((task) => ['accepted', 'in_progress'].includes(task.status))
+  const completedTasks = tasks.filter((task) => ['completed', 'rejected', 'cancelled'].includes(task.status))
+  return <DashboardLayout user={user} eyebrow="Technician workspace" title="Your work, clearly queued." description="Find suitable requests, manage offers, and move accepted jobs forward.">
+    <section className="technician-dashboard page-width">
+      <div className="dashboard-summary" aria-label="Work summary"><div><strong>{requests.length}</strong><span>Open requests</span></div><div><strong>{pendingBids.length}</strong><span>Pending bids</span></div><div><strong>{activeTasks.length}</strong><span>Active jobs</span></div><div><strong>{tasks.filter((task) => task.status === 'completed').length}</strong><span>Completed</span></div></div>
+      {message && <p className="form-message" role="status">{message}</p>}
+      {loading ? <LoadingState text="Loading your work..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : <>
+        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}</span><h3>{item.detail}</h3><p>{item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="bid-row"><label className="visually-hidden" htmlFor={`bid-price-${item.id}`}>Your bid amount</label><input id={`bid-price-${item.id}`} type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /><button className="small-button" type="button" onClick={() => bid(item.id)}>Place bid</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
+        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><button className="small-button" type="button" onClick={async () => { try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price }) }); setMessage('Bid updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update bid</button></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
+        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed bid: ৳{task.price}</span></div><div className="activity-meta"><strong className={`status-${task.status}`}>{task.status.replace('_', ' ')}</strong>{task.status === 'accepted' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
+        {completedTasks.length > 0 && <details className="panel history-panel"><summary>Completed and closed work ({completedTasks.length})</summary><div className="activity-list">{completedTasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Bid: ৳{task.price}</span></div><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></article>)}</div></details>}
+      </>}
+    </section>
+  </DashboardLayout>
 }
 
 function AdminListPanel({ title, eyebrow, children, empty }) {
@@ -304,13 +430,45 @@ function AdminListPanel({ title, eyebrow, children, empty }) {
 function AdminDashboard({ user }) {
   const [data, setData] = useState(null)
   const [message, setMessage] = useState('')
-  const load = () => request('/admin/overview').then(setData).catch((error) => setMessage(error.message))
-  useEffect(() => { load() }, [])
-  const update = async (id, status) => { try { await request(`/admin/technicians/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); load() } catch (error) { setMessage(error.message) } }
-  const manageTask = async (id, status) => { try { await request(`/admin/tasks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); load() } catch (error) { setMessage(error.message) } }
-  const removePost = async (id) => { if (!window.confirm('Remove this service request and its bids?')) return; try { await request(`/admin/posts/${id}`, { method: 'DELETE' }); load() } catch (error) { setMessage(error.message) } }
-  const removeUser = async (id) => { if (!window.confirm('Remove this user and related marketplace data?')) return; try { await request(`/admin/users/${id}`, { method: 'DELETE' }); load() } catch (error) { setMessage(error.message) } }
-  return <DashboardLayout user={user} eyebrow="Admin workspace" title="Keep the marketplace healthy." description="Oversee users, technicians, requests, bids, and task progress from one control room."><section className="admin-page page-width">{data ? <><div className="admin-stats">{Object.entries(data.counts).map(([label, value]) => <div className="admin-stat" key={label}><strong>{value}</strong><span>{label.replace(/([A-Z])/g, ' $1')}</span></div>)}</div><AdminListPanel eyebrow="Review queue" title={`Technician applications (${data.pendingTechnicians.length})`} empty="No pending technician applications.">{data.pendingTechnicians.length > 0 && <div className="activity-list">{data.pendingTechnicians.map((technician) => <article className="activity-item" key={technician.id}><div><span className="request-category">Application</span><h3>{technician.name}</h3><p>{technician.skills}</p></div><div className="bid-actions"><button className="small-button" type="button" onClick={() => update(technician.id, 'approved')}>Approve</button><button className="quiet-button" type="button" onClick={() => update(technician.id, 'rejected')}>Reject</button></div></article>)}</div>}</AdminListPanel><AdminListPanel eyebrow="Directory" title={`Registered users (${data.users.length})`} empty="No registered users found."><div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Control</th></tr></thead><tbody>{data.users.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.email}</td><td><span className="table-status">{item.role}</span></td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td>{item.role !== 'admin' && <button className="quiet-button" type="button" onClick={() => removeUser(item.id)}>Remove</button>}</td></tr>)}</tbody></table></div></AdminListPanel><AdminListPanel eyebrow="Technician directory" title={`All technicians (${data.technicians.length})`} empty="No technicians found."><div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Skills</th><th>Address</th><th>Status</th><th>Control</th></tr></thead><tbody>{data.technicians.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.skills}</td><td>{item.address || '-'}</td><td><span className="table-status">{item.status}</span></td><td><select className="admin-select" value={item.status} onChange={(event) => update(item.id, event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></td></tr>)}</tbody></table></div></AdminListPanel><AdminListPanel eyebrow="Service requests" title={`All requests (${data.posts.length})`} empty="No requests found."><div className="table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Bids</th><th>Posted</th><th>Control</th></tr></thead><tbody>{data.posts.map((item) => <tr key={item.id}><td><strong>{item.detail}</strong><small>{item.category}</small></td><td>{item.postedBy}</td><td>{item.bidCount}</td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td><button className="quiet-button" type="button" onClick={() => removePost(item.id)}>Remove</button></td></tr>)}</tbody></table></div></AdminListPanel><AdminListPanel eyebrow="Marketplace activity" title={`Tasks and bids (${data.tasks.length})`} empty="No tasks found."><div className="table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Technician</th><th>Price</th><th>Status</th><th>Control</th></tr></thead><tbody>{data.tasks.map((item) => <tr key={item.id}><td><strong>{item.detail}</strong><small>{item.category}</small></td><td>{item.customerName}</td><td>{item.technicianName}</td><td>৳{item.price}</td><td><span className="table-status">{item.status.replace('_', ' ')}</span></td><td><select className="admin-select" value={item.status} onChange={(event) => manageTask(item.id, event.target.value)}><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></td></tr>)}</tbody></table></div></AdminListPanel>{message && <p className="form-message">{message}</p>}</> : <div className="panel"><EmptyState text={message || 'Loading admin data...'} /></div>}</section></DashboardLayout>
+  const [loadError, setLoadError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [userSearch, setUserSearch] = useState('')
+  const [userRole, setUserRole] = useState('all')
+  const [requestSearch, setRequestSearch] = useState('')
+  const [taskStatus, setTaskStatus] = useState('all')
+  const load = async () => {
+    try {
+      setData(await request('/admin/overview'))
+      setLoadError('')
+    } catch (error) {
+      setLoadError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => {
+    request('/admin/overview').then(setData).catch((error) => setLoadError(error.message)).finally(() => setLoading(false))
+  }, [])
+  const update = async (id, status) => { try { await request(`/admin/technicians/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Technician ${status}.`); await load() } catch (error) { setMessage(error.message) } }
+  const manageTask = async (id, status) => { try { await request(`/admin/tasks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Task marked ${status.replace('_', ' ')}.`); await load() } catch (error) { setMessage(error.message) } }
+  const removePost = async (id) => { if (!window.confirm('Remove this service request and its bids?')) return; try { await request(`/admin/posts/${id}`, { method: 'DELETE' }); setMessage('Request removed.'); await load() } catch (error) { setMessage(error.message) } }
+  const removeUser = async (id) => { if (!window.confirm('Archive and remove this user and related marketplace data?')) return; try { await request(`/admin/users/${id}`, { method: 'DELETE' }); setMessage('User archived and removed.'); await load() } catch (error) { setMessage(error.message) } }
+  const users = (data?.users || []).filter((item) => item.role !== 'admin' && (userRole === 'all' || item.role === userRole) && `${item.name} ${item.email}`.toLowerCase().includes(userSearch.trim().toLowerCase()))
+  const requests = (data?.posts || []).filter((item) => `${item.detail} ${item.category} ${item.postedBy}`.toLowerCase().includes(requestSearch.trim().toLowerCase()))
+  const tasks = (data?.tasks || []).filter((item) => taskStatus === 'all' || item.status === taskStatus)
+  return <DashboardLayout user={user} eyebrow="Admin workspace" title="Keep the marketplace healthy." description="Review exceptions, oversee users, and keep requests moving.">
+    <section className="admin-page page-width">
+      {message && <p className="form-message" role="status">{message}</p>}
+      {loading ? <LoadingState text="Loading marketplace overview..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : data && <>
+        <div className="dashboard-summary admin-summary">{Object.entries(data.counts).map(([label, value]) => <div key={label}><strong>{value}</strong><span>{label.replace(/([A-Z])/g, ' $1')}</span></div>)}</div>
+        <AdminListPanel eyebrow="Needs attention" title={`Technician applications (${data.pendingTechnicians.length})`} empty="No pending technician applications.">{data.pendingTechnicians.length > 0 && <div className="activity-list">{data.pendingTechnicians.map((technician) => <article className="activity-item" key={technician.id}><div><span className="request-category">Application · {technician.address || 'Area not provided'}</span><h3>{technician.name}</h3><p>{technician.skills}</p></div><div className="bid-actions"><button className="small-button" type="button" onClick={() => update(technician.id, 'approved')}>Approve</button><button className="quiet-button" type="button" onClick={() => update(technician.id, 'rejected')}>Reject</button></div></article>)}</div>}</AdminListPanel>
+        <AdminListPanel eyebrow="Directory" title={`Users (${users.length})`} empty="No users match those filters."><div className="dashboard-toolbar"><label className="dashboard-search">Search users<input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Name or email" /></label><label className="dashboard-search">Role<select value={userRole} onChange={(event) => setUserRole(event.target.value)}><option value="all">All roles</option><option value="customer">Customers</option><option value="technician">Technicians</option></select></label></div>{users.length > 0 && <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Action</th></tr></thead><tbody>{users.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.email}</td><td><span className="table-status">{item.role}</span></td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td><button className="quiet-button" type="button" onClick={() => removeUser(item.id)}>Archive</button></td></tr>)}</tbody></table></div>}</AdminListPanel>
+        <AdminListPanel eyebrow="Service requests" title={`Requests (${requests.length})`} empty="No requests match the search."><label className="dashboard-search">Search requests<input value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Description, category, or customer" /></label>{requests.length > 0 && <div className="table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Bids</th><th>Posted</th><th>Action</th></tr></thead><tbody>{requests.map((item) => <tr key={item.id}><td><strong>{item.detail}</strong><small>{item.category}</small></td><td>{item.postedBy}</td><td>{item.bidCount}</td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td><button className="quiet-button" type="button" onClick={() => removePost(item.id)}>Remove</button></td></tr>)}</tbody></table></div>}</AdminListPanel>
+        <AdminListPanel eyebrow="Marketplace activity" title={`Tasks (${tasks.length})`} empty="No tasks match this status."><label className="dashboard-search">Status<select value={taskStatus} onChange={(event) => setTaskStatus(event.target.value)}><option value="all">All statuses</option><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></label>{tasks.length > 0 && <div className="table-wrap"><table className="admin-table"><thead><tr><th>Request</th><th>Customer</th><th>Technician</th><th>Price</th><th>Status</th><th>Change status</th></tr></thead><tbody>{tasks.map((item) => <tr key={item.id}><td><strong>{item.detail}</strong><small>{item.category}</small></td><td>{item.customerName}</td><td>{item.technicianName}</td><td>৳{item.price}</td><td><span className="table-status">{item.status.replace('_', ' ')}</span></td><td><select className="admin-select" aria-label={`Change task status for ${item.detail}`} value={item.status} onChange={(event) => manageTask(item.id, event.target.value)}><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></td></tr>)}</tbody></table></div>}</AdminListPanel>
+        <AdminListPanel eyebrow="Technician directory" title={`Technicians (${data.technicians.length})`} empty="No technicians found."><div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Skills</th><th>Area</th><th>Status</th><th>Review</th></tr></thead><tbody>{data.technicians.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.skills}</td><td>{item.address || '-'}</td><td><span className="table-status">{item.status}</span></td><td><select className="admin-select" aria-label={`Change application status for ${item.name}`} value={item.status} onChange={(event) => update(item.id, event.target.value)}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></td></tr>)}</tbody></table></div></AdminListPanel>
+      </>}
+    </section>
+  </DashboardLayout>
 }
 
 function App() {

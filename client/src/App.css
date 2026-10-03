@@ -112,6 +112,42 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }h1 { margin: 0; font-siz
 .admin-audit-list > div { display: block; }
 @media (max-width: 800px) { .admin-tools-grid { grid-template-columns: 1fr; } }
 .archive-section { padding-bottom: 18px; }
+.customer-dashboard, .technician-dashboard { display: grid; gap: 18px; padding-bottom: 100px; }
+.dashboard-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.dashboard-summary > div { display: grid; gap: 3px; min-height: 76px; align-content: center; padding: 14px 17px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.dashboard-summary strong { font-family: 'Space Grotesk', sans-serif; font-size: 1.45rem; line-height: 1.1; }
+.dashboard-summary span { color: var(--muted); font-size: .74rem; }
+.dashboard-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.dashboard-filter-group { display: flex; flex: 1 1 400px; flex-wrap: wrap; gap: 6px; }
+.filter-chip { min-height: 36px; border: 1px solid var(--line); border-radius: 20px; padding: 7px 12px; background: transparent; color: var(--muted); font-size: .76rem; font-weight: 700; }
+.filter-chip:hover, .filter-chip.is-active { border-color: var(--orange); background: rgba(255, 107, 53, .12); color: var(--orange); }
+.dashboard-search { display: grid; flex: 1 1 180px; gap: 5px; color: var(--muted); font-size: .74rem; font-weight: 700; }
+.dashboard-search input, .dashboard-search select { width: 100%; min-height: 38px; border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; background: var(--panel); color: var(--ink); }
+.dashboard-error { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; border: 1px solid rgba(255, 107, 53, .35); border-radius: 9px; background: var(--panel); color: var(--orange); }
+.dashboard-error p { margin: 0; }
+.customer-request-list { display: grid; gap: 12px; }
+.customer-request-item { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.customer-request-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.customer-request-heading h2 { max-width: 740px; margin: 7px 0; font-size: 1.1rem; line-height: 1.3; letter-spacing: 0; }
+.dashboard-status { display: inline-flex; width: fit-content; flex: 0 0 auto; align-items: center; border: 1px solid var(--line); border-radius: 16px; padding: 5px 9px; color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: capitalize; }
+.dashboard-status.status-accepted, .dashboard-status.status-in_progress, .dashboard-status.status-completed { border-color: rgba(168, 215, 186, .35); color: var(--green); }
+.dashboard-status.status-pending, .dashboard-status.status-waiting { border-color: rgba(255, 107, 53, .35); color: var(--orange); }
+.customer-bid-list { display: grid; border-top: 1px solid var(--line); }
+.customer-bid-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.customer-bid-row > div:first-child strong, .customer-bid-row > div:first-child span { display: block; }
+.customer-bid-row > div:first-child span { margin-top: 3px; color: var(--muted); font-size: .73rem; }
+.bid-price { white-space: nowrap; }
+.admin-summary { margin-bottom: 16px; }
+.admin-page > .panel { margin-top: 14px; }
+.history-panel summary { cursor: pointer; color: var(--ink); font-weight: 700; }
+.history-panel[open] summary { margin-bottom: 18px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+@media (max-width: 700px) {
+	.dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.customer-request-heading { flex-direction: column; }
+	.customer-bid-row { grid-template-columns: minmax(0, 1fr) auto; }
+	.customer-bid-row .bid-actions { grid-column: 1 / -1; }
+}
 .messages-section { padding-bottom: 18px; }
 .messages-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
 .conversation-list { display: grid; align-content: start; gap: 7px; }
