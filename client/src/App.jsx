@@ -640,9 +640,15 @@ function AdminTools() {
 function ArchivedUsersPanel() {
   const [archives, setArchives] = useState([])
   const [loading, setLoading] = useState(true)
+  const [deletingArchiveId, setDeletingArchiveId] = useState(null)
   const [message, setMessage] = useState('')
   const load = () => request('/admin/archived-users').then(setArchives).catch((error) => setMessage(error.message)).finally(() => setLoading(false))
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('helplagbe-archive-updated', refresh)
+    refresh()
+    return () => window.removeEventListener('helplagbe-archive-updated', refresh)
+  }, [])
   const restore = async (archiveId) => {
     if (!window.confirm('Restore this archived account and its saved history?')) return
     try {
@@ -655,15 +661,19 @@ function ArchivedUsersPanel() {
   }
   const permanentlyDelete = async (archive) => {
     if (!window.confirm(`Permanently delete ${archive.username}'s archived account and saved marketplace history? This cannot be undone.`)) return
+    setDeletingArchiveId(archive.id)
+    setMessage('')
     try {
       const result = await request(`/admin/archived-users/${archive.id}`, { method: 'DELETE' })
       setMessage(result.message)
-      load()
+      await load()
     } catch (error) {
       setMessage(error.message)
+    } finally {
+      setDeletingArchiveId(null)
     }
   }
-  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Two-stage deletion</p><h2>Archived accounts</h2><p className="muted-label">Restore an account, or permanently delete its saved data. Permanent deletion cannot be undone.</p></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th><th>Actions</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td><td><div className="archive-actions"><button className="quiet-button" type="button" onClick={() => restore(archive.id)}>Restore</button><button className="quiet-button danger-button" type="button" onClick={() => permanentlyDelete(archive)}>Delete permanently</button></div></td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}{message && <p className="form-message">{message}</p>}</div></section>
+  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Two-stage deletion</p><h2>Archived accounts</h2><p className="muted-label">Restore an account, or permanently delete its saved data. Permanent deletion cannot be undone.</p></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th><th>Actions</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td><td><div className="archive-actions"><button className="quiet-button" type="button" disabled={deletingArchiveId === archive.id} onClick={() => restore(archive.id)}>Restore</button><button className="quiet-button danger-button" type="button" disabled={deletingArchiveId !== null} onClick={() => permanentlyDelete(archive)}>{deletingArchiveId === archive.id ? 'Deleting...' : 'Delete permanently'}</button></div></td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}{message && <p className="form-message" role="status">{message}</p>}</div></section>
 }
 
 function AdminReportsPanel() {
@@ -1207,7 +1217,17 @@ function AdminDashboard({ user }) {
   const update = async (id, status) => { try { await request(`/admin/technicians/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Technician ${status}.`); await load() } catch (error) { setMessage(error.message) } }
   const manageTask = async (id, status) => { try { await request(`/admin/tasks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Task marked ${status.replace('_', ' ')}.`); await load() } catch (error) { setMessage(error.message) } }
   const removePost = async (id) => { if (!window.confirm('Remove this service request and its bids?')) return; try { await request(`/admin/posts/${id}`, { method: 'DELETE' }); setMessage('Request removed.'); await load() } catch (error) { setMessage(error.message) } }
-  const removeUser = async (id) => { if (!window.confirm('Move this account and its marketplace history to Archived accounts? You can restore it later or permanently delete it from there.')) return; try { await request(`/admin/users/${id}`, { method: 'DELETE' }); setMessage('User moved to Archived accounts.'); await load() } catch (error) { setMessage(error.message) } }
+  const removeUser = async (id) => {
+    if (!window.confirm('Move this account and its marketplace history to Archived accounts? You can restore it later or permanently delete it from there.')) return
+    try {
+      await request(`/admin/users/${id}`, { method: 'DELETE' })
+      setMessage('User moved to Archived accounts.')
+      window.dispatchEvent(new Event('helplagbe-archive-updated'))
+      await load()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
   const users = (data?.users || []).filter((item) => item.role !== 'admin' && (userRole === 'all' || item.role === userRole) && `${item.name} ${item.email}`.toLowerCase().includes(userSearch.trim().toLowerCase()))
   const requests = (data?.posts || []).filter((item) => `${item.detail} ${item.category} ${item.postedBy}`.toLowerCase().includes(requestSearch.trim().toLowerCase()))
   const tasks = (data?.tasks || []).filter((item) => taskStatus === 'all' || item.status === taskStatus)

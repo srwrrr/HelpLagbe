@@ -1557,6 +1557,13 @@ app.delete('/api/admin/archived-users/:archiveId', authenticate, requireAdmin, a
     response.json({ message: 'Archived account and saved data permanently deleted.' })
   } catch (error) {
     await connection.rollback()
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'archived_user_permanent_delete_failed',
+      archiveId,
+      requestId: response.getHeader('X-Request-Id') || null,
+      code: error.code || null,
+    }))
     response.status(500).json({ message: 'Could not permanently delete archived user.' })
   } finally {
     connection.release()
