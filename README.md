@@ -2,6 +2,8 @@
 
 HelpLagbe is a local service marketplace connecting customers with verified technicians. Customers can create service requests and compare bids; technicians can apply, bid, message customers, and manage accepted work; administrators oversee the marketplace. The public site includes a service-focused homepage, a directory of approved technicians, and contact links in the footer.
 
+**Live website:** [helplagbe-client.onrender.com](https://helplagbe-client.onrender.com)
+
 The original [Software Requirements Specification (PDF)](SRS_Documents/Software%20Requirements%20Specification%20(SRS)%20for%20HelpLagbe.pdf) describes the project's initial scope. See the [implementation addendum](SRS_Documents/Implementation%20Addendum.md) for requirements aligned with the current application and notes on features that remain out of scope.
 
 ## Stack
@@ -154,7 +156,7 @@ npm run seed:realistic
 - Public homepage with customer and technician entry points
 - Approved technician directory with location/availability filters, skills, ratings, completed jobs, and typical first-offer response time
 - Customer bid management with proposed appointments, mutual scheduling confirmation, reschedule/cancel reasons, a task timeline, and task-only messaging
-- Notifications for offers, messages, appointment changes, and task events link directly to the related dashboard task or conversation
+- Actionable notifications for offers, messages, appointment changes, and task events; selecting one marks it read and opens the related dashboard task or conversation when a task link is available
 - Technician offers include a clear scope note for labor, parts, call-out fees, and price flexibility; later agreed-price changes require an explanation and approval from the other participant
 - Customer pre-accept technician overview with work history, completed-task count, ratings, and recent reviews
 - Confirmation-based payment records with an agreed amount and receipt reference; no online payment processing or escrow
@@ -162,8 +164,12 @@ npm run seed:realistic
 - Technician opportunity matching by service area, plus rating and response-time sorting
 - Per-completed-task interactive reviews with star ratings, selectable compliments, optional written feedback, notification dropdown with unread count, and private messaging for accepted tasks
 - Customer, technician, and admin dashboards with sidebar navigation and editable account profiles, including validated profile-photo uploads
-- Admin user management, audit log, two-stage account deletion (archive/restore, then confirmed permanent deletion)
+- Admin user management, audit log, and two-stage account deletion: archiving removes the user from the active system while preserving a recoverable snapshot; the Archived accounts panel refreshes after archiving and supports restore or confirmed permanent deletion
 - Public contact links, persistent light/dark mode, and responsive layouts
+
+### Archived account lifecycle
+
+Administrators archive users from the Users section. The account and its marketplace data are saved for recovery, and the archive appears in the Archived accounts section without requiring a page reload. From there, an administrator can restore the account or permanently delete its saved archive. Permanent deletion cannot be undone; personal details are removed from the relevant archive/restore audit entries while a non-personal deletion record is retained.
 
 ## Tests and Production Build
 
