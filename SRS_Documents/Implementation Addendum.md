@@ -24,8 +24,9 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 ### Technician directory
 
 - **FR-007:** The public technician directory shall list administrator-approved technicians only.
-- **FR-008:** A technician listing shall show the technician's name, skills, number of completed jobs, and available customer rating information.
+- **FR-008:** A technician listing shall show the technician's name, skills, service area, availability, number of completed jobs, customer rating, and typical first-offer response time.
 - **FR-009:** The directory shall not expose private contact details. Communication between a customer and technician is available through the accepted-task messaging workflow.
+- **FR-009a:** Customers shall be able to filter technicians by skill/name, service area, and availability, and sort by rating, completed work, or typical first-offer response time.
 - **FR-010:** If the directory request fails, the interface shall show an error rather than presenting the failure as an empty directory.
 - **FR-010a:** Public service-request listings shall identify the requester as anonymous. The requester's name may be shown only to an authenticated, administrator-approved technician.
 - **FR-010b:** The public homepage shall display recent service requests using the paginated request list, while preserving the same requester-identity privacy rule.
@@ -45,10 +46,20 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 
 ### Customer and technician dashboards
 
-- **FR-024:** Customer and technician dashboards shall provide role-appropriate sidebar navigation to the main workspace sections and profile settings.
-- **FR-025:** Customers and technicians shall be able to edit their name, email, phone number, and address from the dashboard.
+- **FR-024:** Customer, technician, and administrator dashboards shall provide role-appropriate sidebar navigation to the main workspace sections and profile settings.
+- **FR-025:** Customers, technicians, and administrators shall be able to edit their name, email, phone number, address, and profile photo from the dashboard.
 - **FR-026:** Technicians shall also be able to edit their listed skills; profile changes shall update their technician directory information.
-- **FR-027:** Profile changes shall be authenticated, validated, and rejected when the email is already used by another account. A successful update shall refresh the signed-in user's displayed name and email.
+- **FR-027:** Profile changes shall be authenticated, validated, and rejected when the email is already used by another account. Profile photos shall accept JPG, PNG, or WebP images up to 5 MB, be stored as uploaded files, and be removable. A successful update shall refresh the signed-in user's displayed name, email, and avatar.
+- **FR-028:** When a customer accepts a technician's bid, the customer workspace shall provide the technician's full name, skills, completed-task count, and overall customer rating and review count.
+- **FR-029:** After a technician completes a task, its customer shall be able to submit or update a one-to-five-star rating, select up to five suggested compliments, and optionally write a review of up to 500 characters.
+- **FR-030:** A technician's overall customer rating shall be calculated from ratings submitted for completed tasks and displayed with the rating count. Review compliments shall be limited to the application's suggested list.
+- **FR-031:** A saved technician profile photo shall appear in the approved technician directory and in the customer profile shown for an accepted task. Users without a photo shall retain an initial-based avatar.
+- **FR-032:** Technician offers shall include a proposed appointment date and time. A customer acceptance confirms the initial proposal; a later reschedule shall record a reason, require the proposer and the other participant to confirm the new time, and prevent work from starting until both have confirmed.
+- **FR-033:** Customers and technicians shall be able to cancel an accepted, scheduled, or in-progress task with a recorded reason. A task timeline shall show offer received, accepted, scheduled, in progress, and completed states, plus schedule changes and cancellation details.
+- **FR-034:** Customers and technicians shall be able to report a task problem or dispute; signed-in users shall be able to report technician profiles and task messages. Administrators shall be able to review, resolve, or dismiss reports with an audit note.
+- **FR-035:** The accepted bid amount shall be recorded as the agreed price. After task completion, each participant may confirm payment method and payment; a receipt reference shall be issued only after both confirm. This record does not process payments, hold funds, or represent independent proof of a bank transfer.
+- **FR-036:** Technician discovery shall support service-area and availability filters. Technician opportunities shall prioritize area matches; directory sorting shall support customer rating, typical first-offer response time, and completed jobs.
+- **FR-037:** Technician application approval shall be described as an application review and shall not be represented as an independent identity guarantee.
 
 ### Administrative account deletion
 
@@ -61,4 +72,4 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 
 ## Scope and Requirement Status
 
-The requirements above describe the current web application; they do not imply that every capability proposed in the original SRS has been delivered. In particular, the current application does not provide SMS one-time-password verification, social sign-in, a native technician mobile application, live technician location tracking, integrated payment processing, or instant booking confirmation. The marketplace workflow is based on customer requests, technician bids, customer selection, and accepted-task management.
+The requirements above describe the current web application; they do not imply that every capability proposed in the original SRS has been delivered. In particular, the current application does not provide SMS one-time-password verification, social sign-in, a native technician mobile application, live technician location tracking, or integrated payment processing. The payment record is a bilateral self-confirmation only; HelpLagbe does not charge or hold funds.

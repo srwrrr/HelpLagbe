@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken'
 import mysql from 'mysql2/promise'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { unlink } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import request from 'supertest'
 import { app, closeDatabasePool, ensureTiDBIdSequences } from '../src/server.js'
 
@@ -48,6 +50,8 @@ test('customer, technician, bid, and archive lifecycle works against the configu
   const customerEmail = `integration-customer-${suffix}@example.invalid`
   const technicianEmail = `integration-technician-${suffix}@example.invalid`
   const archiveEmail = `integration-archive-${suffix}@example.invalid`
+  let profilePhotoPath
+  let reportId
 
   try {
     let response = await request(app).post('/api/auth/register').send({ username: 'Integration Customer', email: customerEmail, password })
@@ -104,20 +108,49 @@ test('customer, technician, bid, and archive lifecycle works against the configu
       phone: '01234567890',
       address: 'Dhaka',
       skills: 'Updated plumbing and repair',
+      serviceArea: 'Dhaka',
+      availability: 'Weekdays',
+      profileImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/YQAAAABJRU5ErkJggg==',
     })
     assert.equal(response.status, 200)
     assert.equal(response.body.user.name, 'Updated Integration Technician')
+    assert.match(response.body.user.profileImage, /^uploads\/profile_[\w-]+\.png$/)
+    profilePhotoPath = response.body.user.profileImage
+    response = await request(app).get('/api/profile').set('Authorization', `Bearer ${technicianToken}`)
+    assert.equal(response.body.profileImage, profilePhotoPath)
+    response = await request(app).patch('/api/profile').set('Authorization', `Bearer ${technicianToken}`)
+      .send({
+        name: 'Updated Integration Technician',
+        email: technicianEmail,
+        skills: 'Updated plumbing and repair',
+        serviceArea: 'Dhaka',
+        availability: 'Weekdays',
+        profileImage: null,
+      })
+    assert.equal(response.status, 200)
+    assert.equal(response.body.user.profileImage, null)
     const [[updatedTechnician]] = await pool.execute(
-      'SELECT Full_Name, Skill_details, address FROM technician WHERE technician_id = ?',
+      'SELECT Full_Name, Skill_details, address, service_area, availability FROM technician WHERE technician_id = ?',
       [technician.technician_id],
     )
     assert.equal(updatedTechnician.Full_Name, 'Updated Integration Technician')
     assert.equal(updatedTechnician.Skill_details, 'Updated plumbing and repair')
     assert.equal(updatedTechnician.address, 'Dhaka')
+    assert.equal(updatedTechnician.service_area, 'Dhaka')
+    assert.equal(updatedTechnician.availability, 'Weekdays')
+    response = await request(app).get('/api/technicians').query({ location: 'Dhaka', availability: 'Weekday', sort: 'rating' })
+    assert.equal(response.status, 200)
+    assert.ok(response.body.items.some((item) => item.id === technician.technician_id))
+    await pool.execute('UPDATE users SET address = ? WHERE email = ?', ['Dhanmondi, Dhaka', customerEmail])
+    response = await request(app).get('/api/technician/requests').set('Authorization', `Bearer ${technicianToken}`)
+    const matchedRequest = response.body.find((item) => item.id === postId)
+    assert.equal(matchedRequest.areaMatch, 1)
+    assert.equal(matchedRequest.customerAddress, undefined)
 
-    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 525.25 })
+    const proposedAppointment = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 525.25, proposedAt: proposedAppointment })
     assert.equal(response.status, 201)
-    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500 })
+    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500, proposedAt: proposedAppointment })
     assert.equal(response.status, 409)
 
     const [[task]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [postId, technician.technician_id])
@@ -125,10 +158,53 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(response.status, 200)
     response = await request(app).patch(`/api/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${customerToken}`).send({ status: 'accepted' })
     assert.equal(response.status, 409)
+    const rescheduledAppointment = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+    response = await request(app).post(`/api/tasks/${task.task_id}/schedule`).set('Authorization', `Bearer ${customerToken}`)
+      .send({ proposedAt: rescheduledAppointment, reason: 'Customer requested a different time' })
+    assert.equal(response.status, 200)
+    response = await request(app).post(`/api/tasks/${task.task_id}/schedule/confirm`).set('Authorization', `Bearer ${technicianToken}`)
+    assert.equal(response.status, 200)
     const [[state]] = await pool.execute('SELECT task_status FROM tasks WHERE task_id = ?', [task.task_id])
-    assert.equal(state.task_status, 'accepted')
+    assert.equal(state.task_status, 'scheduled')
     const [[notice]] = await pool.execute("SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? AND type = 'bid_accepted'", [technician.user_id])
     assert.ok(Number(notice.total) > 0)
+
+    response = await request(app).patch(`/api/technician/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${technicianToken}`).send({ status: 'in_progress' })
+    assert.equal(response.status, 200)
+    response = await request(app).patch(`/api/technician/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${technicianToken}`).send({ status: 'completed' })
+    assert.equal(response.status, 200)
+    response = await request(app).post(`/api/tasks/${task.task_id}/payment/confirm`).set('Authorization', `Bearer ${customerToken}`)
+      .send({ paymentMethod: 'cash' })
+    assert.equal(response.status, 200)
+    assert.equal(response.body.paymentStatus, 'unpaid')
+    response = await request(app).post(`/api/tasks/${task.task_id}/payment/confirm`).set('Authorization', `Bearer ${technicianToken}`)
+      .send({ paymentMethod: 'cash' })
+    assert.equal(response.status, 200)
+    assert.equal(response.body.paymentStatus, 'paid')
+    assert.equal(response.body.receiptNumber, `HL-${task.task_id}`)
+    response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${customerToken}`)
+    assert.equal(response.status, 200)
+    const completedTask = response.body.find((post) => post.taskId === task.task_id)
+    assert.ok(completedTask)
+    assert.equal(completedTask.technicianId, technician.technician_id)
+    assert.equal(completedTask.technicianName, 'Updated Integration Technician')
+    assert.equal(Number(completedTask.technicianCompletedJobs), 1)
+    assert.equal(Number(completedTask.technicianReviewCount), 0)
+
+    response = await request(app)
+      .post(`/api/tasks/${task.task_id}/review`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ rating: 5, compliments: ['On time', 'Professional'], review: 'Excellent work.' })
+    assert.equal(response.status, 200)
+    response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${customerToken}`)
+    const reviewedTask = response.body.find((post) => post.taskId === task.task_id)
+    assert.equal(Number(reviewedTask.technicianAverageRating), 5)
+    assert.equal(Number(reviewedTask.technicianReviewCount), 1)
+    assert.deepEqual(JSON.parse(reviewedTask.reviewText), {
+      version: 1,
+      review: 'Excellent work.',
+      compliments: ['On time', 'Professional'],
+    })
 
     response = await request(app).post('/api/auth/register').send({ username: 'Archive Restore Test', email: archiveEmail, password })
     assert.equal(response.status, 201)
@@ -143,6 +219,17 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     const [admins] = await pool.execute('SELECT user_id FROM users WHERE admin_id IS NOT NULL ORDER BY user_id LIMIT 1')
     assert.ok(admins[0], 'integration database must contain an administrator')
     const adminToken = jwt.sign({ userId: admins[0].user_id, role: 'admin' }, process.env.JWT_SECRET || 'helplagbe-local-development-secret', { expiresIn: '2m' })
+    response = await request(app).post('/api/reports').set('Authorization', `Bearer ${customerToken}`)
+      .send({ reportType: 'dispute', taskId: task.task_id, category: 'Service issue', description: 'Please review this completed task and payment record.' })
+    assert.equal(response.status, 201)
+    reportId = response.body.id
+    response = await request(app).get('/api/admin/reports').set('Authorization', `Bearer ${adminToken}`)
+    assert.equal(response.status, 200)
+    const report = response.body.find((item) => item.taskId === task.task_id)
+    assert.ok(report)
+    response = await request(app).patch(`/api/admin/reports/${report.id}`).set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'resolved', resolutionNote: 'Reviewed with both participants.' })
+    assert.equal(response.status, 200)
     response = await request(app).delete(`/api/admin/users/${archiveUserId}`).set('Authorization', `Bearer ${adminToken}`)
     assert.equal(response.status, 200)
     const [[archive]] = await pool.execute('SELECT archive_id, snapshot FROM archived_users WHERE email = ?', [archiveEmail])
@@ -171,7 +258,9 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.ok(permanentDeleteAudit)
     assert.doesNotMatch(permanentDeleteAudit.details, /Archive Restore Test|integration-archive-/)
   } finally {
+    if (reportId) await pool.execute('DELETE FROM marketplace_reports WHERE report_id = ?', [reportId])
     await pool.execute('DELETE FROM users WHERE email IN (?, ?, ?)', [customerEmail, technicianEmail, archiveEmail])
     await pool.execute('DELETE FROM archived_users WHERE email IN (?, ?, ?)', [customerEmail, technicianEmail, archiveEmail])
+    if (profilePhotoPath) await unlink(resolve(process.cwd(), '..', profilePhotoPath)).catch(() => {})
   }
 })

@@ -88,6 +88,104 @@ test('profile updates require authentication and validate email before database 
   assert.equal(invalidEmailResponse.body.message, 'Enter a valid email address.')
 })
 
+test('profile photo updates reject non-image data for every signed-in role', async () => {
+  for (const role of ['customer', 'technician', 'admin']) {
+    const token = jwt.sign(
+      { userId: 1, role },
+      process.env.JWT_SECRET || 'helplagbe-local-development-secret',
+    )
+    const response = await request(app)
+      .patch('/api/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Updated Account',
+        email: 'account@example.com',
+        skills: 'Valid technician skills',
+        profileImage: 'data:text/plain;base64,SGVsbG8=',
+      })
+
+    assert.equal(response.status, 400)
+    assert.equal(response.body.message, 'Attach a valid JPG, PNG, or WebP image.')
+  }
+})
+
+test('offers require a future proposed appointment before database access', async () => {
+  const technicianToken = jwt.sign(
+    { userId: 2, role: 'technician' },
+    process.env.JWT_SECRET || 'helplagbe-local-development-secret',
+  )
+  const response = await request(app)
+    .post('/api/tasks/bid')
+    .set('Authorization', `Bearer ${technicianToken}`)
+    .send({ postId: 1, price: 250 })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.message, 'Choose a proposed appointment date and time in the future.')
+})
+
+test('rescheduling and cancellation require a future time and an explanation', async () => {
+  const invalidSchedule = await request(app)
+    .post('/api/tasks/1/schedule')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ proposedAt: '2020-01-01T10:00:00.000Z', reason: 'Need to change the visit' })
+  assert.equal(invalidSchedule.status, 400)
+
+  const missingCancellationReason = await request(app)
+    .post('/api/tasks/1/cancel')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ reason: 'No' })
+  assert.equal(missingCancellationReason.status, 400)
+})
+
+test('payment confirmation requires an explicit supported method', async () => {
+  const response = await request(app)
+    .post('/api/tasks/1/payment/confirm')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ paymentMethod: 'credit_card' })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.message, 'Choose cash, bank transfer, or other as the payment method.')
+})
+
+test('reports require a meaningful description before database access', async () => {
+  const response = await request(app)
+    .post('/api/reports')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ reportType: 'task', category: 'Safety', description: 'Bad' })
+
+  assert.equal(response.status, 400)
+})
+
+test('only admins can open the report review queue', async () => {
+  const response = await request(app)
+    .get('/api/admin/reports')
+    .set('Authorization', `Bearer ${customerToken}`)
+  assert.equal(response.status, 403)
+})
+
+test('completed-task reviews reject unlisted compliments before database access', async () => {
+  const response = await request(app)
+    .post('/api/tasks/1/review')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ rating: 5, compliments: ['Invented compliment'] })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.message, 'Choose up to 5 compliments from the suggested list.')
+})
+
+test('completed-task reviews limit selected compliments to five', async () => {
+  const response = await request(app)
+    .post('/api/tasks/1/review')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({
+      rating: 5,
+      compliments: ['On time', 'Great communication', 'Professional', 'Quality work', 'Fair price', 'Clean and careful'],
+    })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.message, 'Choose up to 5 compliments from the suggested list.')
+})
+
 test('request creation rejects categories outside the supported list', async () => {
   const response = await request(app)
     .post('/api/posts')

@@ -149,14 +149,27 @@ INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Categor
 
 CREATE TABLE `tasks` (
   `task_id` int(11) NOT NULL,
-  `task_status` enum('pending','accepted','rejected','in_progress','completed','cancelled') DEFAULT 'pending',
+  `task_status` enum('pending','accepted','scheduled','rejected','in_progress','completed','cancelled') DEFAULT 'pending',
   `price` decimal(10,2) NOT NULL,
   `post_id` int(11) NOT NULL,
   `technician_id` int(11) NOT NULL,
   `accepted_at` timestamp NULL DEFAULT NULL,
   `completed_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `proposed_at` datetime DEFAULT NULL,
+  `customer_schedule_confirmed_at` datetime DEFAULT NULL,
+  `technician_schedule_confirmed_at` datetime DEFAULT NULL,
+  `cancelled_by` int(11) DEFAULT NULL,
+  `cancel_reason` varchar(500) DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL,
+  `agreed_price` decimal(10,2) DEFAULT NULL,
+  `payment_status` enum('unpaid','paid') NOT NULL DEFAULT 'unpaid',
+  `payment_method` enum('cash','bank_transfer','other') DEFAULT NULL,
+  `customer_paid_confirmed_at` datetime DEFAULT NULL,
+  `technician_paid_confirmed_at` datetime DEFAULT NULL,
+  `paid_at` datetime DEFAULT NULL,
+  `receipt_number` varchar(40) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -203,7 +216,9 @@ CREATE TABLE `technician` (
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `address` text DEFAULT NULL
+  `address` text DEFAULT NULL,
+  `service_area` varchar(255) DEFAULT NULL,
+  `availability` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -248,6 +263,46 @@ CREATE TABLE `users` (
   `admin_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `task_lifecycle_events` (
+  `event_id` int(11) NOT NULL AUTO_INCREMENT,
+  `task_id` int(11) NOT NULL,
+  `actor_id` int(11) DEFAULT NULL,
+  `event_type` varchar(40) NOT NULL,
+  `from_status` varchar(30) DEFAULT NULL,
+  `to_status` varchar(30) DEFAULT NULL,
+  `scheduled_for` datetime DEFAULT NULL,
+  `reason` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`event_id`),
+  KEY `idx_task_lifecycle_task` (`task_id`, `created_at`),
+  CONSTRAINT `task_lifecycle_task_fk` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE CASCADE,
+  CONSTRAINT `task_lifecycle_actor_fk` FOREIGN KEY (`actor_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `marketplace_reports` (
+  `report_id` int(11) NOT NULL AUTO_INCREMENT,
+  `reporter_id` int(11) DEFAULT NULL,
+  `task_id` int(11) DEFAULT NULL,
+  `target_user_id` int(11) DEFAULT NULL,
+  `message_id` int(11) DEFAULT NULL,
+  `report_type` enum('dispute','profile','message','task') NOT NULL,
+  `category` varchar(60) NOT NULL,
+  `description` varchar(1000) NOT NULL,
+  `task_detail` varchar(2000) DEFAULT NULL,
+  `reported_content` varchar(1000) DEFAULT NULL,
+  `status` enum('open','reviewing','resolved','dismissed') NOT NULL DEFAULT 'open',
+  `resolution_note` varchar(500) DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`report_id`),
+  KEY `idx_marketplace_reports_status` (`status`, `created_at`),
+  CONSTRAINT `marketplace_reports_reporter_fk` FOREIGN KEY (`reporter_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
+  CONSTRAINT `marketplace_reports_task_fk` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`task_id`) ON DELETE SET NULL,
+  CONSTRAINT `marketplace_reports_target_fk` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
+  CONSTRAINT `marketplace_reports_reviewer_fk` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

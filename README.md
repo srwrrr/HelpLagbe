@@ -148,10 +148,13 @@ npm run seed:realistic
 - Customer or technician account selection during registration
 - Technician applications, administrator approval, and bidding
 - Public homepage with customer and technician entry points
-- Approved technician directory with skills, completed jobs, and ratings
-- Customer bid management and technician task lifecycle
-- Reviews, notification dropdown with unread count, and private messaging for accepted tasks
-- Customer and technician dashboards with sidebar navigation and editable account profiles
+- Approved technician directory with location/availability filters, skills, ratings, completed jobs, and typical first-offer response time
+- Customer bid management with proposed appointments, mutual scheduling confirmation, reschedule/cancel reasons, a task timeline, and task-only messaging
+- Confirmation-based payment records with an agreed amount and receipt reference; no online payment processing or escrow
+- User reporting for technician profiles, messages, tasks, and disputes, with an admin review queue
+- Technician opportunity matching by service area, plus rating and response-time sorting
+- Per-completed-task interactive reviews with star ratings, selectable compliments, optional written feedback, notification dropdown with unread count, and private messaging for accepted tasks
+- Customer, technician, and admin dashboards with sidebar navigation and editable account profiles, including validated profile-photo uploads
 - Admin user management, audit log, two-stage account deletion (archive/restore, then confirmed permanent deletion)
 - Public contact links, persistent light/dark mode, and responsive layouts
 
