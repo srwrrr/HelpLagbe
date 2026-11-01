@@ -127,7 +127,7 @@ function Shell({ children, user }) {
   return <main className="app-shell"><Header user={user} />{children}<Footer /></main>
 }
 
-function Home({ posts, user }) {
+function Home({ posts, postsLoading, postsError, user }) {
   const startRequest = () => go(user?.role === 'customer' ? '/customer/new-request' : '/register')
   return <Shell user={user}>
     <section className="hero-section page-width">
@@ -160,19 +160,19 @@ function Home({ posts, user }) {
       </div>
     </section>
     <section className="steps-section page-width"><div className="section-heading"><div><p className="eyebrow">How HelpLagbe works</p><h2>From “I need help” to “all sorted.”</h2></div></div><div className="steps-grid"><Step number="01" title="Describe the job" text="Tell us what needs fixing and add a photo if it helps." /><Step number="02" title="Compare local bids" text="Technicians respond with their price and availability." /><Step number="03" title="Choose your helper" text="Accept the bid that feels right and track the task." /></div></section>
-    <RequestPreview posts={posts} />
+    <RequestPreview posts={posts} loading={postsLoading} error={postsError} />
   </Shell>
 }
 
 function ServiceCard({ tone, icon, title, text }) { return <article className={`service-card ${tone}`}><span className="service-icon">{icon}</span><h3>{title}</h3><p>{text}</p><span className="service-arrow">-&gt;</span></article> }
 function Step({ number, title, text }) { return <div className="step"><span className="step-number">{number}</span><h3>{title}</h3><p>{text}</p></div> }
 
-function RequestPreview({ posts }) {
-  return <section className="request-section page-width"><div className="section-heading"><div><p className="eyebrow">Live service requests</p><h2>See what people need today.</h2></div><button className="outline-button" type="button" onClick={() => go('/requests')}>Browse marketplace</button></div>{posts.length ? <div className="request-grid">{posts.slice(0, 6).map((post) => <RequestCard key={post.id} post={post} />)}</div> : <EmptyState text="No live requests yet." />}</section>
+function RequestPreview({ posts, loading, error }) {
+  return <section className="request-section page-width"><div className="section-heading"><div><p className="eyebrow">Live service requests</p><h2>See what people need today.</h2></div><button className="outline-button" type="button" onClick={() => go('/requests')}>Browse marketplace</button></div>{loading ? <LoadingState text="Loading service requests..." /> : error ? <p className="form-message" role="alert">{error}</p> : posts.length ? <div className="request-grid">{posts.slice(0, 6).map((post) => <RequestCard key={post.id} post={post} />)}</div> : <EmptyState text="No live requests yet." />}</section>
 }
 
 function RequestCard({ post, action }) {
-  return <article className="request-card">{post.image && <img className="request-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h3>{post.detail}</h3><p>Posted {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'recently'}</p>{action}</article>
+  return <article className="request-card">{post.image && <img className="request-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h3>{post.detail}</h3><p>{post.customerName || 'Anonymous customer'} · Posted {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'recently'}</p>{action}</article>
 }
 function EmptyState({ text }) { return <div className="empty-state"><span className="empty-icon">-</span><p>{text}</p></div> }
 function LoadingState({ text = 'Loading...' }) { return <div className="loading-state" role="status"><span className="loading-spinner" aria-hidden="true"></span><p>{text}</p></div> }
@@ -185,7 +185,7 @@ function ReviewPanel() {
   const [rating, setRating] = useState(completed?.reviewRating || 5)
   const [review, setReview] = useState(completed?.reviewText || '')
   const [message, setMessage] = useState('')
-  if (!completed) return null
+  if (!completed) return <p className="muted-label">A completed job will appear here when it is ready for review.</p>
   const submit = async (event) => {
     event.preventDefault()
     setMessage('Saving...')
@@ -196,20 +196,6 @@ function ReviewPanel() {
     } catch (error) { setMessage(error.message) }
   }
   return <div className="panel review-panel"><div className="panel-heading"><div><p className="eyebrow">Completed work</p><h2>How was the service?</h2></div><span className="verified-label">Private review</span></div><p className="review-context">Your review helps other customers choose trusted technicians.</p><form className="review-form" onSubmit={submit}><label>Rating<select value={rating} onChange={(event) => setRating(Number(event.target.value))}><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Okay</option><option value="2">2 - Needs improvement</option><option value="1">1 - Poor</option></select></label><label>Review<textarea rows="3" maxLength="500" value={review} onChange={(event) => setReview(event.target.value)} placeholder="Share a short review (optional)" /></label><button className="primary-button" type="submit">Save review</button>{message && <p className="form-message">{message}</p>}</form></div>
-}
-
-function BidEditor() {
-  const [tasks, setTasks] = useState([])
-  const [prices, setPrices] = useState({})
-  const [message, setMessage] = useState('')
-  const load = () => request('/technician/tasks').then(setTasks).catch(() => setTasks([]))
-  useEffect(() => { load() }, [])
-  const update = async (taskId) => {
-    try { await request(`/technician/tasks/${taskId}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[taskId] }) }); setMessage('Bid updated.'); load() } catch (error) { setMessage(error.message) }
-  }
-  const pending = tasks.filter((task) => task.status === 'pending')
-  if (!pending.length) return null
-  return <section className="page-width bid-editor-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Your pending offers</p><h2>Review your bids</h2></div><span className="count-badge">{pending.length}</span></div><div className="bid-editor-list">{pending.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: {task.price}</span></div><input type="number" min="0" value={prices[task.id] ?? task.price} onChange={(event) => setPrices({ ...prices, [task.id]: event.target.value })} /><button className="small-button" type="button" onClick={() => update(task.id)}>Update bid</button></div>)}</div>{message && <p className="form-message">{message}</p>}</div></section>
 }
 
 function AdminTools() {
@@ -241,7 +227,17 @@ function ArchivedUsersPanel() {
       setMessage(error.message)
     }
   }
-  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Data retention</p><h2>Archived accounts</h2></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th><th>Action</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td><td><button className="quiet-button" type="button" onClick={() => restore(archive.id)}>Restore</button></td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}{message && <p className="form-message">{message}</p>}</div></section>
+  const permanentlyDelete = async (archive) => {
+    if (!window.confirm(`Permanently delete ${archive.username}'s archived account and saved marketplace history? This cannot be undone.`)) return
+    try {
+      const result = await request(`/admin/archived-users/${archive.id}`, { method: 'DELETE' })
+      setMessage(result.message)
+      load()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+  return <section className="page-width archive-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Two-stage deletion</p><h2>Archived accounts</h2><p className="muted-label">Restore an account, or permanently delete its saved data. Permanent deletion cannot be undone.</p></div><span className="count-badge">{archives.length}</span></div>{loading ? <LoadingState text="Loading archived accounts..." /> : archives.length ? <div className="table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Archived</th><th>Reason</th><th>Actions</th></tr></thead><tbody>{archives.map((archive) => <tr key={archive.id}><td>{archive.username}</td><td>{archive.email}</td><td><span className="table-status">{archive.role}</span></td><td>{new Date(archive.archivedAt).toLocaleString()}</td><td>{archive.reason}</td><td><div className="archive-actions"><button className="quiet-button" type="button" onClick={() => restore(archive.id)}>Restore</button><button className="quiet-button danger-button" type="button" onClick={() => permanentlyDelete(archive)}>Delete permanently</button></div></td></tr>)}</tbody></table></div> : <EmptyState text="No accounts have been archived." />}{message && <p className="form-message">{message}</p>}</div></section>
 }
 
 function MessagesPanel() {
@@ -258,7 +254,7 @@ function MessagesPanel() {
     if (!selectedTask || !body.trim()) return
     try { await request(`/messages/${selectedTask}`, { method: 'POST', body: JSON.stringify({ body }) }); setBody(''); setMessage('Message sent.'); const items = await request(`/messages/${selectedTask}`); setMessages(items) } catch (error) { setMessage(error.message) }
   }
-  if (!conversations.length) return null
+  if (!conversations.length) return <section className="page-width messages-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Private communication</p><h2>Messages</h2></div><span className="verified-label">Task-only</span></div><p className="muted-label">Messages with customers or technicians appear here after a bid is accepted.</p></div></section>
   return <section className="page-width messages-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Private communication</p><h2>Messages</h2></div><span className="verified-label">Task-only</span></div><div className="messages-layout"><div className="conversation-list">{conversations.map((conversation) => <button className={selectedTask === conversation.taskId ? 'conversation-button active' : 'conversation-button'} type="button" key={conversation.taskId} onClick={() => setSelectedTask(conversation.taskId)}><strong>{conversation.detail}</strong><span>{conversation.status.replace('_', ' ')}</span></button>)}</div><div className="message-thread">{messages.length ? messages.map((item) => <div className="message-bubble" key={item.id}><strong>{item.senderName}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString()}</small></div>) : <p className="muted-label">Start the conversation for this accepted task.</p>}<form className="message-form" onSubmit={send}><input value={body} maxLength="1000" onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button className="small-button" type="submit">Send</button></form>{message && <p className="form-message">{message}</p>}</div></div></div></section>
 }
 
@@ -346,8 +342,82 @@ function AuthPage({ mode }) {
   return <Shell><section className="auth-page"><div className="auth-panel"><p className="eyebrow">HelpLagbe account</p><h1>{mode === 'login' ? 'Welcome back.' : isTechnician ? 'Put your skills to work.' : 'Start getting help.'}</h1><p className="auth-intro">{mode === 'login' ? 'Sign in to continue to your workspace.' : isTechnician ? 'Apply to join trusted technicians on HelpLagbe.' : 'Create an account and get your next job moving.'}</p><form onSubmit={submit}>{isRegister && <label>Account type<select value={accountType} onChange={(event) => setAccountType(event.target.value)}><option value="customer">Customer</option><option value="technician">Technician</option></select></label>}{isRegister && <label>Name<input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} required /></label>}<label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label>Password<div className="password-input-wrap"><input type={showPassword ? 'text' : 'password'} minLength="8" maxLength="72" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /><button className="password-toggle" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>{isTechnician && <><label>National ID<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} required /></label><label>Skills<textarea rows="3" value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} required /></label><label>Address<input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label></>}<button className="primary-button auth-submit" type="submit">{mode === 'login' ? 'Log in' : isTechnician ? 'Submit application' : 'Create account'}</button></form>{message && <p className="form-message">{message}</p>}<div className="auth-links">{mode === 'login' ? <><button type="button" onClick={() => go('/register')}>Need an account? Register</button><button type="button" onClick={() => go('/register-technician')}>Join as a technician</button></> : <button type="button" onClick={() => go('/login')}>Already registered? Log in</button>}</div></div><div className="auth-side"><span className="side-mark">H</span><h2>Help that fits real life.</h2><p>One trusted place for customers, technicians, and the people who keep homes running.</p></div></section></Shell>
 }
 
+function ProfileEditor({ user }) {
+  const [profile, setProfile] = useState({ name: user.name || '', email: user.email || '', phone: '', address: '', skills: '' })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    let active = true
+    request('/profile')
+      .then((data) => {
+        if (active) setProfile({ name: data.name || '', email: data.email || '', phone: data.phone || '', address: data.address || '', skills: data.skills || '' })
+      })
+      .catch((error) => { if (active) setMessage(error.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  const save = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setMessage('')
+    try {
+      const data = await request('/profile', { method: 'PATCH', body: JSON.stringify(profile) })
+      setProfile((current) => ({ ...current, ...data.user }))
+      const storedUser = getStoredUser()
+      if (storedUser) {
+        localStorage.setItem('helplagbe_user', JSON.stringify({ ...storedUser, name: data.user.name, email: data.user.email }))
+        window.dispatchEvent(new Event('helplagbe-auth'))
+      }
+      setMessage(data.message)
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <section className="panel profile-editor">
+    <div className="panel-heading"><div><p className="eyebrow">Your account</p><h2>Edit profile</h2><p className="muted-label">Update the details associated with your HelpLagbe account.</p></div></div>
+    {loading ? <LoadingState text="Loading your profile..." /> : <form className="request-form profile-form" onSubmit={save}>
+      <div className="form-row">
+        <label>Name<input value={profile.name} maxLength="100" onChange={(event) => setProfile({ ...profile, name: event.target.value })} required /></label>
+        <label>Email<input type="email" value={profile.email} onChange={(event) => setProfile({ ...profile, email: event.target.value })} required /></label>
+      </div>
+      <div className="form-row">
+        <label>Phone<input type="tel" value={profile.phone} maxLength="20" onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label>
+        <label>Address<input value={profile.address} maxLength="500" onChange={(event) => setProfile({ ...profile, address: event.target.value })} /></label>
+      </div>
+      {user.role === 'technician' && <label>Skills<textarea rows="3" value={profile.skills} maxLength="1000" onChange={(event) => setProfile({ ...profile, skills: event.target.value })} required /></label>}
+      <button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save profile'}</button>
+      {message && <p className="form-message" role="status">{message}</p>}
+    </form>}
+  </section>
+}
+
 function DashboardLayout({ user, eyebrow, title, description, children }) {
-  return <Shell user={user}><section className="dashboard-heading page-width"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div><div className="profile-chip"><span className="profile-avatar">{user.name?.slice(0, 1)}</span><span><strong>{user.name}</strong><small>{user.email}</small></span></div></section>{user.role === 'customer' && <section className="page-width review-section"><ReviewPanel /></section>}{user.role === 'technician' && <BidEditor />}{user.role === 'admin' && <><AdminTools /><ArchivedUsersPanel /></>}{user.role !== 'admin' && <MessagesPanel />}{children}</Shell>
+  const hasSidebar = user.role === 'customer' || user.role === 'technician'
+  const navigation = user.role === 'customer'
+    ? [['dashboard-overview', 'Overview'], ['customer-requests', 'My requests'], ['dashboard-messages', 'Messages'], ['dashboard-reviews', 'Reviews'], ['dashboard-profile', 'Edit profile']]
+    : [['dashboard-overview', 'Overview'], ['technician-opportunities', 'Opportunities'], ['technician-offers', 'My offers'], ['technician-active', 'Active jobs'], ['technician-history', 'Work history'], ['dashboard-messages', 'Messages'], ['dashboard-profile', 'Edit profile']]
+  const dashboardContent = <>
+    {user.role === 'customer' && <section className="dashboard-anchor" id="dashboard-reviews" aria-label="Reviews"><ReviewPanel /></section>}
+    {user.role !== 'admin' && <div id="dashboard-messages"><MessagesPanel /></div>}
+    {children}
+    {hasSidebar && <div id="dashboard-profile"><ProfileEditor user={user} /></div>}
+  </>
+
+  return <Shell user={user}>
+    <section className="dashboard-heading page-width"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div><div className="profile-chip"><span className="profile-avatar">{user.name?.slice(0, 1)}</span><span><strong>{user.name}</strong><small>{user.email}</small></span></div></section>
+    {hasSidebar
+      ? <div className="dashboard-layout page-width">
+        <aside className="dashboard-sidebar"><p className="eyebrow">Workspace</p><nav aria-label={`${user.role} dashboard`}>{navigation.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}</nav></aside>
+        <div className="dashboard-content">{dashboardContent}</div>
+      </div>
+      : <>{user.role === 'admin' && <><AdminTools /><ArchivedUsersPanel /></>}{children}</>}
+  </Shell>
 }
 
 function CustomerDashboard({ user }) {
@@ -420,14 +490,14 @@ function CustomerDashboard({ user }) {
   }
 
   return <DashboardLayout user={user} eyebrow="Customer workspace" title="Your service requests." description="Track offers, active work, and completed jobs in one place.">
-    <section className="customer-dashboard page-width">
+    <section className="customer-dashboard page-width" id="dashboard-overview">
       <div className="dashboard-summary" aria-label="Request summary">
         <div><strong>{counts.requests}</strong><span>Requests</span></div>
         <div><strong>{counts.attention}</strong><span>Bids to review</span></div>
         <div><strong>{counts.active}</strong><span>Active jobs</span></div>
         <div><strong>{counts.completed}</strong><span>Completed</span></div>
       </div>
-      <div className="dashboard-toolbar">
+      <div className="dashboard-toolbar" id="customer-requests">
         <div className="dashboard-filter-group" role="group" aria-label="Filter requests">
           {[['all', 'All'], ['attention', 'Needs attention'], ['active', 'Active'], ['completed', 'Completed']].map(([value, label]) => <button key={value} type="button" className={filter === value ? 'filter-chip is-active' : 'filter-chip'} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}
         </div>
@@ -488,13 +558,14 @@ function TechnicianDashboard({ user }) {
   const activeTasks = tasks.filter((task) => ['accepted', 'in_progress'].includes(task.status))
   const completedTasks = tasks.filter((task) => ['completed', 'rejected', 'cancelled'].includes(task.status))
   return <DashboardLayout user={user} eyebrow="Technician workspace" title="Your work, clearly queued." description="Find suitable requests, manage offers, and move accepted jobs forward.">
-    <section className="technician-dashboard page-width">
+    <section className="technician-dashboard page-width" id="dashboard-overview">
       <div className="dashboard-summary" aria-label="Work summary"><div><strong>{requests.length}</strong><span>Open requests</span></div><div><strong>{pendingBids.length}</strong><span>Pending bids</span></div><div><strong>{activeTasks.length}</strong><span>Active jobs</span></div><div><strong>{tasks.filter((task) => task.status === 'completed').length}</strong><span>Completed</span></div></div>
       {message && <p className="form-message" role="status">{message}</p>}
       {loading ? <LoadingState text="Loading your work..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : <>
-        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}</span><h3>{item.detail}</h3><p>{item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="bid-row"><label className="visually-hidden" htmlFor={`bid-price-${item.id}`}>Your bid amount</label><input id={`bid-price-${item.id}`} type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /><button className="small-button" type="button" onClick={() => bid(item.id)}>Place bid</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
-        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><button className="small-button" type="button" onClick={async () => { try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price }) }); setMessage('Bid updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update bid</button></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
-        <section className="panel"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed bid: ৳{task.price}</span></div><div className="activity-meta"><strong className={`status-${task.status}`}>{task.status.replace('_', ' ')}</strong>{task.status === 'accepted' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
+        <section className="panel" id="technician-opportunities"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}</span><h3>{item.detail}</h3><p>{item.customerName || 'Anonymous customer'} · {item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="bid-row"><label className="visually-hidden" htmlFor={`bid-price-${item.id}`}>Your bid amount</label><input id={`bid-price-${item.id}`} type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /><button className="small-button" type="button" onClick={() => bid(item.id)}>Place bid</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
+        <section className="panel" id="technician-offers"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><button className="small-button" type="button" onClick={async () => { try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price }) }); setMessage('Bid updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update bid</button></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
+        <section className="panel" id="technician-active"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed bid: ৳{task.price}</span></div><div className="activity-meta"><strong className={`status-${task.status}`}>{task.status.replace('_', ' ')}</strong>{task.status === 'accepted' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
+        <div id="technician-history"></div>
         {completedTasks.length > 0 && <details className="panel history-panel"><summary>Completed and closed work ({completedTasks.length})</summary><div className="activity-list">{completedTasks.map((task) => <article className="activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Bid: ৳{task.price}</span></div><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></article>)}</div></details>}
       </>}
     </section>
@@ -530,7 +601,7 @@ function AdminDashboard({ user }) {
   const update = async (id, status) => { try { await request(`/admin/technicians/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Technician ${status}.`); await load() } catch (error) { setMessage(error.message) } }
   const manageTask = async (id, status) => { try { await request(`/admin/tasks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(`Task marked ${status.replace('_', ' ')}.`); await load() } catch (error) { setMessage(error.message) } }
   const removePost = async (id) => { if (!window.confirm('Remove this service request and its bids?')) return; try { await request(`/admin/posts/${id}`, { method: 'DELETE' }); setMessage('Request removed.'); await load() } catch (error) { setMessage(error.message) } }
-  const removeUser = async (id) => { if (!window.confirm('Archive and remove this user and related marketplace data?')) return; try { await request(`/admin/users/${id}`, { method: 'DELETE' }); setMessage('User archived and removed.'); await load() } catch (error) { setMessage(error.message) } }
+  const removeUser = async (id) => { if (!window.confirm('Move this account and its marketplace history to Archived accounts? You can restore it later or permanently delete it from there.')) return; try { await request(`/admin/users/${id}`, { method: 'DELETE' }); setMessage('User moved to Archived accounts.'); await load() } catch (error) { setMessage(error.message) } }
   const users = (data?.users || []).filter((item) => item.role !== 'admin' && (userRole === 'all' || item.role === userRole) && `${item.name} ${item.email}`.toLowerCase().includes(userSearch.trim().toLowerCase()))
   const requests = (data?.posts || []).filter((item) => `${item.detail} ${item.category} ${item.postedBy}`.toLowerCase().includes(requestSearch.trim().toLowerCase()))
   const tasks = (data?.tasks || []).filter((item) => taskStatus === 'all' || item.status === taskStatus)
@@ -552,9 +623,26 @@ function AdminDashboard({ user }) {
 function App() {
   const path = usePath()
   const [user, setUser] = useState(getStoredUser)
-  const [posts, setPosts] = useState([])
+  const userRole = user?.role
+  const [postsState, setPostsState] = useState({ role: userRole, posts: [], loading: true, error: '' })
+  const posts = postsState.role === userRole ? postsState.posts : []
+  const postsLoading = postsState.role !== userRole || postsState.loading
+  const postsError = postsState.role === userRole ? postsState.error : ''
   useEffect(() => { document.documentElement.dataset.theme = localStorage.getItem('helplagbe_theme') || 'dark' }, [])
-  useEffect(() => { request('/posts').then(setPosts).catch(() => setPosts([])) }, [])
+  useEffect(() => {
+    let active = true
+    request('/posts')
+      .then((data) => {
+        if (!Array.isArray(data.items)) throw new Error('The service request list could not be read.')
+        if (active) setPostsState({ role: userRole, posts: data.items, loading: false, error: '' })
+      })
+      .catch((error) => {
+        if (active) {
+          setPostsState({ role: userRole, posts: [], loading: false, error: error.message })
+        }
+      })
+    return () => { active = false }
+  }, [userRole])
   useEffect(() => { const sync = () => setUser(getStoredUser()); window.addEventListener('storage', sync); window.addEventListener('helplagbe-auth', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('helplagbe-auth', sync) } }, [])
   if (path === '/login') return <AuthPage key={path} mode="login" />
   if (path === '/register') return <AuthPage key={path} mode="register" />
@@ -564,7 +652,7 @@ function App() {
   if (path === '/customer' || path === '/customer/new-request') return user?.role === 'customer' ? <CustomerDashboard user={user} /> : <AuthPage mode="login" />
   if (path === '/technician') return user?.role === 'technician' ? <TechnicianDashboard user={user} /> : <AuthPage mode="login" />
   if (path === '/admin') return user?.role === 'admin' ? <AdminDashboard user={user} /> : <AuthPage mode="login" />
-  return <Home posts={posts} user={user} />
+  return <Home posts={posts} postsLoading={postsLoading} postsError={postsError} user={user} />
 }
 
 export default App

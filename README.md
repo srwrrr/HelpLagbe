@@ -151,7 +151,8 @@ npm run seed:realistic
 - Approved technician directory with skills, completed jobs, and ratings
 - Customer bid management and technician task lifecycle
 - Reviews, notification dropdown with unread count, and private messaging for accepted tasks
-- Admin user management, audit log, archive, and restore workflows
+- Customer and technician dashboards with sidebar navigation and editable account profiles
+- Admin user management, audit log, two-stage account deletion (archive/restore, then confirmed permanent deletion)
 - Public contact links, persistent light/dark mode, and responsive layouts
 
 ## Tests and Production Build

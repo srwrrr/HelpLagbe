@@ -264,6 +264,19 @@ function authenticate(request, response, next) {
   }
 }
 
+function optionalAuthenticate(request, _response, next) {
+  const header = request.headers.authorization || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!token) return next()
+
+  try {
+    request.user = jwt.verify(token, jwtSecret)
+  } catch {
+    request.user = null
+  }
+  next()
+}
+
 function requireAdmin(request, response, next) {
   if (request.user?.role !== 'admin') return response.status(403).json({ message: 'Admin access required.' })
   next()
@@ -369,11 +382,12 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
   }
 })
 
-app.get('/api/posts', async (request, response) => {
+app.get('/api/posts', optionalAuthenticate, async (request, response) => {
   try {
     const { page, limit, offset } = parsePagination(request, 12)
     const category = sanitizeText(request.query.category || '', 60)
     const search = sanitizeText(request.query.search || '', 120)
+    const technicianViewerId = request.user?.role === 'technician' ? request.user.userId : null
     const filters = []
     const values = []
 
@@ -388,11 +402,13 @@ app.get('/api/posts', async (request, response) => {
 
     const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
     const [rows] = await pool.execute(
-      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt, COUNT(t.task_id) AS bidCount
-       FROM posts p LEFT JOIN tasks t ON t.post_id = p.post_id ${whereClause}
-       GROUP BY p.post_id, p.Post_detail, p.Category, p.\`Sub-Category\`, p.Image, p.created_at
+      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt, COUNT(t.task_id) AS bidCount,
+              CASE WHEN EXISTS (SELECT 1 FROM technician viewerTech WHERE viewerTech.user_id = ? AND viewerTech.status = 'approved') THEN customer.username ELSE NULL END AS customerName
+       FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
+       LEFT JOIN tasks t ON t.post_id = p.post_id ${whereClause}
+       GROUP BY p.post_id, p.Post_detail, p.Category, p.\`Sub-Category\`, p.Image, p.created_at, customer.username
        ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
-      [...values, limit, offset],
+      [technicianViewerId, ...values, limit, offset],
     )
     const [totalRows] = await pool.execute(
       `SELECT COUNT(*) AS total FROM posts p ${whereClause}`,
@@ -509,7 +525,12 @@ app.get('/api/technician/requests', authenticate, async (request, response) => {
 
   try {
     const [rows] = await pool.execute(
-      'SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt FROM posts p WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN (\'accepted\', \'in_progress\', \'completed\')) ORDER BY p.created_at DESC LIMIT 30',
+      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt,
+              CASE WHEN EXISTS (SELECT 1 FROM technician viewerTech WHERE viewerTech.user_id = ? AND viewerTech.status = 'approved') THEN customer.username ELSE NULL END AS customerName
+       FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
+       WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN ('accepted', 'in_progress', 'completed'))
+       ORDER BY p.created_at DESC LIMIT 30`,
+      [request.user.userId],
     )
     response.json(rows)
   } catch (error) {
@@ -924,10 +945,10 @@ app.delete('/api/admin/users/:userId', authenticate, requireAdmin, async (reques
     await connection.execute('DELETE FROM users WHERE user_id = ? AND admin_id IS NULL', [user.user_id])
     await connection.execute(
       'INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [request.user.userId, 'user_archived', 'user', user.user_id, `${user.username} archived before removal`],
+      [request.user.userId, 'user_archived', 'user', user.user_id, 'Account archived for recovery.'],
     )
     await connection.commit()
-    response.json({ message: 'User archived and removed.' })
+    response.json({ message: 'Account archived and removed from the active system.' })
   } catch (error) {
     await connection.rollback()
     response.status(500).json({ message: 'Could not archive and remove user.' })
@@ -1006,7 +1027,7 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
     await connection.execute('DELETE FROM archived_users WHERE archive_id = ?', [archive.archive_id])
     await connection.execute(
       'INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
-      [request.user.userId, 'user_restored', 'archive', archive.original_user_id, `${archive.username} restored from archive`],
+      [request.user.userId, 'user_restored', 'archive', archive.original_user_id, 'Archived account and available history restored.'],
     )
     await connection.commit()
     response.json({ message: 'Archived account and available history restored.', userId: archive.original_user_id })
@@ -1017,6 +1038,47 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
       return response.status(409).json({ message: 'Related account or marketplace data is no longer available. The archive was left unchanged.' })
     }
     response.status(500).json({ message: 'Could not restore archived user.' })
+  } finally {
+    connection.release()
+  }
+})
+
+app.delete('/api/admin/archived-users/:archiveId', authenticate, requireAdmin, async (request, response) => {
+  const archiveId = Number(request.params.archiveId)
+  if (!Number.isInteger(archiveId) || archiveId < 1) {
+    return response.status(400).json({ message: 'A valid archived account is required.' })
+  }
+
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [archives] = await connection.execute(
+      'SELECT archive_id, original_user_id FROM archived_users WHERE archive_id = ? LIMIT 1 FOR UPDATE',
+      [archiveId],
+    )
+    const archive = archives[0]
+    if (!archive) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Archived user not found.' })
+    }
+
+    await connection.execute(
+      `UPDATE admin_audit_log
+       SET details = 'Archived account lifecycle event; personal data removed.'
+       WHERE target_id = ? AND ((target_type = 'user' AND action = 'user_archived')
+         OR (target_type = 'archive' AND action = 'user_restored'))`,
+      [archive.original_user_id],
+    )
+    await connection.execute('DELETE FROM archived_users WHERE archive_id = ?', [archive.archive_id])
+    await connection.execute(
+      'INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+      [request.user.userId, 'user_permanently_deleted', 'archived_user', archive.archive_id, 'Archived account and saved personal data permanently deleted.'],
+    )
+    await connection.commit()
+    response.json({ message: 'Archived account and saved data permanently deleted.' })
+  } catch (error) {
+    await connection.rollback()
+    response.status(500).json({ message: 'Could not permanently delete archived user.' })
   } finally {
     connection.release()
   }
@@ -1253,6 +1315,97 @@ app.post('/api/auth/register-technician', async (request, response) => {
     await connection.rollback()
     if (error.code === 'ER_DUP_ENTRY') return response.status(409).json({ message: 'Email or national ID already exists.' })
     response.status(500).json({ message: 'Could not submit technician application.' })
+  } finally {
+    connection.release()
+  }
+})
+
+app.get('/api/profile', authenticate, async (request, response) => {
+  if (!['customer', 'technician'].includes(request.user.role)) {
+    return response.status(403).json({ message: 'Profile editing is available for customer and technician accounts.' })
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT u.user_id AS id, u.username AS name, u.email, u.phone_no AS phone, u.address,
+              tech.technician_id AS technicianId, tech.Skill_details AS skills
+       FROM users u LEFT JOIN technician tech ON tech.user_id = u.user_id
+       WHERE u.user_id = ? AND u.admin_id IS NULL LIMIT 1`,
+      [request.user.userId],
+    )
+    if (!rows[0]) return response.status(404).json({ message: 'Account not found.' })
+    const { technicianId, ...profile } = rows[0]
+    response.json({ ...profile, role: technicianId ? 'technician' : 'customer' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load your profile.' })
+  }
+})
+
+app.patch('/api/profile', authenticate, async (request, response) => {
+  if (!['customer', 'technician'].includes(request.user.role)) {
+    return response.status(403).json({ message: 'Profile editing is available for customer and technician accounts.' })
+  }
+
+  const body = request.body && typeof request.body === 'object' ? request.body : {}
+  const username = sanitizeText(body.name, 100)
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  const phone = sanitizeText(body.phone, 20)
+  const address = sanitizeText(body.address, 500)
+  const skills = sanitizeText(body.skills, 1000)
+
+  if (username.length < 2 || (typeof body.name === 'string' && body.name.trim().length > 100)) {
+    return response.status(400).json({ message: 'Name must be between 2 and 100 characters.' })
+  }
+  if (!isValidEmail(email)) return response.status(400).json({ message: 'Enter a valid email address.' })
+  if (phone && !/^[+0-9()\-\s]{7,20}$/.test(phone)) {
+    return response.status(400).json({ message: 'Enter a valid phone number.' })
+  }
+  if (typeof body.address === 'string' && body.address.length > 500) {
+    return response.status(400).json({ message: 'Address must be 500 characters or fewer.' })
+  }
+  if (request.user.role === 'technician'
+    && (skills.length < 3 || (typeof body.skills === 'string' && body.skills.trim().length > 1000))) {
+    return response.status(400).json({ message: 'Skills must be between 3 and 1000 characters.' })
+  }
+
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [users] = await connection.execute(
+      'SELECT user_id FROM users WHERE user_id = ? AND admin_id IS NULL LIMIT 1 FOR UPDATE',
+      [request.user.userId],
+    )
+    const user = users[0]
+    const [technicians] = user
+      ? await connection.execute('SELECT technician_id FROM technician WHERE user_id = ? LIMIT 1', [user.user_id])
+      : [[]]
+    if (user) user.technician_id = technicians[0]?.technician_id
+    if (!user || (request.user.role === 'technician' && !user.technician_id)
+      || (request.user.role === 'customer' && user.technician_id)) {
+      await connection.rollback()
+      return response.status(403).json({ message: 'Account role changed. Please sign in again.' })
+    }
+
+    await connection.execute(
+      'UPDATE users SET username = ?, email = ?, phone_no = ?, address = ? WHERE user_id = ?',
+      [username, email, phone || null, address || null, user.user_id],
+    )
+    if (user.technician_id) {
+      await connection.execute(
+        'UPDATE technician SET Full_Name = ?, address = ?, Skill_details = ? WHERE technician_id = ?',
+        [username, address || null, skills, user.technician_id],
+      )
+    }
+
+    await connection.commit()
+    response.json({
+      message: 'Profile updated.',
+      user: { id: user.user_id, name: username, email, phone, address, ...(user.technician_id ? { skills } : {}), role: user.technician_id ? 'technician' : 'customer' },
+    })
+  } catch (error) {
+    await connection.rollback()
+    if (error.code === 'ER_DUP_ENTRY') return response.status(409).json({ message: 'An account with that email already exists.' })
+    response.status(500).json({ message: 'Could not update your profile.' })
   } finally {
     connection.release()
   }

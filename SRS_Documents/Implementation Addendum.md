@@ -27,6 +27,8 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 - **FR-008:** A technician listing shall show the technician's name, skills, number of completed jobs, and available customer rating information.
 - **FR-009:** The directory shall not expose private contact details. Communication between a customer and technician is available through the accepted-task messaging workflow.
 - **FR-010:** If the directory request fails, the interface shall show an error rather than presenting the failure as an empty directory.
+- **FR-010a:** Public service-request listings shall identify the requester as anonymous. The requester's name may be shown only to an authenticated, administrator-approved technician.
+- **FR-010b:** The public homepage shall display recent service requests using the paginated request list, while preserving the same requester-identity privacy rule.
 
 ### Homepage and navigation
 
@@ -40,6 +42,22 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 
 - **FR-016:** Signed-in users shall be able to open the existing notification menu from the site header and see their notifications and unread count.
 - **FR-017:** The notification control shall use a recognizable bell icon, retain its unread-count badge, and communicate its expanded state to assistive technology.
+
+### Customer and technician dashboards
+
+- **FR-024:** Customer and technician dashboards shall provide role-appropriate sidebar navigation to the main workspace sections and profile settings.
+- **FR-025:** Customers and technicians shall be able to edit their name, email, phone number, and address from the dashboard.
+- **FR-026:** Technicians shall also be able to edit their listed skills; profile changes shall update their technician directory information.
+- **FR-027:** Profile changes shall be authenticated, validated, and rejected when the email is already used by another account. A successful update shall refresh the signed-in user's displayed name and email.
+
+### Administrative account deletion
+
+- **FR-018:** An administrator removing an account shall first move it and its restorable marketplace history into Archived accounts.
+- **FR-019:** Administrators shall be able to restore an archived account and its saved history if the original email is not already in use.
+- **FR-020:** Administrators shall have a separate, explicitly confirmed permanent-delete action for archived accounts. Permanent deletion shall remove the archive snapshot and saved personal data and shall not be reversible through the application.
+- **FR-021:** Permanent deletion shall retain a non-identifying administrative audit event and redact personal details in earlier archive/restore audit entries.
+- **FR-022:** Permanent deletion shall be restricted to administrators; protected admin accounts cannot be archived through the user-removal workflow.
+- **FR-023:** Archived accounts remain recoverable until an administrator restores or permanently deletes them; the application does not currently enforce an automatic expiry period.
 
 ## Scope and Requirement Status
 

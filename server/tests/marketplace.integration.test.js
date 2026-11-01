@@ -76,6 +76,45 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     })
     assert.equal(response.status, 201)
     const postId = response.body.id
+
+    for (const [token, expectedCustomerName] of [
+      [null, null],
+      [customerToken, null],
+      [technicianToken, 'Integration Customer'],
+    ]) {
+      let listingRequest = request(app).get('/api/posts').query({ search: suffix })
+      if (token) listingRequest = listingRequest.set('Authorization', `Bearer ${token}`)
+      response = await listingRequest
+      assert.equal(response.status, 200)
+      const listedPost = response.body.items.find((post) => post.id === postId)
+      assert.ok(listedPost)
+      assert.equal(listedPost.customerName, expectedCustomerName)
+    }
+
+    response = await request(app).get('/api/technician/requests').set('Authorization', `Bearer ${technicianToken}`)
+    assert.equal(response.status, 200)
+    assert.equal(response.body.find((post) => post.id === postId)?.customerName, 'Integration Customer')
+
+    response = await request(app).get('/api/profile').set('Authorization', `Bearer ${technicianToken}`)
+    assert.equal(response.status, 200)
+    assert.equal(response.body.role, 'technician')
+    response = await request(app).patch('/api/profile').set('Authorization', `Bearer ${technicianToken}`).send({
+      name: 'Updated Integration Technician',
+      email: technicianEmail,
+      phone: '01234567890',
+      address: 'Dhaka',
+      skills: 'Updated plumbing and repair',
+    })
+    assert.equal(response.status, 200)
+    assert.equal(response.body.user.name, 'Updated Integration Technician')
+    const [[updatedTechnician]] = await pool.execute(
+      'SELECT Full_Name, Skill_details, address FROM technician WHERE technician_id = ?',
+      [technician.technician_id],
+    )
+    assert.equal(updatedTechnician.Full_Name, 'Updated Integration Technician')
+    assert.equal(updatedTechnician.Skill_details, 'Updated plumbing and repair')
+    assert.equal(updatedTechnician.address, 'Dhaka')
+
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 525.25 })
     assert.equal(response.status, 201)
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500 })
@@ -114,6 +153,23 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(response.status, 200)
     response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${response.body.token}`)
     assert.ok(response.body.some((post) => post.detail === `Restored history ${suffix}`))
+
+    response = await request(app).delete(`/api/admin/users/${archiveUserId}`).set('Authorization', `Bearer ${adminToken}`)
+    assert.equal(response.status, 200)
+    const [[secondArchive]] = await pool.execute('SELECT archive_id FROM archived_users WHERE email = ?', [archiveEmail])
+    assert.ok(secondArchive)
+    response = await request(app).delete(`/api/admin/archived-users/${secondArchive.archive_id}`).set('Authorization', `Bearer ${adminToken}`)
+    assert.equal(response.status, 200)
+    const [[remainingArchive]] = await pool.execute('SELECT COUNT(*) AS total FROM archived_users WHERE archive_id = ?', [secondArchive.archive_id])
+    assert.equal(Number(remainingArchive.total), 0)
+    const [[remainingUser]] = await pool.execute('SELECT COUNT(*) AS total FROM users WHERE email = ?', [archiveEmail])
+    assert.equal(Number(remainingUser.total), 0)
+    const [[permanentDeleteAudit]] = await pool.execute(
+      "SELECT details FROM admin_audit_log WHERE action = 'user_permanently_deleted' AND target_id = ? ORDER BY audit_id DESC LIMIT 1",
+      [secondArchive.archive_id],
+    )
+    assert.ok(permanentDeleteAudit)
+    assert.doesNotMatch(permanentDeleteAudit.details, /Archive Restore Test|integration-archive-/)
   } finally {
     await pool.execute('DELETE FROM users WHERE email IN (?, ?, ?)', [customerEmail, technicianEmail, archiveEmail])
     await pool.execute('DELETE FROM archived_users WHERE email IN (?, ?, ?)', [customerEmail, technicianEmail, archiveEmail])

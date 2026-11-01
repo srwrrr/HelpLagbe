@@ -63,6 +63,31 @@ test('technician registration validates credentials before opening a database co
   assert.equal(response.body.message, 'Password must be at least 8 characters and include letters and numbers.')
 })
 
+test('permanently deleting archived accounts requires administrator access', async () => {
+  const anonymousResponse = await request(app).delete('/api/admin/archived-users/1')
+  assert.equal(anonymousResponse.status, 401)
+
+  const customerResponse = await request(app)
+    .delete('/api/admin/archived-users/1')
+    .set('Authorization', `Bearer ${customerToken}`)
+  assert.equal(customerResponse.status, 403)
+})
+
+test('profile updates require authentication and validate email before database access', async () => {
+  const anonymousResponse = await request(app).patch('/api/profile').send({
+    name: 'Updated Customer',
+    email: 'not-an-email',
+  })
+  assert.equal(anonymousResponse.status, 401)
+
+  const invalidEmailResponse = await request(app)
+    .patch('/api/profile')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ name: 'Updated Customer', email: 'not-an-email' })
+  assert.equal(invalidEmailResponse.status, 400)
+  assert.equal(invalidEmailResponse.body.message, 'Enter a valid email address.')
+})
+
 test('request creation rejects categories outside the supported list', async () => {
   const response = await request(app)
     .post('/api/posts')
