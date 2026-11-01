@@ -62,6 +62,11 @@ function normalizePath() {
   return hashPath || window.location.pathname || '/'
 }
 
+function getRouteQueryValue(key) {
+  const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?').slice(1).join('?') : ''
+  return new URLSearchParams(hashQuery || window.location.search).get(key)
+}
+
 function go(path) {
   const nextPath = path === '/' ? '/' : path.startsWith('/') ? path : `/${path}`
   const target = nextPath === '/' ? '/' : `/#${nextPath}`
@@ -124,23 +129,44 @@ function ThemeToggle() {
 function NotificationCenter({ user }) {
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
   useEffect(() => {
     if (!user) return
-    const load = () => request('/notifications').then(setNotifications).catch(() => setNotifications([]))
+    const load = () => request('/notifications').then(setNotifications).catch((error) => setMessage(error.message))
     load()
     const timer = window.setInterval(load, 30000)
     return () => window.clearInterval(timer)
   }, [user])
   const unread = notifications.filter((notification) => !notification.readAt).length
   const markRead = async (notification) => {
-    if (notification.readAt) return
+    if (notification.readAt) return true
     try {
       await request(`/notifications/${notification.id}/read`, { method: 'PATCH' })
       setNotifications((items) => items.map((item) => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
-    } catch {}
+      return true
+    } catch (error) {
+      setMessage(error.message)
+      return false
+    }
+  }
+  const openNotification = async (notification) => {
+    setMessage('')
+    if (!await markRead(notification)) return
+    setOpen(false)
+    if (notification.targetType !== 'task' || !notification.targetId || !['customer', 'technician'].includes(user.role)) return
+    const section = notification.type === 'message'
+      ? 'dashboard-messages'
+      : user.role === 'customer'
+        ? 'customer-requests'
+        : ['task_completed', 'task_cancelled', 'payment_confirmation', 'bid_withdrawn', 'request_closed', 'bid_rejected'].includes(notification.type)
+          ? 'technician-history'
+          : notification.type === 'request_updated'
+            ? 'technician-offers'
+            : 'technician-active'
+    go(`/${user.role}?section=${section}&taskId=${encodeURIComponent(notification.targetId)}`)
   }
   if (!user) return null
-  return <div className="notification-center"><button className="notification-button" type="button" onClick={() => setOpen(!open)} aria-label="Notifications" aria-expanded={open} title="Notifications"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{unread > 0 && <b>{unread > 9 ? '9+' : unread}</b>}</button>{open && <div className="notification-menu"><div className="notification-menu-heading"><strong>Notifications</strong><span>{unread ? `${unread} unread` : 'All caught up'}</span></div>{notifications.length ? notifications.map((notification) => <button className={`notification-item ${notification.readAt ? 'is-read' : ''}`} type="button" key={notification.id} onClick={() => markRead(notification)}><strong>{notification.title}</strong><span>{notification.message}</span><small>{new Date(notification.createdAt).toLocaleString()}</small></button>) : <p className="notification-empty">No notifications yet.</p>}</div>}</div>
+  return <div className="notification-center"><button className="notification-button" type="button" onClick={() => setOpen(!open)} aria-label="Notifications" aria-expanded={open} title="Notifications"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{unread > 0 && <b>{unread > 9 ? '9+' : unread}</b>}</button>{open && <div className="notification-menu"><div className="notification-menu-heading"><strong>Notifications</strong><span>{unread ? `${unread} unread` : 'All caught up'}</span></div>{message && <p className="form-message" role="alert">{message}</p>}{notifications.length ? notifications.map((notification) => <button className={`notification-item ${notification.readAt ? 'is-read' : ''}`} type="button" key={notification.id} onClick={() => openNotification(notification)}><strong>{notification.title}</strong><span>{notification.message}</span><small>{new Date(notification.createdAt).toLocaleString()}{notification.targetType === 'task' ? ' · View task' : ''}</small></button>) : <p className="notification-empty">No notifications yet.</p>}</div>}</div>
 }
 
 function Header({ user }) {
@@ -401,6 +427,80 @@ function TaskServiceLocation({ task }) {
   </div>
 }
 
+function CustomerRequestControls({ post, bids, onUpdated }) {
+  const [editing, setEditing] = useState(!post.serviceAddress && !post.closedAt)
+  const [closing, setClosing] = useState(false)
+  const [reason, setReason] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    detail: post.detail || '',
+    category: post.category || 'Appliance',
+    subCategory: post.subCategory || '',
+    serviceAddress: post.serviceAddress || '',
+    building: post.building || '',
+    flatNo: post.flatNo || '',
+  })
+  const hasAcceptedTechnician = bids.some((bid) => ['accepted', 'scheduled', 'in_progress', 'completed'].includes(bid.status))
+  const canEdit = !post.closedAt && !hasAcceptedTechnician
+
+  const update = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setMessage('')
+    try {
+      const result = await request(`/customer/posts/${post.id}`, { method: 'PATCH', body: JSON.stringify(form) })
+      setMessage(result.message)
+      setEditing(false)
+      await onUpdated()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const closeRequest = async () => {
+    if (reason.trim().length < 5) {
+      setMessage('Please provide a reason of at least 5 characters.')
+      return
+    }
+    if (!window.confirm('Close this request? Pending offers will be declined and technicians will be notified. This cannot be reopened.')) return
+    setSaving(true)
+    setMessage('')
+    try {
+      const result = await request(`/customer/posts/${post.id}/close`, { method: 'POST', body: JSON.stringify({ reason }) })
+      setMessage(result.message)
+      setClosing(false)
+      setReason('')
+      await onUpdated()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canEdit) return post.closedAt
+    ? <div className="request-management-note"><strong>Request closed</strong>{post.closeReason && <span>Reason: {post.closeReason}</span>}</div>
+    : null
+
+  return <section className="request-management">
+    <div className="request-management-actions">
+      <button className="quiet-button" type="button" onClick={() => { setEditing((open) => !open); setClosing(false) }}>{editing ? 'Hide edit form' : post.serviceAddress ? 'Edit request' : 'Add service address'}</button>
+      <button className="quiet-button danger-button" type="button" onClick={() => { setClosing((open) => !open); setEditing(false) }}>{closing ? 'Keep request open' : 'Close request'}</button>
+    </div>
+    {editing && <form className="request-form request-edit-form" onSubmit={update}>
+      <label>Job description<textarea rows="3" maxLength="2000" minLength="10" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required /><span className="muted-label">Keep out phone numbers, email addresses, and your exact location. Use the private address fields below.</span></label>
+      <div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} /></label></div>
+      <fieldset className="request-location-fields"><legend>Private service location</legend><label>Service address<input autoComplete="street-address" maxLength="500" value={form.serviceAddress} onChange={(event) => setForm({ ...form, serviceAddress: event.target.value })} required /></label><div className="form-row"><label>Building / house name<input maxLength="150" value={form.building} onChange={(event) => setForm({ ...form, building: event.target.value })} /></label><label>Flat / unit number<input maxLength="100" value={form.flatNo} onChange={(event) => setForm({ ...form, flatNo: event.target.value })} /></label></div></fieldset>
+      <button className="small-button" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save request changes'}</button>
+    </form>}
+    {closing && <div className="request-close-form"><label>Why are you closing this request?<input maxLength="500" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. No longer need this repair" /></label><button className="quiet-button danger-button" type="button" disabled={saving || reason.trim().length < 5} onClick={closeRequest}>{saving ? 'Closing...' : 'Confirm close request'}</button></div>}
+    {message && <p className="form-message" role="status">{message}</p>}
+  </section>
+}
+
 function ReportForm({ reportType, taskId, messageId, technicianId }) {
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState(reportType === 'dispute' ? 'Payment or price dispute' : 'Inappropriate conduct')
@@ -442,6 +542,8 @@ function TaskLifecyclePanel({ task, userRole, onUpdated }) {
   const [scheduleDraft, setScheduleDraft] = useState(() => ({ source: task.proposedAt, value: toDateTimeInputValue(task.proposedAt) }))
   const proposedAt = scheduleDraft.source === task.proposedAt ? scheduleDraft.value : toDateTimeInputValue(task.proposedAt)
   const [reason, setReason] = useState('')
+  const [priceDraft, setPriceDraft] = useState('')
+  const [priceChangeReason, setPriceChangeReason] = useState('')
   const [paymentMethod, setPaymentMethod] = useState(task.paymentMethod || 'cash')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -468,14 +570,36 @@ function TaskLifecyclePanel({ task, userRole, onUpdated }) {
   const canConfirmSchedule = task.status === 'accepted' && task.proposedAt && !ownScheduleConfirmation
   const ownPaymentConfirmation = userRole === 'customer' ? task.customerPaidConfirmedAt : task.technicianPaidConfirmedAt
   const canChangeSchedule = ['accepted', 'scheduled'].includes(task.status)
+  const canProposePriceChange = ['accepted', 'scheduled', 'in_progress'].includes(task.status) && task.priceChangeProposed == null
+  const priceChangePendingForCurrentUser = task.priceChangeProposed != null && Number(task.priceChangeProposedBy) !== Number(getStoredUser()?.id)
+  const savePriceChange = async (path, body, success) => {
+    setSaving(true)
+    setMessage('')
+    try {
+      const result = await request(path, { method: 'POST', body: JSON.stringify(body) })
+      setMessage(result.message || success)
+      setPriceChangeReason('')
+      setPriceDraft('')
+      await onUpdated()
+      await loadTimeline()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return <section className="task-lifecycle-panel" aria-label="Booking status and actions">
     <div className="booking-timeline" aria-label="Booking progress">
       {['Offer received', 'Accepted', 'Scheduled', 'In progress', 'Completed'].map((step, index) => <div className={`booking-step ${currentStep >= index ? 'is-complete' : ''} ${currentStep === index ? 'is-current' : ''}`} key={step}><span>{currentStep > index ? '✓' : index + 1}</span><small>{step}</small></div>)}
-      {['cancelled', 'rejected'].includes(task.status) && <span className={`dashboard-status status-${task.status}`}>{task.status === 'cancelled' ? `Cancelled: ${task.cancelReason || 'Reason recorded'}` : 'Offer declined'}</span>}
+      {['cancelled', 'rejected', 'withdrawn'].includes(task.status) && <span className={`dashboard-status status-${task.status}`}>{task.status === 'cancelled' ? `Cancelled: ${task.cancelReason || 'Reason recorded'}` : task.status === 'withdrawn' ? `Offer withdrawn: ${task.cancelReason || 'Reason recorded'}` : 'Offer declined'}</span>}
     </div>
     {task.proposedAt && <p className="muted-label">Proposed appointment: <strong>{new Date(task.proposedAt).toLocaleString()}</strong></p>}
+    {userRole === 'customer' && ['accepted', 'scheduled', 'in_progress', 'completed'].includes(task.status) && <p className="muted-label">Current agreed price: <strong>৳{task.agreedPrice ?? task.price}</strong></p>}
+    {task.priceDetails && <p className="offer-price-details"><strong>Offer includes:</strong> {task.priceDetails}</p>}
     {!!timeline.length && <details className="task-event-history"><summary>Timeline details</summary><ol>{timeline.map((item) => <li key={item.id}><strong>{item.type.replaceAll('_', ' ')}</strong><span>{new Date(item.createdAt).toLocaleString()}{item.actorName ? ` · ${item.actorName}` : ''}</span>{item.scheduledFor && <span>Appointment: {new Date(item.scheduledFor).toLocaleString()}</span>}{item.reason && <p>{item.reason}</p>}</li>)}</ol></details>}
+    {task.priceChangeProposed != null && <div className="price-change-proposal"><strong>Proposed agreed price: ৳{task.priceChangeProposed}</strong><p>{task.priceChangeReason}</p>{priceChangePendingForCurrentUser ? <div className="task-lifecycle-actions"><button className="small-button" type="button" disabled={saving} onClick={() => savePriceChange(`/tasks/${taskId}/price-change/decision`, { accept: true }, 'Price change accepted.')}>Accept new price</button><button className="quiet-button danger-button" type="button" disabled={saving} onClick={() => savePriceChange(`/tasks/${taskId}/price-change/decision`, { accept: false }, 'Price change declined.')}>Decline</button></div> : <span className="muted-label">Waiting for the other participant to decide.</span>}</div>}
+    {canProposePriceChange && <div className="price-change-form"><strong>Change agreed price</strong><p className="muted-label">The other participant must approve a price change before it takes effect.</p><div className="task-lifecycle-actions"><label>New price<input type="number" min="0.01" step="0.01" value={priceDraft} onChange={(event) => setPriceDraft(event.target.value)} placeholder={String(task.agreedPrice ?? task.price)} /></label><label>Why is the price changing?<input maxLength="450" value={priceChangeReason} onChange={(event) => setPriceChangeReason(event.target.value)} placeholder="Explain any added work, parts, or costs" /></label><button className="quiet-button" type="button" disabled={saving || !Number(priceDraft) || priceChangeReason.trim().length < 5} onClick={() => savePriceChange(`/tasks/${taskId}/price-change`, { proposedPrice: Number(priceDraft), reason: priceChangeReason }, 'Price change proposed.')}>Propose price change</button></div></div>}
     {canChangeSchedule && <div className="task-lifecycle-actions">
       <label>New appointment time<input type="datetime-local" value={proposedAt} onChange={(event) => setScheduleDraft({ source: task.proposedAt, value: event.target.value })} /></label>
       <label>Reason for change or cancellation<input maxLength="500" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this needs to change" /></label>
@@ -582,11 +706,11 @@ function AdminReportsPanel() {
 
 function MessagesPanel() {
   const [conversations, setConversations] = useState([])
-  const [selectedTask, setSelectedTask] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(() => Number(getRouteQueryValue('taskId')) || null)
   const [messages, setMessages] = useState([])
   const [body, setBody] = useState('')
   const [message, setMessage] = useState('')
-  const loadConversations = () => request('/messages').then((items) => { setConversations(items); setSelectedTask((current) => current || items[0]?.taskId || null) }).catch(() => setConversations([]))
+  const loadConversations = () => request('/messages').then((items) => { setConversations(items); setSelectedTask((current) => items.some((item) => Number(item.taskId) === Number(current)) ? current : current ? items[0]?.taskId || null : items[0]?.taskId || null) }).catch(() => setConversations([]))
   useEffect(() => { loadConversations() }, [])
   useEffect(() => { if (selectedTask) request(`/messages/${selectedTask}`).then(setMessages).catch(() => setMessages([])) }, [selectedTask])
   const send = async (event) => {
@@ -595,7 +719,7 @@ function MessagesPanel() {
     try { await request(`/messages/${selectedTask}`, { method: 'POST', body: JSON.stringify({ body }) }); setBody(''); setMessage('Message sent.'); const items = await request(`/messages/${selectedTask}`); setMessages(items) } catch (error) { setMessage(error.message) }
   }
   if (!conversations.length) return <section className="page-width messages-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Private communication</p><h2>Messages</h2></div><span className="verified-label">Task-only</span></div><p className="muted-label">Messages with customers or technicians appear here after a bid is accepted.</p></div></section>
-  return <section className="page-width messages-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Private communication</p><h2>Messages</h2></div><span className="verified-label">Task-only</span></div><div className="messages-layout"><div className="conversation-list">{conversations.map((conversation) => <button className={selectedTask === conversation.taskId ? 'conversation-button active' : 'conversation-button'} type="button" key={conversation.taskId} onClick={() => setSelectedTask(conversation.taskId)}><strong>{conversation.detail}</strong><span>{conversation.status.replace('_', ' ')}</span></button>)}</div><div className="message-thread">{messages.length ? messages.map((item) => <div className="message-bubble" key={item.id}><strong>{item.senderName}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString()}</small>{Number(item.senderId) !== Number(getStoredUser()?.id) && <ReportForm reportType="message" taskId={selectedTask} messageId={item.id} />}</div>) : <p className="muted-label">Start the conversation for this accepted task.</p>}<form className="message-form" onSubmit={send}><input value={body} maxLength="1000" onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button className="small-button" type="submit">Send</button></form>{message && <p className="form-message">{message}</p>}</div></div></div></section>
+  return <section className="page-width messages-section"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">Private communication</p><h2>Messages</h2></div><span className="verified-label">Task-only</span></div><div className="messages-layout"><div className="conversation-list">{conversations.map((conversation) => <button className={selectedTask === conversation.taskId ? 'conversation-button active' : 'conversation-button'} type="button" key={conversation.taskId} data-task-id={conversation.taskId} onClick={() => setSelectedTask(conversation.taskId)}><strong>{conversation.detail}</strong><span>{conversation.status.replace('_', ' ')}</span></button>)}</div><div className="message-thread">{messages.length ? messages.map((item) => <div className="message-bubble" key={item.id}><strong>{item.senderName}</strong><p>{item.body}</p><small>{new Date(item.createdAt).toLocaleString()}</small>{Number(item.senderId) !== Number(getStoredUser()?.id) && <ReportForm reportType="message" taskId={selectedTask} messageId={item.id} />}</div>) : <p className="muted-label">Start the conversation for this accepted task.</p>}<form className="message-form" onSubmit={send}><input value={body} maxLength="1000" onChange={(event) => setBody(event.target.value)} placeholder="Write a message..." /><button className="small-button" type="submit">Send</button></form>{message && <p className="form-message">{message}</p>}</div></div></div></section>
 }
 
 function RequestsPage({ posts, user }) {
@@ -797,7 +921,9 @@ function ProfileEditor({ user }) {
 
 function DashboardLayout({ user, eyebrow, title, description, children }) {
   const hasSidebar = user.role === 'customer' || user.role === 'technician' || user.role === 'admin'
-  const [activeSection, setActiveSection] = useState(user.role === 'admin' ? 'admin-overview' : 'dashboard-overview')
+  const requestedSection = getRouteQueryValue('section')
+  const requestedTaskId = getRouteQueryValue('taskId')
+  const [activeSection, setActiveSection] = useState(requestedSection || (user.role === 'admin' ? 'admin-overview' : 'dashboard-overview'))
   const navigation = user.role === 'admin'
     ? [['admin-overview', 'Overview'], ['admin-applications', 'Applications'], ['admin-users', 'Users'], ['admin-requests', 'Requests'], ['admin-tasks', 'Tasks'], ['admin-technicians', 'Technicians'], ['admin-reports', 'Reports & disputes'], ['admin-safety', 'Safety & audit'], ['admin-archive', 'Archived accounts'], ['dashboard-profile', 'Edit profile']]
     : user.role === 'customer'
@@ -823,10 +949,29 @@ function DashboardLayout({ user, eyebrow, title, description, children }) {
     'technician-active': 'Manage the jobs customers have accepted.',
     'technician-history': 'Look back at completed and closed jobs.',
   }
+  useEffect(() => {
+    if (!/^\d+$/.test(requestedTaskId || '')) return undefined
+    const root = document.querySelector('.dashboard-content')
+    if (!root) return undefined
+    const selector = `[data-task-id="${requestedTaskId}"]`
+    const revealTarget = () => {
+      const target = root.querySelector(selector)
+      if (!target) return false
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target.classList.add('task-notification-target')
+      return true
+    }
+    if (revealTarget()) return undefined
+    const observer = new MutationObserver(() => {
+      if (revealTarget()) observer.disconnect()
+    })
+    observer.observe(root, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [requestedTaskId, activeSection])
   const activeLabel = navigation.find(([id]) => id === activeSection)?.[1] || 'Overview'
   const dashboardContent = <>
     {user.role === 'customer' && <section className="dashboard-anchor" id="dashboard-reviews" data-dashboard-section="dashboard-reviews" aria-label="Reviews"><ReviewPanel active={activeSection === 'dashboard-reviews'} /></section>}
-    {user.role !== 'admin' && <div id="dashboard-messages" data-dashboard-section="dashboard-messages"><MessagesPanel /></div>}
+    {user.role !== 'admin' && <div id="dashboard-messages" data-dashboard-section="dashboard-messages"><MessagesPanel key={requestedTaskId || 'default'} /></div>}
     {user.role === 'admin' && <div data-dashboard-section="admin-reports"><AdminReportsPanel /></div>}
     {user.role === 'admin' && <div data-dashboard-section="admin-safety"><AdminTools /></div>}
     {user.role === 'admin' && <div data-dashboard-section="admin-archive"><ArchivedUsersPanel /></div>}
@@ -911,6 +1056,11 @@ function CustomerDashboard({ user }) {
   }
 
   const updateBid = async (taskId, status) => {
+    const bid = posts.find((item) => item.taskId === taskId)
+    if (status === 'accepted' && !bid?.serviceAddress?.trim()) {
+      setMessage("Add this request's service address before accepting an offer.")
+      return
+    }
     try {
       await request(`/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
       setMessage(status === 'accepted' ? 'Bid accepted.' : 'Bid declined.')
@@ -937,7 +1087,7 @@ function CustomerDashboard({ user }) {
         <label className="dashboard-search">Search requests<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Description or category" /></label>
         <button className="primary-button" type="button" onClick={() => { setShowForm((visible) => !visible); setMessage('') }}>{showForm ? 'Close form' : 'New request'}</button>
       </div>
-      {showForm && <div className="panel request-create-panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" maxLength="2000" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><fieldset className="request-location-fields"><legend>Where should the technician come?</legend><label>Service address <span className="muted-label">(street, area, city)</span><input autoComplete="street-address" maxLength="500" value={form.serviceAddress} onChange={(event) => setForm({ ...form, serviceAddress: event.target.value })} required placeholder="Road, neighbourhood, city" /></label><div className="form-row"><label>Building / house name <span className="muted-label">(optional)</span><input maxLength="150" value={form.building} onChange={(event) => setForm({ ...form, building: event.target.value })} placeholder="Building or house name" /></label><label>Flat / unit number <span className="muted-label">(optional)</span><input maxLength="100" value={form.flatNo} onChange={(event) => setForm({ ...form, flatNo: event.target.value })} placeholder="Flat or unit" /></label></div><p className="muted-label">Your exact address stays private from other customers and technicians who have not been selected for this job.</p></fieldset><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button></form></div>}
+      {showForm && <div className="panel request-create-panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" maxLength="2000" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /><span className="muted-label">Do not include your phone number, email, or exact address here. The address section is private until a technician is selected.</span></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><fieldset className="request-location-fields"><legend>Where should the technician come?</legend><label>Service address <span className="muted-label">(street, area, city)</span><input autoComplete="street-address" maxLength="500" value={form.serviceAddress} onChange={(event) => setForm({ ...form, serviceAddress: event.target.value })} required placeholder="Road, neighbourhood, city" /></label><div className="form-row"><label>Building / house name <span className="muted-label">(optional)</span><input maxLength="150" value={form.building} onChange={(event) => setForm({ ...form, building: event.target.value })} placeholder="Building or house name" /></label><label>Flat / unit number <span className="muted-label">(optional)</span><input maxLength="100" value={form.flatNo} onChange={(event) => setForm({ ...form, flatNo: event.target.value })} placeholder="Flat or unit" /></label></div><p className="muted-label">Your exact address stays private from other customers and technicians who have not been selected for this job.</p></fieldset><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button></form></div>}
       {message && <p className="form-message" role="status">{message}</p>}
       {loading ? <LoadingState text="Loading your requests..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : visiblePosts.length ? <div className="customer-request-list">{visiblePosts.map((post) => {
         const bids = posts.filter((bid) => bid.id === post.id && bid.taskId)
@@ -946,9 +1096,10 @@ function CustomerDashboard({ user }) {
         const state = bids.find((bid) => ['accepted', 'scheduled', 'in_progress'].includes(bid.status))?.status
           || (bids.some((bid) => bid.status === 'completed') ? 'completed' : bids.some((bid) => bid.status === 'cancelled') ? 'cancelled' : 'waiting')
         return <article className="customer-request-item" key={post.id}>
-          <div className="customer-request-heading"><div>{post.image && <img className="activity-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h2>{post.detail}</h2><span className="muted-label">{bids.length} {bids.length === 1 ? 'bid' : 'bids'}</span></div><span className={`dashboard-status status-${state}`}>{hasAttention ? 'Review bids' : state === 'waiting' ? 'Waiting for bids' : state.replace('_', ' ')}</span></div>
+          <div className="customer-request-heading"><div>{post.image && <img className="activity-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h2>{post.detail}</h2><span className="muted-label">{bids.length} {bids.length === 1 ? 'bid' : 'bids'} · {bids.filter((bid) => bid.status === 'pending').length} pending</span></div><span className={`dashboard-status status-${post.closedAt ? 'closed' : state}`}>{post.closedAt ? 'Closed' : hasAttention ? 'Review bids' : state === 'waiting' ? 'Waiting for bids' : state.replace('_', ' ')}</span></div>
           {post.serviceAddress && <p className="customer-request-location"><strong>Service location:</strong> {[post.serviceAddress, post.building, post.flatNo ? `Flat ${post.flatNo}` : ''].filter(Boolean).join(', ')}</p>}
-          {bids.length > 0 && <div className="customer-bid-list">{bids.map((bid) => <div className="customer-bid-entry" key={bid.taskId}><div className="customer-bid-row"><div><strong>{bid.technicianName || 'Approved technician'}</strong><span>{bid.technicianSkills || 'Technician application approved'}{bid.proposedAt ? ` · Proposed ${new Date(bid.proposedAt).toLocaleString()}` : ' · Appointment time not provided'}</span></div><strong className="bid-price">৳{bid.price}</strong>{bid.status === 'pending' ? <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(bid.taskId, 'accepted')}>Accept</button><button className="quiet-button" type="button" onClick={() => updateBid(bid.taskId, 'rejected')}>Decline</button></div> : <span className={`table-status status-${bid.status}`}>{bid.status.replace('_', ' ')}</span>}</div>{bid.status === 'pending' && <PendingTechnicianOverview taskId={bid.taskId} />}{['pending', 'accepted', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(bid.status) && <TaskLifecyclePanel task={bid} userRole="customer" onUpdated={load} />}</div>)}</div>}
+          <CustomerRequestControls post={post} bids={bids} onUpdated={load} />
+          {bids.length > 0 && <div className="customer-bid-list">{bids.map((bid) => <div className="customer-bid-entry" key={bid.taskId} data-task-id={bid.taskId}><div className="customer-bid-row"><div><strong>{bid.technicianName || 'Approved technician'}</strong><span>{bid.technicianSkills || 'Technician application approved'}{bid.proposedAt ? ` · Proposed ${new Date(bid.proposedAt).toLocaleString()}` : ' · Appointment time not provided'}</span></div><strong className="bid-price">৳{bid.price}</strong>{bid.status === 'pending' ? <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(bid.taskId, 'accepted')}>Accept</button><button className="quiet-button" type="button" onClick={() => updateBid(bid.taskId, 'rejected')}>Decline</button></div> : <span className={`table-status status-${bid.status}`}>{bid.status.replace('_', ' ')}</span>}</div>{bid.priceDetails && <p className="offer-price-details"><strong>Price includes:</strong> {bid.priceDetails}</p>}{bid.status === 'pending' && <PendingTechnicianOverview taskId={bid.taskId} />}{['pending', 'accepted', 'scheduled', 'in_progress', 'completed', 'cancelled', 'rejected', 'withdrawn'].includes(bid.status) && <TaskLifecyclePanel task={bid} userRole="customer" onUpdated={load} />}</div>)}</div>}
           {acceptedBid && <AcceptedTechnicianProfile technician={acceptedBid} />}
         </article>
       })}</div> : <EmptyState text={posts.length ? 'No requests match your filters.' : 'Your requests will appear here after you post one.'} />}
@@ -960,6 +1111,7 @@ function TechnicianDashboard({ user }) {
   const [requests, setRequests] = useState([])
   const [tasks, setTasks] = useState([])
   const [prices, setPrices] = useState({})
+  const [priceDetails, setPriceDetails] = useState({})
   const [scheduleDrafts, setScheduleDrafts] = useState({})
   const [message, setMessage] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -989,7 +1141,20 @@ function TechnicianDashboard({ user }) {
     const price = Number(prices[postId])
     if (!Number.isFinite(price) || price <= 0 || Math.round(price * 100) !== price * 100) { setMessage('Enter a positive price with at most two decimal places.'); return }
     if (!scheduleDrafts[postId]) { setMessage('Choose your proposed appointment date and time.'); return }
-    try { await request('/tasks/bid', { method: 'POST', body: JSON.stringify({ postId, price, proposedAt: dateTimeToIso(scheduleDrafts[postId]) }) }); setMessage('Offer and proposed appointment sent.'); await load() } catch (error) { setMessage(error.message) }
+    if ((priceDetails[postId] || '').trim().length < 10) { setMessage('Explain what the price includes and whether it may change.'); return }
+    try { await request('/tasks/bid', { method: 'POST', body: JSON.stringify({ postId, price, priceDetails: priceDetails[postId], proposedAt: dateTimeToIso(scheduleDrafts[postId]) }) }); setMessage('Offer and proposed appointment sent.'); await load() } catch (error) { setMessage(error.message) }
+  }
+  const withdrawOffer = async (taskId) => {
+    const reason = window.prompt('Why are you withdrawing this offer? (At least 5 characters)')
+    if (reason === null) return
+    if (reason.trim().length < 5) { setMessage('Provide a withdrawal reason of at least 5 characters.'); return }
+    try {
+      const result = await request(`/technician/tasks/${taskId}/withdraw`, { method: 'POST', body: JSON.stringify({ reason }) })
+      setMessage(result.message)
+      await load()
+    } catch (error) {
+      setMessage(error.message)
+    }
   }
   const updateTask = async (taskId, status) => { try { await request(`/technician/tasks/${taskId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setMessage(status === 'completed' ? 'Job marked complete.' : 'Job started.'); await load() } catch (error) { setMessage(error.message) } }
   const categories = ['all', ...new Set(requests.map((item) => item.category).filter(Boolean))]
@@ -998,16 +1163,16 @@ function TechnicianDashboard({ user }) {
   const visibleRequests = matchingRequestList.filter((item) => `${item.detail} ${item.category} ${item.subCategory || ''}`.toLowerCase().includes(query.trim().toLowerCase()) && (category === 'all' || item.category === category))
   const pendingBids = tasks.filter((task) => task.status === 'pending')
   const activeTasks = tasks.filter((task) => ['accepted', 'scheduled', 'in_progress'].includes(task.status))
-  const completedTasks = tasks.filter((task) => ['completed', 'rejected', 'cancelled'].includes(task.status))
+  const completedTasks = tasks.filter((task) => ['completed', 'rejected', 'withdrawn', 'cancelled'].includes(task.status))
   return <DashboardLayout user={user} eyebrow="Technician workspace" title="Your work, clearly queued." description="Find suitable requests, manage offers, and move accepted jobs forward.">
     <section className="technician-dashboard page-width" id="dashboard-overview">
       <div className="dashboard-summary" data-dashboard-section="dashboard-overview" aria-label="Work summary"><div><strong>{requests.length}</strong><span>Open requests</span></div><div><strong>{pendingBids.length}</strong><span>Pending bids</span></div><div><strong>{activeTasks.length}</strong><span>Active jobs</span></div><div><strong>{tasks.filter((task) => task.status === 'completed').length}</strong><span>Completed</span></div></div>
       {message && <p className="form-message" role="status">{message}</p>}
       {loading ? <LoadingState text="Loading your work..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : <>
-        <section className="panel" id="technician-opportunities" data-dashboard-section="technician-opportunities"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label><label className="matching-toggle"><input type="checkbox" checked={localMatchesOnly} onChange={(event) => setLocalMatchesOnly(event.target.checked)} />Show matching service-area requests only ({matchedRequests.length})</label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}{item.areaMatch ? ' · Nearby match' : ''}</span><h3>{item.detail}</h3><p>{item.customerName || 'Anonymous customer'} · {item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="offer-inputs"><label>Offer price<input type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /></label><label>Proposed appointment<input type="datetime-local" value={scheduleDrafts[item.id] || ''} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [item.id]: event.target.value })} /></label><button className="small-button" type="button" onClick={() => bid(item.id)}>Send offer</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
-        <section className="panel" id="technician-offers" data-dashboard-section="technician-offers"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><input type="datetime-local" aria-label={`Proposed appointment for ${task.detail}`} value={scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt)} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [`task-${task.id}`]: event.target.value })} /><button className="small-button" type="button" onClick={async () => { const schedule = scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt); try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price, proposedAt: dateTimeToIso(schedule) }) }); setMessage('Offer updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update offer</button></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
-        <section className="panel" id="technician-active" data-dashboard-section="technician-active"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} />{task.status === 'scheduled' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div><TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} /></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
-        <section className="panel history-panel" id="technician-history" data-dashboard-section="technician-history"><div className="panel-heading"><div><p className="eyebrow">Work history</p><h2>Completed and closed jobs</h2></div><span className="count-badge">{completedTasks.length}</span></div>{completedTasks.length > 0 ? <div className="activity-list">{completedTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} /><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></div>{task.status === 'completed' && <TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} />}</article>)}</div> : <EmptyState text="Completed and closed jobs will appear here." />}</section>
+        <section className="panel" id="technician-opportunities" data-dashboard-section="technician-opportunities"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label><label className="matching-toggle"><input type="checkbox" checked={localMatchesOnly} onChange={(event) => setLocalMatchesOnly(event.target.checked)} />Show matching service-area requests only ({matchedRequests.length})</label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}{item.areaMatch ? ' · Nearby match' : ''}</span><h3>{item.detail}</h3><p>{item.customerName || 'Anonymous customer'} · {item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="offer-inputs"><label>Offer price<input type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /></label><label>Proposed appointment<input type="datetime-local" value={scheduleDrafts[item.id] || ''} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [item.id]: event.target.value })} /></label><label className="offer-details-field">What does this include?<textarea rows="2" maxLength="500" minLength="10" value={priceDetails[item.id] || ''} onChange={(event) => setPriceDetails({ ...priceDetails, [item.id]: event.target.value })} placeholder="Labor, parts, call-out fee, and whether the price can change" required /></label><button className="small-button" type="button" onClick={() => bid(item.id)}>Send offer</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
+        <section className="panel" id="technician-offers" data-dashboard-section="technician-offers"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id} data-task-id={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><input type="datetime-local" aria-label={`Proposed appointment for ${task.detail}`} value={scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt)} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [`task-${task.id}`]: event.target.value })} /><textarea aria-label={`Price inclusions for ${task.detail}`} maxLength="500" minLength="10" value={priceDetails[`task-${task.id}`] ?? task.priceDetails ?? ''} onChange={(event) => setPriceDetails({ ...priceDetails, [`task-${task.id}`]: event.target.value })} placeholder="Labor, parts, call-out fee, price changes" /><div className="bid-editor-actions"><button className="small-button" type="button" onClick={async () => { const schedule = scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt); const details = priceDetails[`task-${task.id}`] ?? task.priceDetails ?? ''; if (details.trim().length < 10) { setMessage('Explain what the price includes and whether it may change.'); return } try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price, priceDetails: details, proposedAt: dateTimeToIso(schedule) }) }); setMessage('Offer updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update offer</button><button className="quiet-button danger-button" type="button" onClick={() => withdrawOffer(task.id)}>Withdraw offer</button></div></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
+        <section className="panel" id="technician-active" data-dashboard-section="technician-active"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item task-activity-item" key={task.id} data-task-id={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} />{task.status === 'scheduled' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div><TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} /></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
+        <section className="panel history-panel" id="technician-history" data-dashboard-section="technician-history"><div className="panel-heading"><div><p className="eyebrow">Work history</p><h2>Completed and closed jobs</h2></div><span className="count-badge">{completedTasks.length}</span></div>{completedTasks.length > 0 ? <div className="activity-list">{completedTasks.map((task) => <article className="activity-item task-activity-item" key={task.id} data-task-id={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} /><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></div>{['completed', 'withdrawn', 'rejected'].includes(task.status) && <TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} />}</article>)}</div> : <EmptyState text="Completed and closed jobs will appear here." />}</section>
       </>}
     </section>
   </DashboardLayout>
@@ -1063,6 +1228,7 @@ function AdminDashboard({ user }) {
 
 function App() {
   const path = usePath()
+  const routePath = path.split('?')[0]
   const [user, setUser] = useState(getStoredUser)
   const userRole = user?.role
   const [postsState, setPostsState] = useState({ role: userRole, posts: [], loading: true, error: '' })
@@ -1085,14 +1251,14 @@ function App() {
     return () => { active = false }
   }, [userRole])
   useEffect(() => { const sync = () => setUser(getStoredUser()); window.addEventListener('storage', sync); window.addEventListener('helplagbe-auth', sync); return () => { window.removeEventListener('storage', sync); window.removeEventListener('helplagbe-auth', sync) } }, [])
-  if (path === '/login') return <AuthPage key={path} mode="login" />
-  if (path === '/register') return <AuthPage key={path} mode="register" />
-  if (path === '/register-technician') return <AuthPage key={path} mode="technician" />
-  if (path === '/requests') return <RequestsPage posts={posts} user={user} />
-  if (path === '/technicians') return <TechniciansPage user={user} />
-  if (path === '/customer' || path === '/customer/new-request') return user?.role === 'customer' ? <CustomerDashboard user={user} /> : <AuthPage mode="login" />
-  if (path === '/technician') return user?.role === 'technician' ? <TechnicianDashboard user={user} /> : <AuthPage mode="login" />
-  if (path === '/admin') return user?.role === 'admin' ? <AdminDashboard user={user} /> : <AuthPage mode="login" />
+  if (routePath === '/login') return <AuthPage key={routePath} mode="login" />
+  if (routePath === '/register') return <AuthPage key={routePath} mode="register" />
+  if (routePath === '/register-technician') return <AuthPage key={routePath} mode="technician" />
+  if (routePath === '/requests') return <RequestsPage posts={posts} user={user} />
+  if (routePath === '/technicians') return <TechniciansPage user={user} />
+  if (routePath === '/customer' || routePath === '/customer/new-request') return user?.role === 'customer' ? <CustomerDashboard key={path} user={user} /> : <AuthPage mode="login" />
+  if (routePath === '/technician') return user?.role === 'technician' ? <TechnicianDashboard key={path} user={user} /> : <AuthPage mode="login" />
+  if (routePath === '/admin') return user?.role === 'admin' ? <AdminDashboard key={path} user={user} /> : <AuthPage mode="login" />
   return <Home posts={posts} postsLoading={postsLoading} postsError={postsError} user={user} />
 }
 

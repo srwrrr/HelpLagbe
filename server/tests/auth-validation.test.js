@@ -76,6 +76,26 @@ test('technician previews are limited to authenticated customers', async () => {
   assert.equal(response.status, 403)
 })
 
+test('closing a request and withdrawing an offer require a reason', async () => {
+  const closeResponse = await request(app)
+    .post('/api/customer/posts/1/close')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ reason: 'No' })
+  assert.equal(closeResponse.status, 400)
+  assert.equal(closeResponse.body.message, 'Provide a reason between 5 and 500 characters.')
+
+  const technicianToken = jwt.sign(
+    { userId: 2, role: 'technician' },
+    process.env.JWT_SECRET || 'helplagbe-local-development-secret',
+  )
+  const withdrawResponse = await request(app)
+    .post('/api/technician/tasks/1/withdraw')
+    .set('Authorization', `Bearer ${technicianToken}`)
+    .send({ reason: 'No' })
+  assert.equal(withdrawResponse.status, 400)
+  assert.equal(withdrawResponse.body.message, 'Provide a withdrawal reason between 5 and 500 characters.')
+})
+
 test('technician registration validates credentials before opening a database connection', async () => {
   const response = await request(app)
     .post('/api/auth/register-technician')
@@ -143,6 +163,38 @@ test('offers require a future proposed appointment before database access', asyn
 
   assert.equal(response.status, 400)
   assert.equal(response.body.message, 'Choose a proposed appointment date and time in the future.')
+
+  const missingPriceDetails = await request(app)
+    .post('/api/tasks/bid')
+    .set('Authorization', `Bearer ${technicianToken}`)
+    .send({
+      postId: 1,
+      price: 250,
+      priceDetails: 'x'.repeat(501),
+      proposedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+  assert.equal(missingPriceDetails.status, 400)
+  assert.equal(missingPriceDetails.body.message, 'Price details must be 500 characters or fewer.')
+})
+
+test('price changes require valid amounts, an explanation, and an explicit decision', async () => {
+  const technicianToken = jwt.sign(
+    { userId: 2, role: 'technician' },
+    process.env.JWT_SECRET || 'helplagbe-local-development-secret',
+  )
+  const missingExplanation = await request(app)
+    .post('/api/tasks/1/price-change')
+    .set('Authorization', `Bearer ${technicianToken}`)
+    .send({ proposedPrice: 300 })
+  assert.equal(missingExplanation.status, 400)
+  assert.equal(missingExplanation.body.message, 'Explain the price change in 5 to 450 characters.')
+
+  const missingDecision = await request(app)
+    .post('/api/tasks/1/price-change/decision')
+    .set('Authorization', `Bearer ${technicianToken}`)
+    .send({})
+  assert.equal(missingDecision.status, 400)
+  assert.equal(missingDecision.body.message, 'Choose whether to accept the proposed price change.')
 })
 
 test('rescheduling and cancellation require a future time and an explanation', async () => {

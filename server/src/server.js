@@ -171,6 +171,8 @@ async function ensureNotificationTable() {
     message VARCHAR(500) NOT NULL,
     read_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    target_type VARCHAR(40) NULL,
+    target_id INT NULL,
     PRIMARY KEY (notification_id),
     KEY idx_notifications_user (user_id, created_at),
     CONSTRAINT notifications_user_fk FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -260,8 +262,10 @@ async function ensureNotificationTable() {
   const [taskStatusColumns] = await pool.execute(
     "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'task_status'",
   )
-  if (taskStatusColumns[0] && !String(taskStatusColumns[0].COLUMN_TYPE).includes("'scheduled'")) {
-    await pool.query("ALTER TABLE tasks MODIFY task_status ENUM('pending','accepted','scheduled','rejected','in_progress','completed','cancelled') DEFAULT 'pending'")
+  if (taskStatusColumns[0]
+    && (!String(taskStatusColumns[0].COLUMN_TYPE).includes("'scheduled'")
+      || !String(taskStatusColumns[0].COLUMN_TYPE).includes("'withdrawn'"))) {
+    await pool.query("ALTER TABLE tasks MODIFY task_status ENUM('pending','accepted','scheduled','rejected','withdrawn','in_progress','completed','cancelled') DEFAULT 'pending'")
   }
   const additions = [
     ['tasks', 'proposed_at', 'DATETIME NULL'],
@@ -271,6 +275,12 @@ async function ensureNotificationTable() {
     ['tasks', 'cancel_reason', 'VARCHAR(500) NULL'],
     ['tasks', 'cancelled_at', 'DATETIME NULL'],
     ['tasks', 'agreed_price', 'DECIMAL(10,2) NULL'],
+    ['tasks', 'price_details', 'VARCHAR(500) NULL'],
+    ['tasks', 'price_change_proposed', 'DECIMAL(10,2) NULL'],
+    ['tasks', 'price_change_reason', 'VARCHAR(500) NULL'],
+    ['tasks', 'price_change_proposed_by', 'INT NULL'],
+    ['notifications', 'target_type', 'VARCHAR(40) NULL'],
+    ['notifications', 'target_id', 'INT NULL'],
     ['tasks', 'payment_status', "ENUM('unpaid','paid') NOT NULL DEFAULT 'unpaid'"],
     ['tasks', 'payment_method', "ENUM('cash','bank_transfer','other') NULL"],
     ['tasks', 'customer_paid_confirmed_at', 'DATETIME NULL'],
@@ -282,6 +292,8 @@ async function ensureNotificationTable() {
     ['posts', 'service_address', 'VARCHAR(500) NULL'],
     ['posts', 'building', 'VARCHAR(150) NULL'],
     ['posts', 'flat_no', 'VARCHAR(100) NULL'],
+    ['posts', 'closed_at', 'DATETIME NULL'],
+    ['posts', 'close_reason', 'VARCHAR(500) NULL'],
     ['marketplace_reports', 'task_detail', 'VARCHAR(2000) NULL'],
     ['marketplace_reports', 'reported_content', 'VARCHAR(1000) NULL'],
   ]
@@ -294,9 +306,12 @@ async function ensureNotificationTable() {
   }
 }
 
-async function createNotification(userId, type, title, message) {
+async function createNotification(userId, type, title, message, targetType = null, targetId = null) {
   if (!userId) return
-  await pool.execute('INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)', [userId, type, title, message])
+  await pool.execute(
+    'INSERT INTO notifications (user_id, type, title, message, target_type, target_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [userId, type, title, message, targetType, targetId],
+  )
 }
 
 async function createAudit(adminId, action, targetType, targetId, details) {
@@ -310,6 +325,14 @@ function toCsvCell(value) {
   const text = String(value ?? '')
   const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text
   return `"${safeText.replace(/"/g, '""')}"`
+}
+
+function redactPersonalDetails(value) {
+  return String(value ?? '')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email removed]')
+    .replace(/(?:\+?880[\s-]?)?0?1[3-9](?:[\s-]?\d){8}\b/g, '[phone removed]')
+    .replace(/\b\d{1,5}\s+[\w.-]+(?:\s+[\w.-]+){0,3}\s+(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|block|boulevard|blvd\.?)\b[^,;\n]*/gi, '[address removed]')
+    .replace(/\b(?:phone|mobile|email|address|flat|apartment|house|road|street|block|holding)\s*(?:(?:number|no\.?|#)\s*[:=-]?\s*|[:=]\s*|is\s+)[^,;\n]+/gi, '[private details removed]')
 }
 
 async function recordTaskEvent(connection, taskId, actorId, eventType, fromStatus, toStatus, scheduledFor = null, reason = null) {
@@ -409,7 +432,8 @@ app.get('/api/health', async (_request, response) => {
 app.get('/api/notifications', authenticate, async (request, response) => {
   try {
     const [rows] = await pool.execute(
-      `SELECT notification_id AS id, type, title, message, read_at AS readAt, created_at AS createdAt
+      `SELECT notification_id AS id, type, title, message, target_type AS targetType, target_id AS targetId,
+              read_at AS readAt, created_at AS createdAt
        FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 30`,
       [request.user.userId],
     )
@@ -487,7 +511,7 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
     await pool.execute('INSERT INTO task_messages (task_id, sender_id, body) VALUES (?, ?, ?)', [request.params.taskId, request.user.userId, body])
     const recipient = Number(access[0].customerId) === Number(request.user.userId) ? access[0].technicianUserId : access[0].customerId
     try {
-      await createNotification(recipient, 'message', 'New task message', `You have a new message about: ${access[0].Post_detail}`)
+      await createNotification(recipient, 'message', 'New task message', `You have a new message about: ${access[0].Post_detail}`, 'task', access[0].task_id)
     } catch (error) {
       console.error('Could not create message notification.', error.message)
     }
@@ -515,21 +539,22 @@ app.get('/api/posts', optionalAuthenticate, async (request, response) => {
       values.push(`%${search}%`, `%${search}%`)
     }
 
-    const whereClause = filters.length ? `WHERE ${filters.join(' AND ')}` : ''
     const [rows] = await pool.execute(
-      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt, COUNT(t.task_id) AS bidCount,
+      `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt,
+              COUNT(CASE WHEN t.task_status = 'pending' THEN 1 END) AS bidCount,
               CASE WHEN EXISTS (SELECT 1 FROM technician viewerTech WHERE viewerTech.user_id = ? AND viewerTech.status = 'approved') THEN customer.username ELSE NULL END AS customerName
        FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
-       LEFT JOIN tasks t ON t.post_id = p.post_id ${whereClause}
+       LEFT JOIN tasks t ON t.post_id = p.post_id
+       WHERE p.closed_at IS NULL ${filters.length ? `AND ${filters.join(' AND ')}` : ''}
        GROUP BY p.post_id, p.Post_detail, p.Category, p.\`Sub-Category\`, p.Image, p.created_at, customer.username
        ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
       [technicianViewerId, ...values, limit, offset],
     )
     const [totalRows] = await pool.execute(
-      `SELECT COUNT(*) AS total FROM posts p ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM posts p WHERE p.closed_at IS NULL ${filters.length ? `AND ${filters.join(' AND ')}` : ''}`,
       values,
     )
-    response.json({ items: rows, pagination: { page, limit, total: Number(totalRows[0]?.total || 0) } })
+    response.json({ items: rows.map((row) => ({ ...row, detail: redactPersonalDetails(row.detail) })), pagination: { page, limit, total: Number(totalRows[0]?.total || 0) } })
   } catch (error) {
     response.status(500).json({ message: 'Could not load service requests.' })
   }
@@ -667,6 +692,150 @@ app.post('/api/posts', authenticate, async (request, response) => {
   }
 })
 
+app.patch('/api/customer/posts/:postId', authenticate, async (request, response) => {
+  if (request.user.role !== 'customer') return response.status(403).json({ message: 'Only customers can edit their requests.' })
+  const body = request.body && typeof request.body === 'object' ? request.body : {}
+  const detail = sanitizeText(body.detail, 2000)
+  const requestedCategory = sanitizeText(body.category, 100)
+  const subCategory = sanitizeText(body.subCategory, 100)
+  const serviceAddress = sanitizeText(body.serviceAddress, 500)
+  const building = sanitizeText(body.building, 150)
+  const flatNo = sanitizeText(body.flatNo, 100)
+  const categories = ['Appliance', 'Plumbing', 'Electrical', 'Home maintenance', 'Computer']
+  const category = categories.find((item) => item.toLowerCase() === requestedCategory.toLowerCase())
+  if (detail.length < 10 || (typeof body.detail === 'string' && body.detail.trim().length > 2000)) {
+    return response.status(400).json({ message: 'Request details must be between 10 and 2000 characters.' })
+  }
+  if (!category) return response.status(400).json({ message: 'Choose a valid service category.' })
+  if (serviceAddress.length < 5 || (typeof body.serviceAddress === 'string' && body.serviceAddress.trim().length > 500)) {
+    return response.status(400).json({ message: 'Enter a service address between 5 and 500 characters.' })
+  }
+  if ((typeof body.subCategory === 'string' && body.subCategory.trim().length > 100)
+    || (typeof body.building === 'string' && body.building.trim().length > 150)
+    || (typeof body.flatNo === 'string' && body.flatNo.trim().length > 100)) {
+    return response.status(400).json({ message: 'Subcategory, building, or flat details exceed the allowed length.' })
+  }
+
+  const connection = await pool.getConnection()
+  let affectedTechnicians = []
+  try {
+    await connection.beginTransaction()
+    const [posts] = await connection.execute(
+      'SELECT post_id, Post_detail, closed_at FROM posts WHERE post_id = ? AND user_id = ? LIMIT 1 FOR UPDATE',
+      [request.params.postId, request.user.userId],
+    )
+    const post = posts[0]
+    if (!post) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Request not found.' })
+    }
+    if (post.closed_at) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'Closed requests cannot be edited.' })
+    }
+    const [acceptedTasks] = await connection.execute(
+      "SELECT task_id FROM tasks WHERE post_id = ? AND task_status IN ('accepted','scheduled','in_progress','completed') LIMIT 1",
+      [post.post_id],
+    )
+    if (acceptedTasks[0]) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'Requests cannot be edited after a technician has been accepted.' })
+    }
+    const [pending] = await connection.execute(
+      "SELECT t.task_id, tech.user_id FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id WHERE t.post_id = ? AND t.task_status = 'pending'",
+      [post.post_id],
+    )
+    affectedTechnicians = pending.map((bid) => bid.user_id)
+    await connection.execute(
+      `UPDATE posts SET Post_detail = ?, Category = ?, \`Sub-Category\` = ?, service_address = ?,
+       building = ?, flat_no = ?, updated_at = NOW() WHERE post_id = ?`,
+      [detail, category, subCategory || null, serviceAddress, building || null, flatNo || null, post.post_id],
+    )
+    for (const bid of pending) {
+      await recordTaskEvent(connection, bid.task_id, request.user.userId, 'request_updated', 'pending', 'pending', null, 'Customer updated request details')
+    }
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    return response.status(500).json({ message: 'Could not update your request.' })
+  } finally {
+    connection.release()
+  }
+  for (const technicianUserId of affectedTechnicians) {
+    try {
+      await createNotification(technicianUserId, 'request_updated', 'Request details updated', 'A customer updated a request you bid on. Review the details before proceeding.', 'task', pending.find((bid) => bid.user_id === technicianUserId)?.task_id)
+    } catch (error) {
+      console.error('Could not notify bidder about request update.', error.message)
+    }
+  }
+  response.json({ message: 'Request updated. Pending bidders have been notified.' })
+})
+
+app.post('/api/customer/posts/:postId/close', authenticate, async (request, response) => {
+  if (request.user.role !== 'customer') return response.status(403).json({ message: 'Only customers can close their requests.' })
+  const reason = sanitizeText(request.body?.reason, 500)
+  if (reason.length < 5 || (typeof request.body?.reason === 'string' && request.body.reason.trim().length > 500)) {
+    return response.status(400).json({ message: 'Provide a reason between 5 and 500 characters.' })
+  }
+
+  const connection = await pool.getConnection()
+  let affectedTechnicians = []
+  try {
+    await connection.beginTransaction()
+    const [posts] = await connection.execute(
+      'SELECT post_id, closed_at FROM posts WHERE post_id = ? AND user_id = ? LIMIT 1 FOR UPDATE',
+      [request.params.postId, request.user.userId],
+    )
+    const post = posts[0]
+    if (!post) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Request not found.' })
+    }
+    if (post.closed_at) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'This request is already closed.' })
+    }
+    const [acceptedTasks] = await connection.execute(
+      "SELECT task_id FROM tasks WHERE post_id = ? AND task_status IN ('accepted','scheduled','in_progress','completed') LIMIT 1",
+      [post.post_id],
+    )
+    if (acceptedTasks[0]) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'A request with an accepted technician cannot be closed here. Cancel the task with its reason instead.' })
+    }
+    const [pending] = await connection.execute(
+      "SELECT t.task_id, tech.user_id FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id WHERE t.post_id = ? AND t.task_status = 'pending'",
+      [post.post_id],
+    )
+    affectedTechnicians = pending.map((bid) => bid.user_id)
+    await connection.execute(
+      'UPDATE posts SET closed_at = NOW(), close_reason = ?, updated_at = NOW() WHERE post_id = ?',
+      [reason, post.post_id],
+    )
+    for (const bid of pending) {
+      await connection.execute(
+        "UPDATE tasks SET task_status = 'rejected', updated_at = NOW() WHERE task_id = ? AND task_status = 'pending'",
+        [bid.task_id],
+      )
+      await recordTaskEvent(connection, bid.task_id, request.user.userId, 'request_closed', 'pending', 'rejected', null, reason)
+    }
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    return response.status(500).json({ message: 'Could not close your request.' })
+  } finally {
+    connection.release()
+  }
+  for (const technicianUserId of affectedTechnicians) {
+    try {
+      await createNotification(technicianUserId, 'request_closed', 'Request closed', 'A customer closed a request you bid on. Your offer is no longer active.', 'task', pending.find((bid) => bid.user_id === technicianUserId)?.task_id)
+    } catch (error) {
+      console.error('Could not notify bidder about request closure.', error.message)
+    }
+  }
+  response.json({ message: 'Request closed and pending offers were declined.' })
+})
+
 app.get('/api/technician/requests', authenticate, async (request, response) => {
   if (request.user.role !== 'technician') {
     return response.status(403).json({ message: 'Only technicians can view this workspace.' })
@@ -681,11 +850,12 @@ app.get('/api/technician/requests', authenticate, async (request, response) => {
               CASE WHEN EXISTS (SELECT 1 FROM technician approvedViewer WHERE approvedViewer.user_id = ? AND approvedViewer.status = 'approved') THEN customer.username ELSE NULL END AS customerName
        FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
        JOIN technician viewerTech ON viewerTech.user_id = ? AND viewerTech.status = 'approved'
-       WHERE NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN ('accepted', 'scheduled', 'in_progress', 'completed'))
+       WHERE p.closed_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN ('accepted', 'scheduled', 'in_progress', 'completed'))
        ORDER BY areaMatch DESC, p.created_at DESC LIMIT 30`,
       [request.user.userId, request.user.userId],
     )
-    response.json(rows)
+    response.json(rows.map((row) => ({ ...row, detail: redactPersonalDetails(row.detail) })))
   } catch (error) {
     response.status(500).json({ message: 'Could not load technician requests.' })
   }
@@ -698,11 +868,15 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
 
   const postId = Number(request.body?.postId)
   const price = Number(request.body?.price)
+  const priceDetails = sanitizeText(request.body?.priceDetails, 500)
   const proposedAt = normalizeFutureDateTime(request.body?.proposedAt)
   if (!Number.isInteger(postId) || postId < 1 || !Number.isFinite(price) || price <= 0 || price > 99999999.99 || Math.abs(price * 100 - Math.round(price * 100)) > 1e-8) {
     return response.status(400).json({ message: 'Enter a valid request and a positive price with at most two decimal places.' })
   }
   if (!proposedAt) return response.status(400).json({ message: 'Choose a proposed appointment date and time in the future.' })
+  if (typeof request.body?.priceDetails === 'string' && request.body.priceDetails.trim().length > 500) {
+    return response.status(400).json({ message: 'Price details must be 500 characters or fewer.' })
+  }
 
   const connection = await pool.getConnection()
   let notification
@@ -719,13 +893,17 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
     }
 
     const [posts] = await connection.execute(
-      'SELECT post_id, user_id, Post_detail FROM posts WHERE post_id = ? FOR UPDATE',
+      'SELECT post_id, user_id, Post_detail, closed_at FROM posts WHERE post_id = ? FOR UPDATE',
       [postId],
     )
     const post = posts[0]
     if (!post) {
       await connection.rollback()
       return response.status(404).json({ message: 'Service request not found.' })
+    }
+    if (post.closed_at) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'This request is closed and no longer accepting offers.' })
     }
     if (Number(post.user_id) === Number(request.user.userId)) {
       await connection.rollback()
@@ -744,16 +922,16 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
     const taskId = await nextGeneratedId(connection, 'helplagbe_tasks_task_id_seq')
     const [insertResult] = await connection.execute(
       usesTiDBSequences
-        ? 'INSERT INTO tasks (task_id, task_status, price, post_id, technician_id, proposed_at, technician_schedule_confirmed_at) VALUES (?, \'pending\', ?, ?, ?, ?, NOW())'
-        : 'INSERT INTO tasks (task_status, price, post_id, technician_id, proposed_at, technician_schedule_confirmed_at) VALUES (\'pending\', ?, ?, ?, ?, NOW())',
+        ? 'INSERT INTO tasks (task_id, task_status, price, price_details, post_id, technician_id, proposed_at, technician_schedule_confirmed_at) VALUES (?, \'pending\', ?, ?, ?, ?, ?, NOW())'
+        : 'INSERT INTO tasks (task_status, price, price_details, post_id, technician_id, proposed_at, technician_schedule_confirmed_at) VALUES (\'pending\', ?, ?, ?, ?, ?, NOW())',
       usesTiDBSequences
-        ? [taskId, price, postId, technician.technician_id, proposedAt]
-        : [price, postId, technician.technician_id, proposedAt],
+        ? [taskId, price, priceDetails, postId, technician.technician_id, proposedAt]
+        : [price, priceDetails, postId, technician.technician_id, proposedAt],
     )
     const generatedTaskId = insertResult.insertId || taskId
     await recordTaskEvent(connection, generatedTaskId, request.user.userId, 'offer_received', null, 'pending', proposedAt)
     await connection.commit()
-    notification = post
+    notification = { ...post, taskId: generatedTaskId }
   } catch (error) {
     await connection.rollback()
     if (error.code === 'ER_DUP_ENTRY') return response.status(409).json({ message: 'You already bid on this request.' })
@@ -763,7 +941,7 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
   }
 
   try {
-    await createNotification(notification.user_id, 'new_bid', 'New bid received', `A technician placed a bid on: ${notification.Post_detail}`)
+    await createNotification(notification.user_id, 'new_bid', 'New bid received', `A technician placed a bid on: ${notification.Post_detail}`, 'task', notification.taskId)
   } catch (error) {
     console.error('Could not create bid notification.', error.message)
   }
@@ -773,11 +951,15 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
 app.patch('/api/technician/tasks/:taskId/bid', authenticate, async (request, response) => {
   if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
   const price = Number(request.body?.price)
+  const priceDetails = sanitizeText(request.body?.priceDetails, 500)
   const proposedAt = normalizeFutureDateTime(request.body?.proposedAt)
   if (!Number.isFinite(price) || price <= 0 || price > 99999999.99 || Math.abs(price * 100 - Math.round(price * 100)) > 1e-8) {
     return response.status(400).json({ message: 'Enter a positive bid amount with at most two decimal places.' })
   }
   if (!proposedAt) return response.status(400).json({ message: 'Choose a proposed appointment date and time in the future.' })
+  if (typeof request.body?.priceDetails === 'string' && request.body.priceDetails.trim().length > 500) {
+    return response.status(400).json({ message: 'Price details must be 500 characters or fewer.' })
+  }
 
   const connection = await pool.getConnection()
   try {
@@ -793,9 +975,9 @@ app.patch('/api/technician/tasks/:taskId/bid', authenticate, async (request, res
     }
     const [result] = await connection.execute(
       `UPDATE tasks t JOIN technician tech ON tech.technician_id = t.technician_id
-       SET t.price = ?, t.proposed_at = ?, t.technician_schedule_confirmed_at = NOW(), t.updated_at = NOW()
+       SET t.price = ?, t.price_details = ?, t.proposed_at = ?, t.technician_schedule_confirmed_at = NOW(), t.updated_at = NOW()
        WHERE t.task_id = ? AND tech.user_id = ? AND t.task_status = 'pending'`,
-      [price, proposedAt, request.params.taskId, request.user.userId],
+      [price, priceDetails, proposedAt, request.params.taskId, request.user.userId],
     )
     if (!result.affectedRows) {
       await connection.rollback()
@@ -812,12 +994,57 @@ app.patch('/api/technician/tasks/:taskId/bid', authenticate, async (request, res
   }
 })
 
+app.post('/api/technician/tasks/:taskId/withdraw', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  const reason = sanitizeText(request.body?.reason, 500)
+  if (reason.length < 5 || (typeof request.body?.reason === 'string' && request.body.reason.trim().length > 500)) {
+    return response.status(400).json({ message: 'Provide a withdrawal reason between 5 and 500 characters.' })
+  }
+  const connection = await pool.getConnection()
+  let task
+  try {
+    await connection.beginTransaction()
+    const [rows] = await connection.execute(
+      `SELECT t.task_id, t.task_status, p.user_id AS customerId, p.Post_detail
+       FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id
+       JOIN posts p ON p.post_id = t.post_id
+       WHERE t.task_id = ? AND tech.user_id = ? LIMIT 1 FOR UPDATE`,
+      [request.params.taskId, request.user.userId],
+    )
+    task = rows[0]
+    if (!task || task.task_status !== 'pending') {
+      await connection.rollback()
+      return response.status(409).json({ message: 'Only your pending offers can be withdrawn.' })
+    }
+    await connection.execute(
+      "UPDATE tasks SET task_status = 'withdrawn', updated_at = NOW() WHERE task_id = ?",
+      [task.task_id],
+    )
+    await recordTaskEvent(connection, task.task_id, request.user.userId, 'offer_withdrawn', 'pending', 'withdrawn', null, reason)
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    return response.status(500).json({ message: 'Could not withdraw this offer.' })
+  } finally {
+    connection.release()
+  }
+  try {
+    await createNotification(task.customerId, 'bid_withdrawn', 'Technician withdrew an offer', `A technician withdrew their offer for: ${redactPersonalDetails(task.Post_detail)}`, 'task', task.task_id)
+  } catch (error) {
+    console.error('Could not notify customer about withdrawn offer.', error.message)
+  }
+  response.json({ message: 'Offer withdrawn and the customer has been notified.' })
+})
+
 app.get('/api/technician/tasks', authenticate, async (request, response) => {
   if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
 
   try {
     const [rows] = await pool.execute(
-      `SELECT t.task_id AS id, t.task_status AS status, t.price, COALESCE(t.agreed_price, t.price) AS agreedPrice,
+      `SELECT t.task_id AS id, t.task_status AS status, t.price, t.price_details AS priceDetails,
+              COALESCE(t.agreed_price, t.price) AS agreedPrice,
+              t.price_change_proposed AS priceChangeProposed, t.price_change_reason AS priceChangeReason,
+              t.price_change_proposed_by AS priceChangeProposedBy,
               DATE_FORMAT(t.proposed_at, '%Y-%m-%dT%H:%i:%s.000Z') AS proposedAt, t.customer_schedule_confirmed_at AS customerScheduleConfirmedAt,
               t.technician_schedule_confirmed_at AS technicianScheduleConfirmedAt,
               t.accepted_at AS acceptedAt, t.completed_at AS completedAt, t.cancel_reason AS cancelReason,
@@ -836,7 +1063,12 @@ app.get('/api/technician/tasks', authenticate, async (request, response) => {
        WHERE tech.user_id = ? ORDER BY t.updated_at DESC`,
       [request.user.userId],
     )
-    response.json(rows)
+    response.json(rows.map((row) => ({
+      ...row,
+      detail: ['accepted', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(row.status)
+        ? row.detail
+        : redactPersonalDetails(row.detail),
+    })))
   } catch (error) {
     response.status(500).json({ message: 'Could not load technician tasks.' })
   }
@@ -883,7 +1115,7 @@ app.patch('/api/technician/tasks/:taskId/status', authenticate, async (request, 
       )
       if (taskRows[0]) {
         try {
-          await createNotification(taskRows[0].user_id, 'task_completed', 'Task completed', `Your technician marked this task complete: ${taskRows[0].Post_detail}`)
+          await createNotification(taskRows[0].user_id, 'task_completed', 'Task completed', `Your technician marked this task complete: ${taskRows[0].Post_detail}`, 'task', taskRows[0].task_id)
         } catch (error) {
           console.error('Could not create completion notification.', error.message)
         }
@@ -920,7 +1152,10 @@ app.get('/api/admin/overview', authenticate, requireAdmin, async (_request, resp
        ORDER BY u.created_at DESC LIMIT 50`,
     )
     const [tasks] = await pool.query(
-      `SELECT t.task_id AS id, t.task_status AS status, t.price, COALESCE(t.agreed_price, t.price) AS agreedPrice,
+      `SELECT t.task_id AS id, t.task_status AS status, t.price, t.price_details AS priceDetails,
+              COALESCE(t.agreed_price, t.price) AS agreedPrice,
+              t.price_change_proposed AS priceChangeProposed, t.price_change_reason AS priceChangeReason,
+              t.price_change_proposed_by AS priceChangeProposedBy,
               t.payment_status AS paymentStatus, t.payment_method AS paymentMethod, t.receipt_number AS receiptNumber,
               p.Post_detail AS detail, p.Category AS category,
               customer.username AS customerName, tech.Full_Name AS technicianName,
@@ -1085,7 +1320,7 @@ app.patch('/api/admin/technicians/:technicianId/status', authenticate, requireAd
 
 app.patch('/api/admin/tasks/:taskId/status', authenticate, requireAdmin, async (request, response) => {
   const { status } = request.body
-  if (!['pending', 'accepted', 'scheduled', 'rejected', 'in_progress', 'completed', 'cancelled'].includes(status)) {
+  if (!['pending', 'accepted', 'scheduled', 'rejected', 'withdrawn', 'in_progress', 'completed', 'cancelled'].includes(status)) {
     return response.status(400).json({ message: 'Invalid task status.' })
   }
 
@@ -1242,7 +1477,8 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
     await insertSnapshotRows(connection, 'tasks', snapshot.tasks, [
       'task_id', 'task_status', 'price', 'post_id', 'technician_id', 'accepted_at', 'completed_at', 'created_at', 'updated_at',
       'proposed_at', 'customer_schedule_confirmed_at', 'technician_schedule_confirmed_at', 'cancelled_by', 'cancel_reason', 'cancelled_at',
-      'agreed_price', 'payment_status', 'payment_method', 'customer_paid_confirmed_at', 'technician_paid_confirmed_at', 'paid_at', 'receipt_number',
+      'agreed_price', 'price_details', 'price_change_proposed', 'price_change_reason', 'price_change_proposed_by',
+      'payment_status', 'payment_method', 'customer_paid_confirmed_at', 'technician_paid_confirmed_at', 'paid_at', 'receipt_number',
     ])
     await insertSnapshotRows(connection, 'task_feedback', snapshot.feedback, [
       'feedback_id', 'consumer_rating', 'consumer_feedback', 'technician_rating', 'technician_feedback', 'task_id', 'created_at', 'updated_at',
@@ -1264,7 +1500,7 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
         ],
       )
     }
-    await insertSnapshotRows(connection, 'notifications', snapshot.notifications, ['notification_id', 'user_id', 'type', 'title', 'message', 'read_at', 'created_at'])
+    await insertSnapshotRows(connection, 'notifications', snapshot.notifications, ['notification_id', 'user_id', 'type', 'title', 'message', 'target_type', 'target_id', 'read_at', 'created_at'])
     await insertSnapshotRows(connection, 'admin_user_controls', snapshot.controls, ['user_id', 'status', 'updated_by', 'updated_at'])
     await insertSnapshotRows(connection, 'website_feedback', snapshot.websiteFeedback, ['feedback_id', 'rating', 'feedback', 'user_id', 'created_at'])
     await connection.execute('DELETE FROM archived_users WHERE archive_id = ?', [archive.archive_id])
@@ -1335,9 +1571,12 @@ app.get('/api/customer/posts', authenticate, async (request, response) => {
   try {
     const [rows] = await pool.execute(
       `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category,
-              p.created_at AS createdAt, p.Image AS image, p.service_address AS serviceAddress,
-              p.building, p.flat_no AS flatNo, t.task_id AS taskId, t.price,
+              p.created_at AS createdAt, p.Image AS image, p.\`Sub-Category\` AS subCategory, p.service_address AS serviceAddress,
+              p.building, p.flat_no AS flatNo, p.closed_at AS closedAt, p.close_reason AS closeReason,
+              t.task_id AS taskId, t.price, t.price_details AS priceDetails,
               COALESCE(t.agreed_price, t.price) AS agreedPrice,
+              t.price_change_proposed AS priceChangeProposed, t.price_change_reason AS priceChangeReason,
+              t.price_change_proposed_by AS priceChangeProposedBy,
               t.task_status AS status, DATE_FORMAT(t.proposed_at, '%Y-%m-%dT%H:%i:%s.000Z') AS proposedAt,
               t.customer_schedule_confirmed_at AS customerScheduleConfirmedAt,
               t.technician_schedule_confirmed_at AS technicianScheduleConfirmedAt,
@@ -1406,14 +1645,15 @@ app.get('/api/customer/bids/:taskId/technician', authenticate, async (request, r
     const technician = technicians[0]
     if (!technician) return response.status(404).json({ message: 'Pending technician offer not found.' })
 
-    const [workHistory] = await pool.execute(
+    const [workHistoryRows] = await pool.execute(
       `SELECT p.Category AS category, p.Post_detail AS detail, t.completed_at AS completedAt
        FROM tasks t JOIN posts p ON p.post_id = t.post_id
        WHERE t.technician_id = ? AND t.task_status = 'completed'
        ORDER BY t.completed_at DESC, t.task_id DESC LIMIT 5`,
       [technician.id],
     )
-    const [reviews] = await pool.execute(
+    const workHistory = workHistoryRows.map((job) => ({ ...job, detail: redactPersonalDetails(job.detail) }))
+    const [reviewRows] = await pool.execute(
       `SELECT feedback.consumer_rating AS rating, feedback.consumer_feedback AS feedback,
               feedback.created_at AS createdAt
        FROM tasks t JOIN task_feedback feedback ON feedback.task_id = t.task_id
@@ -1421,6 +1661,7 @@ app.get('/api/customer/bids/:taskId/technician', authenticate, async (request, r
        ORDER BY feedback.created_at DESC, feedback.feedback_id DESC LIMIT 5`,
       [technician.id],
     )
+    const reviews = reviewRows.map((review) => ({ ...review, feedback: redactPersonalDetails(review.feedback) }))
     response.json({ ...technician, workHistory, reviews })
   } catch (error) {
     response.status(500).json({ message: 'Could not load the technician overview.' })
@@ -1487,7 +1728,7 @@ app.patch('/api/tasks/:taskId/status', authenticate, async (request, response) =
   try {
     await connection.beginTransaction()
     const [tasks] = await connection.execute(
-      `SELECT t.task_id, t.post_id, t.technician_id, t.task_status, t.proposed_at, p.Post_detail
+      `SELECT t.task_id, t.post_id, t.technician_id, t.task_status, t.proposed_at, p.Post_detail, p.closed_at, p.service_address
        FROM tasks t JOIN posts p ON p.post_id = t.post_id
        WHERE t.task_id = ? AND p.user_id = ? LIMIT 1 FOR UPDATE`,
       [request.params.taskId, request.user.userId],
@@ -1500,6 +1741,14 @@ app.patch('/api/tasks/:taskId/status', authenticate, async (request, response) =
     if (task.task_status !== 'pending') {
       await connection.rollback()
       return response.status(409).json({ message: 'Only pending bids can be accepted or rejected.' })
+    }
+    if (status === 'accepted' && task.closed_at) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'This request has been closed and its offer can no longer be accepted.' })
+    }
+    if (status === 'accepted' && !task.service_address?.trim()) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'Add a service address to this request before accepting an offer.' })
     }
 
     if (status === 'accepted') {
@@ -1543,6 +1792,8 @@ app.patch('/api/tasks/:taskId/status', authenticate, async (request, response) =
         status === 'accepted' ? 'bid_accepted' : 'bid_rejected',
         status === 'accepted' ? 'Bid accepted' : 'Bid not selected',
         `Your bid was ${status === 'accepted' ? 'accepted' : 'not selected'} for: ${task.Post_detail}`,
+        'task',
+        task.task_id,
       )
     }
   } catch (error) {
@@ -1566,6 +1817,108 @@ async function findTaskParticipant(connection, taskId, userId) {
   task.otherUserId = task.actorRole === 'customer' ? task.technicianUserId : task.customerId
   return task
 }
+
+app.post('/api/tasks/:taskId/price-change', authenticate, async (request, response) => {
+  const proposedPrice = Number(request.body?.proposedPrice)
+  const reason = sanitizeText(request.body?.reason, 500)
+  if (!Number.isFinite(proposedPrice) || proposedPrice <= 0 || proposedPrice > 99999999.99
+    || Math.abs(proposedPrice * 100 - Math.round(proposedPrice * 100)) > 1e-8) {
+    return response.status(400).json({ message: 'Enter a positive price with at most two decimal places.' })
+  }
+  if (reason.length < 5 || (typeof request.body?.reason === 'string' && request.body.reason.trim().length > 450)) {
+    return response.status(400).json({ message: 'Explain the price change in 5 to 450 characters.' })
+  }
+
+  const connection = await pool.getConnection()
+  let task
+  try {
+    await connection.beginTransaction()
+    task = await findTaskParticipant(connection, request.params.taskId, request.user.userId)
+    if (!task) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Task not found.' })
+    }
+    if (!['accepted', 'scheduled', 'in_progress'].includes(task.task_status)) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'Agreed prices can only be changed before the task is completed or cancelled.' })
+    }
+    if (task.price_change_proposed !== null) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'A price change is already waiting for a decision.' })
+    }
+    if (Number(task.agreed_price ?? task.price) === proposedPrice) {
+      await connection.rollback()
+      return response.status(400).json({ message: 'The proposed price must differ from the current agreed price.' })
+    }
+    await connection.execute(
+      'UPDATE tasks SET price_change_proposed = ?, price_change_reason = ?, price_change_proposed_by = ?, updated_at = NOW() WHERE task_id = ?',
+      [proposedPrice, reason, request.user.userId, task.task_id],
+    )
+    await recordTaskEvent(connection, task.task_id, request.user.userId, 'price_change_proposed', task.task_status, task.task_status, null, `Proposed ৳${proposedPrice.toFixed(2)}: ${reason}`)
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    return response.status(500).json({ message: 'Could not propose a price change.' })
+  } finally {
+    connection.release()
+  }
+
+  try {
+    await createNotification(task.otherUserId, 'price_change', 'Price change proposed', `A new agreed price was proposed for: ${task.detail}`, 'task', task.task_id)
+  } catch (error) {
+    console.error('Could not create price-change notification.', error.message)
+  }
+  response.json({ message: 'Price change proposed. The other participant must approve it before the agreed price changes.' })
+})
+
+app.post('/api/tasks/:taskId/price-change/decision', authenticate, async (request, response) => {
+  const accept = request.body?.accept
+  if (typeof accept !== 'boolean') return response.status(400).json({ message: 'Choose whether to accept the proposed price change.' })
+  const connection = await pool.getConnection()
+  let task
+  try {
+    await connection.beginTransaction()
+    task = await findTaskParticipant(connection, request.params.taskId, request.user.userId)
+    if (!task) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Task not found.' })
+    }
+    if (task.price_change_proposed === null || Number(task.price_change_proposed_by) === Number(request.user.userId)) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'There is no price change waiting for your decision.' })
+    }
+    if (!['accepted', 'scheduled', 'in_progress'].includes(task.task_status)) {
+      await connection.rollback()
+      return response.status(409).json({ message: 'This task can no longer change its agreed price.' })
+    }
+    const eventType = accept ? 'price_change_accepted' : 'price_change_declined'
+    if (accept) {
+      await connection.execute(
+        'UPDATE tasks SET agreed_price = price_change_proposed, price_change_proposed = NULL, price_change_reason = NULL, price_change_proposed_by = NULL, updated_at = NOW() WHERE task_id = ?',
+        [task.task_id],
+      )
+    } else {
+      await connection.execute(
+        'UPDATE tasks SET price_change_proposed = NULL, price_change_reason = NULL, price_change_proposed_by = NULL, updated_at = NOW() WHERE task_id = ?',
+        [task.task_id],
+      )
+    }
+    await recordTaskEvent(connection, task.task_id, request.user.userId, eventType, task.task_status, task.task_status, null, `৳${Number(task.price_change_proposed).toFixed(2)}: ${task.price_change_reason}`)
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    return response.status(500).json({ message: 'Could not record your price decision.' })
+  } finally {
+    connection.release()
+  }
+
+  try {
+    await createNotification(task.price_change_proposed_by, accept ? 'price_change_accepted' : 'price_change_declined', accept ? 'Price change accepted' : 'Price change declined', `${accept ? 'The proposed price change was accepted' : 'The proposed price change was declined'} for: ${task.detail}`, 'task', task.task_id)
+  } catch (error) {
+    console.error('Could not notify proposer about the price decision.', error.message)
+  }
+  response.json({ message: accept ? 'New agreed price saved.' : 'Price change declined. The existing agreed price remains.' })
+})
 
 app.post('/api/tasks/:taskId/schedule', authenticate, async (request, response) => {
   const proposedAt = normalizeFutureDateTime(request.body?.proposedAt)
@@ -1602,7 +1955,7 @@ app.post('/api/tasks/:taskId/schedule', authenticate, async (request, response) 
     connection.release()
   }
   try {
-    await createNotification(task.otherUserId, 'schedule_change', 'Appointment change proposed', `A new time was proposed for: ${task.detail}`)
+    await createNotification(task.otherUserId, 'schedule_change', 'Appointment change proposed', `A new time was proposed for: ${task.detail}`, 'task', task.task_id)
   } catch (error) {
     console.error('Could not create appointment notification.', error.message)
   }
@@ -1647,7 +2000,7 @@ app.post('/api/tasks/:taskId/schedule/confirm', authenticate, async (request, re
     connection.release()
   }
   try {
-    await createNotification(task.otherUserId, 'schedule_confirmed', scheduled ? 'Appointment confirmed' : 'Appointment confirmation received', `${scheduled ? 'The appointment is confirmed' : 'The other participant confirmed the appointment'} for: ${task.detail}`)
+    await createNotification(task.otherUserId, 'schedule_confirmed', scheduled ? 'Appointment confirmed' : 'Appointment confirmation received', `${scheduled ? 'The appointment is confirmed' : 'The other participant confirmed the appointment'} for: ${task.detail}`, 'task', task.task_id)
   } catch (error) {
     console.error('Could not create appointment notification.', error.message)
   }
@@ -1683,7 +2036,7 @@ app.post('/api/tasks/:taskId/cancel', authenticate, async (request, response) =>
     connection.release()
   }
   try {
-    await createNotification(task.otherUserId, 'task_cancelled', 'Task cancelled', `The task was cancelled: ${task.detail}`)
+    await createNotification(task.otherUserId, 'task_cancelled', 'Task cancelled', `The task was cancelled: ${task.detail}`, 'task', task.task_id)
   } catch (error) {
     console.error('Could not create cancellation notification.', error.message)
   }
@@ -1736,7 +2089,7 @@ app.post('/api/tasks/:taskId/payment/confirm', authenticate, async (request, res
     connection.release()
   }
   try {
-    await createNotification(task.otherUserId, 'payment_confirmation', paid ? 'Payment record completed' : 'Payment confirmation needed', `${paid ? 'Both sides confirmed payment' : 'A payment confirmation was recorded'} for task ${task.task_id}`)
+    await createNotification(task.otherUserId, 'payment_confirmation', paid ? 'Payment record completed' : 'Payment confirmation needed', `${paid ? 'Both sides confirmed payment' : 'A payment confirmation was recorded'} for task ${task.task_id}`, 'task', task.task_id)
   } catch (error) {
     console.error('Could not create payment notification.', error.message)
   }

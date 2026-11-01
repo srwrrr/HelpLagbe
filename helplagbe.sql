@@ -127,6 +127,8 @@ CREATE TABLE `posts` (
   `service_address` varchar(500) DEFAULT NULL,
   `building` varchar(150) DEFAULT NULL,
   `flat_no` varchar(100) DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
+  `close_reason` varchar(500) DEFAULT NULL,
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -152,8 +154,9 @@ INSERT INTO `posts` (`post_id`, `Post_detail`, `Image`, `Category`, `Sub-Categor
 
 CREATE TABLE `tasks` (
   `task_id` int(11) NOT NULL,
-  `task_status` enum('pending','accepted','scheduled','rejected','in_progress','completed','cancelled') DEFAULT 'pending',
+  `task_status` enum('pending','accepted','scheduled','rejected','withdrawn','in_progress','completed','cancelled') DEFAULT 'pending',
   `price` decimal(10,2) NOT NULL,
+  `price_details` varchar(500) DEFAULT NULL,
   `post_id` int(11) NOT NULL,
   `technician_id` int(11) NOT NULL,
   `accepted_at` timestamp NULL DEFAULT NULL,
@@ -167,6 +170,9 @@ CREATE TABLE `tasks` (
   `cancel_reason` varchar(500) DEFAULT NULL,
   `cancelled_at` datetime DEFAULT NULL,
   `agreed_price` decimal(10,2) DEFAULT NULL,
+  `price_change_proposed` decimal(10,2) DEFAULT NULL,
+  `price_change_reason` varchar(500) DEFAULT NULL,
+  `price_change_proposed_by` int(11) DEFAULT NULL,
   `payment_status` enum('unpaid','paid') NOT NULL DEFAULT 'unpaid',
   `payment_method` enum('cash','bank_transfer','other') DEFAULT NULL,
   `customer_paid_confirmed_at` datetime DEFAULT NULL,
@@ -341,7 +347,7 @@ CREATE TABLE `user_posts_with_bids` (
 ,`created_at` timestamp
 ,`updated_at` timestamp
 ,`bid_count` bigint(21)
-,`latest_status` enum('pending','accepted','in_progress','completed','cancelled')
+,`latest_status` enum('pending','accepted','scheduled','rejected','withdrawn','in_progress','completed','cancelled')
 ,`username` varchar(255)
 );
 

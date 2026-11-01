@@ -145,12 +145,17 @@ npm run seed:realistic
 
 - Customer requests with optional JPG, PNG, or WebP images up to 5MB
 - Request-specific service addresses with optional building and flat details; exact location and either party's optional phone number are shared only with the selected match after acceptance
+- Customer request editing before acceptance, legacy address completion, and reasoned request closure that declines pending offers and notifies bidders
+- Technician withdrawal of pending offers with a reason, customer notification, and preserved task timeline
+- Public request and pre-accept history descriptions automatically redact common email, Bangladesh phone, and street-address patterns; customers are advised to keep contact/location details out of descriptions
 - Marketplace search and category filters
 - Customer or technician account selection during registration; optional phone number at signup and editable later from the profile
 - Technician applications, administrator approval, and bidding
 - Public homepage with customer and technician entry points
 - Approved technician directory with location/availability filters, skills, ratings, completed jobs, and typical first-offer response time
 - Customer bid management with proposed appointments, mutual scheduling confirmation, reschedule/cancel reasons, a task timeline, and task-only messaging
+- Notifications for offers, messages, appointment changes, and task events link directly to the related dashboard task or conversation
+- Technician offers include a clear scope note for labor, parts, call-out fees, and price flexibility; later agreed-price changes require an explanation and approval from the other participant
 - Customer pre-accept technician overview with work history, completed-task count, ratings, and recent reviews
 - Confirmation-based payment records with an agreed amount and receipt reference; no online payment processing or escrow
 - User reporting for technician profiles, messages, tasks, and disputes, with an admin review queue

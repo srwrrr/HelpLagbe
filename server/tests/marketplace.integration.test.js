@@ -158,11 +158,33 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(response.status, 201)
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500, proposedAt: proposedAppointment })
     assert.equal(response.status, 409)
+    const [[linkedTask]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ?', [postId])
+    response = await request(app).get('/api/notifications').set('Authorization', `Bearer ${customerToken}`)
+    const offerNotification = response.body.find((item) => item.type === 'new_bid')
+    assert.equal(offerNotification.targetType, 'task')
+    assert.equal(Number(offerNotification.targetId), Number(linkedTask.task_id))
 
     response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${customerToken}`)
     assert.equal(response.body.find((post) => post.id === postId)?.serviceAddress, 'Road 5, Dhanmondi, Dhaka')
     assert.equal(response.body.find((post) => post.id === postId)?.building, 'Green House')
     assert.equal(response.body.find((post) => post.id === postId)?.flatNo, '4B')
+    response = await request(app).patch(`/api/customer/posts/${postId}`).set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        detail: `Lifecycle ${suffix} contact 01325409987 email tech@example.invalid at 123 Main Street`,
+        category: 'Plumbing',
+        subCategory: 'Repair',
+        serviceAddress: 'Road 5, Dhanmondi, Dhaka',
+        building: 'Green House',
+        flatNo: '4B',
+      })
+    assert.equal(response.status, 200)
+    response = await request(app).get('/api/posts').query({ search: suffix })
+    const publicRequest = response.body.items.find((post) => post.id === postId)
+    assert.ok(publicRequest)
+    assert.doesNotMatch(publicRequest.detail, /01325409987|tech@example\.invalid|123 Main Street/)
+    response = await request(app).get('/api/technician/requests').set('Authorization', `Bearer ${technicianToken}`)
+    assert.doesNotMatch(response.body.find((post) => post.id === postId).detail, /01325409987|tech@example\.invalid|123 Main Street/)
+
     const [[task]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [postId, technician.technician_id])
     response = await request(app).get(`/api/customer/bids/${task.task_id}/technician`).set('Authorization', `Bearer ${customerToken}`)
     assert.equal(response.status, 200)
@@ -233,6 +255,36 @@ test('customer, technician, bid, and archive lifecycle works against the configu
       review: 'Excellent work.',
       compliments: ['On time', 'Professional'],
     })
+
+    response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`)
+      .send({ detail: `Request to close ${suffix}`, category: 'Appliance', serviceAddress: 'Dhaka, Bangladesh' })
+    assert.equal(response.status, 201)
+    const closePostId = response.body.id
+    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`)
+      .send({ postId: closePostId, price: 250, proposedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })
+    assert.equal(response.status, 201)
+    const [[closeTask]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [closePostId, technician.technician_id])
+    response = await request(app).post(`/api/customer/posts/${closePostId}/close`).set('Authorization', `Bearer ${customerToken}`)
+      .send({ reason: 'No longer need this repair' })
+    assert.equal(response.status, 200)
+    const [[closedTask]] = await pool.execute('SELECT task_status FROM tasks WHERE task_id = ?', [closeTask.task_id])
+    assert.equal(closedTask.task_status, 'rejected')
+    response = await request(app).get('/api/posts').query({ search: suffix })
+    assert.ok(!response.body.items.some((post) => post.id === closePostId))
+
+    response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`)
+      .send({ detail: `Offer to withdraw ${suffix}`, category: 'Plumbing', serviceAddress: 'Dhaka, Bangladesh' })
+    assert.equal(response.status, 201)
+    const withdrawPostId = response.body.id
+    response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`)
+      .send({ postId: withdrawPostId, price: 300, proposedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })
+    assert.equal(response.status, 201)
+    const [[withdrawTask]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [withdrawPostId, technician.technician_id])
+    response = await request(app).post(`/api/technician/tasks/${withdrawTask.task_id}/withdraw`).set('Authorization', `Bearer ${technicianToken}`)
+      .send({ reason: 'I am unavailable for this appointment' })
+    assert.equal(response.status, 200)
+    const [[withdrawnTask]] = await pool.execute('SELECT task_status FROM tasks WHERE task_id = ?', [withdrawTask.task_id])
+    assert.equal(withdrawnTask.task_status, 'withdrawn')
 
     response = await request(app).post('/api/auth/register').send({ username: 'Archive Restore Test', email: archiveEmail, password })
     assert.equal(response.status, 201)
