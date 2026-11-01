@@ -106,7 +106,7 @@ Open [http://localhost:4173](http://localhost:4173). The API URL defaults to `ht
 
 ### 6. Sign in and test
 
-Register a customer at `/#/register` or apply as a technician at `/#/register-technician`. Technician applications require administrator approval before technicians can bid.
+Register at `/#/register` and choose whether to create a customer or technician account. Technician applications require administrator approval before technicians can bid; `/#/register-technician` opens registration with Technician selected.
 
 The following accounts are for local testing with the matching initial or seeded data:
 
