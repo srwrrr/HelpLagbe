@@ -99,7 +99,7 @@ function NotificationCenter({ user }) {
     } catch {}
   }
   if (!user) return null
-  return <div className="notification-center"><button className="notification-button" type="button" onClick={() => setOpen(!open)} aria-label="Notifications" title="Notifications"><span aria-hidden="true">!</span>{unread > 0 && <b>{unread > 9 ? '9+' : unread}</b>}</button>{open && <div className="notification-menu"><div className="notification-menu-heading"><strong>Notifications</strong><span>{unread ? `${unread} unread` : 'All caught up'}</span></div>{notifications.length ? notifications.map((notification) => <button className={`notification-item ${notification.readAt ? 'is-read' : ''}`} type="button" key={notification.id} onClick={() => markRead(notification)}><strong>{notification.title}</strong><span>{notification.message}</span><small>{new Date(notification.createdAt).toLocaleString()}</small></button>) : <p className="notification-empty">No notifications yet.</p>}</div>}</div>
+  return <div className="notification-center"><button className="notification-button" type="button" onClick={() => setOpen(!open)} aria-label="Notifications" aria-expanded={open} title="Notifications"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>{unread > 0 && <b>{unread > 9 ? '9+' : unread}</b>}</button>{open && <div className="notification-menu"><div className="notification-menu-heading"><strong>Notifications</strong><span>{unread ? `${unread} unread` : 'All caught up'}</span></div>{notifications.length ? notifications.map((notification) => <button className={`notification-item ${notification.readAt ? 'is-read' : ''}`} type="button" key={notification.id} onClick={() => markRead(notification)}><strong>{notification.title}</strong><span>{notification.message}</span><small>{new Date(notification.createdAt).toLocaleString()}</small></button>) : <p className="notification-empty">No notifications yet.</p>}</div>}</div>
 }
 
 function Header({ user }) {
@@ -113,7 +113,14 @@ function Header({ user }) {
 }
 
 function Footer() {
-  return <footer className="site-footer"><Brand /><span>Help anytime, anywhere.</span></footer>
+  return <footer className="site-footer page-width">
+    <div className="footer-brand"><Brand /><span>Help anytime, anywhere.</span></div>
+    <div className="footer-contact">
+      <strong>Get in touch</strong>
+      <a href="mailto:sarwarhossain083@gmail.com">sarwarhossain083@gmail.com</a>
+      <a href="tel:+8801325490985">01325409985</a>
+    </div>
+  </footer>
 }
 
 function Shell({ children, user }) {
@@ -121,7 +128,40 @@ function Shell({ children, user }) {
 }
 
 function Home({ posts, user }) {
-  return <Shell user={user}><section className="hero-section page-width"><div className="hero-copy"><p className="eyebrow">Reliable help, close to home</p><h1>Skilled hands for the jobs that keep life moving.</h1><p className="hero-text">Find trusted technicians for repairs, maintenance, and everyday home services. Post a request, compare bids, and get the work done.</p><div className="hero-actions"><button className="primary-button" type="button" onClick={() => go(user ? '/customer/new-request' : '/login')}>Post a service request</button><button className="text-button" type="button" onClick={() => go('/register-technician')}>Join as a technician <span>-&gt;</span></button></div><div className="trust-row"><span><strong>3 steps</strong> to get help</span><span><strong>Local</strong> technicians</span><span><strong>Clear</strong> pricing</span></div></div><div className="hero-visual"><div className="visual-note"><span className="note-dot"></span>Available today</div><div className="visual-card"><div className="card-header"><span>Popular request</span><span className="status-chip">Open</span></div><h2>AC not cooling properly</h2><p>Appliance repair &middot; Dhanmondi</p><div className="card-footer"><span className="avatar">NR</span><span>3 technicians interested</span><strong>from ৳500</strong></div></div><div className="visual-sun"></div><div className="visual-line line-one"></div><div className="visual-line line-two"></div></div></section><section className="services-section page-width"><div className="section-heading"><div><p className="eyebrow">What can we help with?</p><h2>One place for practical help.</h2></div><button className="outline-button" type="button" onClick={() => go('/requests')}>View all requests</button></div><div className="service-grid"><ServiceCard tone="warm" icon="AC" title="Appliance repair" text="AC, washing machines, refrigerators, and more." /><ServiceCard tone="green" icon="PL" title="Plumbing" text="Leaks, fixtures, pipes, and urgent repairs." /><ServiceCard tone="blue" icon="EL" title="Electrical work" text="Safe installation and everyday electrical fixes." /><ServiceCard tone="lilac" icon="HM" title="Home maintenance" text="Small jobs that make a big difference." /></div></section><section className="steps-section page-width"><div className="section-heading"><div><p className="eyebrow">How HelpLagbe works</p><h2>From “I need help” to “all sorted.”</h2></div></div><div className="steps-grid"><Step number="01" title="Describe the job" text="Tell us what needs fixing and add a photo if it helps." /><Step number="02" title="Compare local bids" text="Technicians respond with their price and availability." /><Step number="03" title="Choose your helper" text="Accept the bid that feels right and track the task." /></div></section><RequestPreview posts={posts} /></Shell>
+  const startRequest = () => go(user?.role === 'customer' ? '/customer/new-request' : '/register')
+  return <Shell user={user}>
+    <section className="hero-section page-width">
+      <div className="hero-copy">
+        <p className="eyebrow">A little help goes a long way</p>
+        <h1>What needs fixing at home?</h1>
+        <p className="hero-text">From a leaky tap to an appliance on the fritz, find help for the jobs that make home feel like home.</p>
+        <div className="hero-actions">
+          <button className="primary-button" type="button" onClick={startRequest}>Post a service request</button>
+          <button className="outline-button" type="button" onClick={() => go('/technicians')}>Browse technicians</button>
+        </div>
+        <p className="hero-reassurance">Browse admin-approved technicians and compare offers before you choose.</p>
+        <p className="hero-technician-link">Are you a skilled professional? <button type="button" onClick={() => go('/register-technician')}>Join as a technician <span aria-hidden="true">-&gt;</span></button></p>
+      </div>
+      <div className="hero-visual">
+        <img src="/home-service.jpg" alt="A service professional repairing a home appliance" />
+        <div className="hero-photo-caption"><span>HelpLagbe</span><strong>Good help makes home feel easier.</strong></div>
+      </div>
+    </section>
+    <section className="services-section page-width">
+      <div className="section-heading">
+        <div><p className="eyebrow">Here for the everyday fixes</p><h2>How can we help?</h2></div>
+        <button className="outline-button" type="button" onClick={startRequest}>Tell us what you need</button>
+      </div>
+      <div className="service-grid">
+        <ServiceCard tone="warm" icon="AC" title="Appliance repair" text="AC, washing machines, refrigerators, and more." />
+        <ServiceCard tone="green" icon="PL" title="Plumbing" text="Leaks, fixtures, pipes, and urgent repairs." />
+        <ServiceCard tone="blue" icon="EL" title="Electrical work" text="Safe installation and everyday electrical fixes." />
+        <ServiceCard tone="lilac" icon="HM" title="Home maintenance" text="Small jobs that make a big difference." />
+      </div>
+    </section>
+    <section className="steps-section page-width"><div className="section-heading"><div><p className="eyebrow">How HelpLagbe works</p><h2>From “I need help” to “all sorted.”</h2></div></div><div className="steps-grid"><Step number="01" title="Describe the job" text="Tell us what needs fixing and add a photo if it helps." /><Step number="02" title="Compare local bids" text="Technicians respond with their price and availability." /><Step number="03" title="Choose your helper" text="Accept the bid that feels right and track the task." /></div></section>
+    <RequestPreview posts={posts} />
+  </Shell>
 }
 
 function ServiceCard({ tone, icon, title, text }) { return <article className={`service-card ${tone}`}><span className="service-icon">{icon}</span><h3>{title}</h3><p>{text}</p><span className="service-arrow">-&gt;</span></article> }
@@ -238,8 +278,45 @@ function RequestsPage({ posts, user }) {
 function TechniciansPage({ user }) {
   const [technicians, setTechnicians] = useState([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => { request('/technicians').then(setTechnicians).catch(() => setTechnicians([])).finally(() => setLoading(false)) }, [])
-  return <Shell user={user}><section className="page-heading page-width"><p className="eyebrow">Verified professionals</p><h1>Find a technician you can trust.</h1><p>Browse admin-approved technicians by their skills, ratings, and completed work. Contact details stay private until a job is accepted.</p></section><section className="request-section page-width">{loading ? <LoadingState text="Loading approved technicians..." /> : <><div className="technician-grid">{technicians.map((technician) => <article className="technician-card" key={technician.id}><div className="technician-avatar">{technician.name?.slice(0, 1)}</div><div><div className="technician-card-heading"><h2>{technician.name}</h2><span className="verified-label">Verified</span></div><p>{technician.skills}</p><div className="technician-stats"><span className="completed-count">{technician.completedJobs} completed {Number(technician.completedJobs) === 1 ? 'job' : 'jobs'}</span><span>{technician.averageRating ? `${technician.averageRating}/5 rating` : 'New to reviews'}</span>{technician.reviewCount > 0 && <span>{technician.reviewCount} {Number(technician.reviewCount) === 1 ? 'review' : 'reviews'}</span>}</div></div></article>)}</div>{!technicians.length && <EmptyState text="No approved technicians are available yet." />}</>}</section></Shell>
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    request('/technicians')
+      .then((data) => {
+        if (!Array.isArray(data.items)) throw new Error('The technician list could not be read.')
+        setTechnicians(data.items)
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return <Shell user={user}>
+    <section className="page-heading page-width">
+      <p className="eyebrow">Verified professionals</p>
+      <h1>Find a technician you can trust.</h1>
+      <p>Browse admin-approved technicians by their skills, ratings, and completed work. Contact details stay private until a job is accepted.</p>
+    </section>
+    <section className="request-section page-width">
+      {loading
+        ? <LoadingState text="Loading approved technicians..." />
+        : error
+          ? <p className="form-message" role="alert">{error}</p>
+          : technicians.length
+            ? <div className="technician-grid">{technicians.map((technician) => <article className="technician-card" key={technician.id}>
+              <div className="technician-avatar">{technician.name?.slice(0, 1)}</div>
+              <div>
+                <div className="technician-card-heading"><h2>{technician.name}</h2><span className="verified-label">Verified</span></div>
+                <p>{technician.skills}</p>
+                <div className="technician-stats">
+                  <span className="completed-count">{technician.completedJobs} completed {Number(technician.completedJobs) === 1 ? 'job' : 'jobs'}</span>
+                  <span>{technician.averageRating ? `${technician.averageRating}/5 rating` : 'New to reviews'}</span>
+                  {technician.reviewCount > 0 && <span>{technician.reviewCount} {Number(technician.reviewCount) === 1 ? 'review' : 'reviews'}</span>}
+                </div>
+              </div>
+            </article>)}</div>
+            : <EmptyState text="No approved technicians are available yet." />}
+    </section>
+  </Shell>
 }
 
 function AuthPage({ mode }) {

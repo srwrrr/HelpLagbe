@@ -1,6 +1,8 @@
 # HelpLagbe
 
-HelpLagbe is a local service marketplace connecting customers with verified technicians. Customers can post jobs and compare bids; technicians can apply, bid, message customers, and manage accepted work; administrators oversee the marketplace.
+HelpLagbe is a local service marketplace connecting customers with verified technicians. Customers can create service requests and compare bids; technicians can apply, bid, message customers, and manage accepted work; administrators oversee the marketplace. The public site includes a service-focused homepage, a directory of approved technicians, and contact links in the footer.
+
+The original [Software Requirements Specification (PDF)](SRS_Documents/Software%20Requirements%20Specification%20(SRS)%20for%20HelpLagbe.pdf) describes the project's initial scope. See the [implementation addendum](SRS_Documents/Implementation%20Addendum.md) for requirements aligned with the current application and notes on features that remain out of scope.
 
 ## Stack
 
@@ -131,10 +133,10 @@ npm run seed:realistic
 
 - `/#/` - public home
 - `/#/login` - sign in
-- `/#/register` - customer registration
-- `/#/register-technician` - technician application
+- `/#/register` - registration; choose Customer or Technician
+- `/#/register-technician` - registration with Technician preselected
 - `/#/requests` - service marketplace
-- `/#/technicians` - approved technician directory
+- `/#/technicians` - directory of approved technicians and their skills, completed jobs, and ratings
 - `/#/customer` - customer workspace
 - `/#/technician` - technician workspace
 - `/#/admin` - administrator workspace
@@ -143,11 +145,14 @@ npm run seed:realistic
 
 - Customer requests with optional JPG, PNG, or WebP images up to 5MB
 - Marketplace search and category filters
-- Technician applications, approval, and bidding
+- Customer or technician account selection during registration
+- Technician applications, administrator approval, and bidding
+- Public homepage with customer and technician entry points
+- Approved technician directory with skills, completed jobs, and ratings
 - Customer bid management and technician task lifecycle
-- Reviews, notifications, and private messaging for accepted tasks
+- Reviews, notification dropdown with unread count, and private messaging for accepted tasks
 - Admin user management, audit log, archive, and restore workflows
-- Persistent light/dark mode and responsive layouts
+- Public contact links, persistent light/dark mode, and responsive layouts
 
 ## Tests and Production Build
 
