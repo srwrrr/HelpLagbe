@@ -279,6 +279,9 @@ async function ensureNotificationTable() {
     ['tasks', 'receipt_number', 'VARCHAR(40) NULL'],
     ['technician', 'service_area', 'VARCHAR(255) NULL'],
     ['technician', 'availability', 'VARCHAR(255) NULL'],
+    ['posts', 'service_address', 'VARCHAR(500) NULL'],
+    ['posts', 'building', 'VARCHAR(150) NULL'],
+    ['posts', 'flat_no', 'VARCHAR(100) NULL'],
     ['marketplace_reports', 'task_detail', 'VARCHAR(2000) NULL'],
     ['marketplace_reports', 'reported_content', 'VARCHAR(1000) NULL'],
   ]
@@ -609,6 +612,9 @@ app.post('/api/posts', authenticate, async (request, response) => {
   const detail = sanitizeText(body.detail, 2000)
   const requestedCategory = sanitizeText(body.category, 100)
   const subCategory = sanitizeText(body.subCategory, 100)
+  const serviceAddress = sanitizeText(body.serviceAddress, 500)
+  const building = sanitizeText(body.building, 150)
+  const flatNo = sanitizeText(body.flatNo, 100)
   const categories = ['Appliance', 'Plumbing', 'Electrical', 'Home maintenance', 'Computer']
   const category = categories.find((item) => item.toLowerCase() === requestedCategory.toLowerCase())
   const imageData = body.imageData
@@ -617,6 +623,13 @@ app.post('/api/posts', authenticate, async (request, response) => {
     return response.status(400).json({ message: 'Request details must be between 10 and 2000 characters.' })
   }
   if (!category) return response.status(400).json({ message: 'Choose a valid service category.' })
+  if (serviceAddress.length < 5 || (typeof body.serviceAddress === 'string' && body.serviceAddress.trim().length > 500)) {
+    return response.status(400).json({ message: 'Enter a service address between 5 and 500 characters.' })
+  }
+  if ((typeof body.building === 'string' && body.building.trim().length > 150)
+    || (typeof body.flatNo === 'string' && body.flatNo.trim().length > 100)) {
+    return response.status(400).json({ message: 'Building and flat details must be 150 and 100 characters or fewer.' })
+  }
   if (typeof body.subCategory === 'string' && body.subCategory.trim().length > 100) {
     return response.status(400).json({ message: 'Subcategory must be 100 characters or fewer.' })
   }
@@ -638,11 +651,11 @@ app.post('/api/posts', authenticate, async (request, response) => {
       const postId = await nextGeneratedId(pool, 'helplagbe_posts_post_id_seq')
       const [result] = await pool.execute(
         usesTiDBSequences
-          ? 'INSERT INTO posts (post_id, Post_detail, Category, `Sub-Category`, Image, user_id) VALUES (?, ?, ?, ?, ?, ?)'
-          : 'INSERT INTO posts (Post_detail, Category, `Sub-Category`, Image, user_id) VALUES (?, ?, ?, ?, ?)',
+          ? 'INSERT INTO posts (post_id, Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          : 'INSERT INTO posts (Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         usesTiDBSequences
-          ? [postId, detail, category, subCategory || null, imagePath, request.user.userId]
-          : [detail, category, subCategory || null, imagePath, request.user.userId],
+          ? [postId, detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null]
+          : [detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null],
       )
       response.status(201).json({ id: result.insertId || postId, message: 'Service request posted.' })
     } catch (error) {
@@ -662,8 +675,8 @@ app.get('/api/technician/requests', authenticate, async (request, response) => {
   try {
     const [rows] = await pool.execute(
       `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt,
-              CASE WHEN viewerTech.service_area IS NOT NULL AND customer.address IS NOT NULL
-                    AND LOWER(customer.address) LIKE CONCAT('%', LOWER(viewerTech.service_area), '%') THEN 1 ELSE 0 END AS areaMatch,
+              CASE WHEN viewerTech.service_area IS NOT NULL AND COALESCE(p.service_address, customer.address) IS NOT NULL
+                    AND LOWER(COALESCE(p.service_address, customer.address)) LIKE CONCAT('%', LOWER(viewerTech.service_area), '%') THEN 1 ELSE 0 END AS areaMatch,
               CASE WHEN viewerTech.service_area IS NULL THEN 0 ELSE 1 END AS hasServiceArea,
               CASE WHEN EXISTS (SELECT 1 FROM technician approvedViewer WHERE approvedViewer.user_id = ? AND approvedViewer.status = 'approved') THEN customer.username ELSE NULL END AS customerName
        FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
@@ -812,9 +825,14 @@ app.get('/api/technician/tasks', authenticate, async (request, response) => {
               DATE_FORMAT(t.paid_at, '%Y-%m-%dT%H:%i:%s.000Z') AS paidAt,
               t.receipt_number AS receiptNumber, t.customer_paid_confirmed_at AS customerPaidConfirmedAt,
               t.technician_paid_confirmed_at AS technicianPaidConfirmedAt,
-              p.Post_detail AS detail, p.Category AS category
+              p.Post_detail AS detail, p.Category AS category,
+              CASE WHEN t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') THEN p.service_address ELSE NULL END AS serviceAddress,
+              CASE WHEN t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') THEN p.building ELSE NULL END AS building,
+              CASE WHEN t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') THEN p.flat_no ELSE NULL END AS flatNo,
+              CASE WHEN t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') THEN customer.phone_no ELSE NULL END AS customerPhone
        FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id
        JOIN posts p ON p.post_id = t.post_id
+       JOIN users customer ON customer.user_id = p.user_id
        WHERE tech.user_id = ? ORDER BY t.updated_at DESC`,
       [request.user.userId],
     )
@@ -1218,7 +1236,8 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
       'technician_id', 'national_id', 'Full_Name', 'Required_Documents', 'Skill_details', 'status', 'user_id', 'created_at', 'updated_at', 'address', 'service_area', 'availability',
     ])
     await insertSnapshotRows(connection, 'posts', snapshot.posts, [
-      'post_id', 'Post_detail', 'Image', 'Category', 'Sub-Category', 'user_id', 'created_at', 'updated_at',
+      'post_id', 'Post_detail', 'Image', 'Category', 'Sub-Category', 'service_address', 'building', 'flat_no',
+      'user_id', 'created_at', 'updated_at',
     ])
     await insertSnapshotRows(connection, 'tasks', snapshot.tasks, [
       'task_id', 'task_status', 'price', 'post_id', 'technician_id', 'accepted_at', 'completed_at', 'created_at', 'updated_at',
@@ -1316,7 +1335,8 @@ app.get('/api/customer/posts', authenticate, async (request, response) => {
   try {
     const [rows] = await pool.execute(
       `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category,
-              p.created_at AS createdAt, p.Image AS image, t.task_id AS taskId, t.price,
+              p.created_at AS createdAt, p.Image AS image, p.service_address AS serviceAddress,
+              p.building, p.flat_no AS flatNo, t.task_id AS taskId, t.price,
               COALESCE(t.agreed_price, t.price) AS agreedPrice,
               t.task_status AS status, DATE_FORMAT(t.proposed_at, '%Y-%m-%dT%H:%i:%s.000Z') AS proposedAt,
               t.customer_schedule_confirmed_at AS customerScheduleConfirmedAt,
@@ -1326,6 +1346,7 @@ app.get('/api/customer/posts', authenticate, async (request, response) => {
               DATE_FORMAT(t.paid_at, '%Y-%m-%dT%H:%i:%s.000Z') AS paidAt,
               t.receipt_number AS receiptNumber, t.customer_paid_confirmed_at AS customerPaidConfirmedAt,
               t.technician_paid_confirmed_at AS technicianPaidConfirmedAt, tech.technician_id AS technicianId,
+              CASE WHEN t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') THEN technician_user.phone_no ELSE NULL END AS technicianPhone,
               tech.Full_Name AS technicianName, tech.Skill_details AS technicianSkills,
               technician_user.Image AS technicianProfileImage,
               tech.status AS technicianStatus,
@@ -1353,6 +1374,56 @@ app.get('/api/customer/posts', authenticate, async (request, response) => {
     response.json(rows)
   } catch (error) {
     response.status(500).json({ message: 'Could not load your requests.' })
+  }
+})
+
+app.get('/api/customer/bids/:taskId/technician', authenticate, async (request, response) => {
+  if (request.user.role !== 'customer') {
+    return response.status(403).json({ message: 'Only customers can preview technicians who bid on their requests.' })
+  }
+
+  try {
+    const [technicians] = await pool.execute(
+      `SELECT tech.technician_id AS id, tech.Full_Name AS name, tech.Skill_details AS skills,
+              tech.service_area AS serviceArea, tech.availability, profile_user.Image AS profileImage,
+              (SELECT COUNT(*) FROM tasks completed
+               WHERE completed.technician_id = tech.technician_id AND completed.task_status = 'completed') AS completedJobs,
+              (SELECT ROUND(AVG(feedback.consumer_rating), 1)
+               FROM tasks reviewed JOIN task_feedback feedback ON feedback.task_id = reviewed.task_id
+               WHERE reviewed.technician_id = tech.technician_id AND feedback.consumer_rating IS NOT NULL) AS averageRating,
+              (SELECT COUNT(*) FROM tasks reviewed
+               JOIN task_feedback feedback ON feedback.task_id = reviewed.task_id
+               WHERE reviewed.technician_id = tech.technician_id AND feedback.consumer_rating IS NOT NULL) AS reviewCount
+       FROM tasks bid
+       JOIN posts own_request ON own_request.post_id = bid.post_id
+       JOIN technician tech ON tech.technician_id = bid.technician_id
+       JOIN users profile_user ON profile_user.user_id = tech.user_id
+       WHERE bid.task_id = ? AND own_request.user_id = ?
+         AND bid.task_status = 'pending' AND tech.status = 'approved'
+       LIMIT 1`,
+      [request.params.taskId, request.user.userId],
+    )
+    const technician = technicians[0]
+    if (!technician) return response.status(404).json({ message: 'Pending technician offer not found.' })
+
+    const [workHistory] = await pool.execute(
+      `SELECT p.Category AS category, p.Post_detail AS detail, t.completed_at AS completedAt
+       FROM tasks t JOIN posts p ON p.post_id = t.post_id
+       WHERE t.technician_id = ? AND t.task_status = 'completed'
+       ORDER BY t.completed_at DESC, t.task_id DESC LIMIT 5`,
+      [technician.id],
+    )
+    const [reviews] = await pool.execute(
+      `SELECT feedback.consumer_rating AS rating, feedback.consumer_feedback AS feedback,
+              feedback.created_at AS createdAt
+       FROM tasks t JOIN task_feedback feedback ON feedback.task_id = t.task_id
+       WHERE t.technician_id = ? AND feedback.consumer_rating IS NOT NULL
+       ORDER BY feedback.created_at DESC, feedback.feedback_id DESC LIMIT 5`,
+      [technician.id],
+    )
+    response.json({ ...technician, workHistory, reviews })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load the technician overview.' })
   }
 })
 

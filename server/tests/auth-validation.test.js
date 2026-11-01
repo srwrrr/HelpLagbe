@@ -54,6 +54,28 @@ test('customer registration rejects malformed email before querying the database
   assert.equal(response.body.message, 'Enter a valid email address.')
 })
 
+test('service requests require a service address before database access', async () => {
+  const response = await request(app)
+    .post('/api/posts')
+    .set('Authorization', `Bearer ${customerToken}`)
+    .send({ detail: 'Repair an electrical outlet', category: 'Electrical' })
+
+  assert.equal(response.status, 400)
+  assert.equal(response.body.message, 'Enter a service address between 5 and 500 characters.')
+})
+
+test('technician previews are limited to authenticated customers', async () => {
+  const technicianToken = jwt.sign(
+    { userId: 2, role: 'technician' },
+    process.env.JWT_SECRET || 'helplagbe-local-development-secret',
+  )
+  const response = await request(app)
+    .get('/api/customer/bids/1/technician')
+    .set('Authorization', `Bearer ${technicianToken}`)
+
+  assert.equal(response.status, 403)
+})
+
 test('technician registration validates credentials before opening a database connection', async () => {
   const response = await request(app)
     .post('/api/auth/register-technician')
@@ -204,6 +226,7 @@ test('request creation rejects image bytes that do not match the claimed MIME ty
     .send({
       detail: 'A sufficiently detailed repair request',
       category: 'Plumbing',
+      serviceAddress: 'Road 5, Dhaka',
       imageData: `data:image/png;base64,${invalidPng}`,
     })
 

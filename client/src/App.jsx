@@ -318,13 +318,87 @@ function AcceptedTechnicianProfile({ technician }) {
       <span className="technician-profile-action">{expanded ? 'Hide profile' : 'View profile'} <span aria-hidden="true">{expanded ? '−' : '+'}</span></span>
     </button>
     {expanded && <div className="technician-profile-details">
-      <div className="technician-profile-identity"><ProfileAvatar name={technician.technicianName || 'Technician'} image={technician.technicianProfileImage} /><div><span className="eyebrow">Application approved</span><h3>{technician.technicianName || 'Technician profile'}</h3><p>{technician.technicianSkills || 'Skilled home-service professional'}</p></div></div>
+      <div className="technician-profile-identity"><ProfileAvatar name={technician.technicianName || 'Technician'} image={technician.technicianProfileImage} /><div><span className="eyebrow">Application approved</span><h3>{technician.technicianName || 'Technician profile'}</h3><p>{technician.technicianSkills || 'Skilled home-service professional'}</p>{technician.technicianPhone && <a className="technician-contact-link" href={`tel:${technician.technicianPhone}`}>Call technician: {technician.technicianPhone}</a>}</div></div>
       <div className="technician-profile-stats">
         <div><strong>{completedJobs}</strong><span>Tasks completed</span></div>
         <div><strong>{averageRating ? `${averageRating.toFixed(1)} / 5` : 'New'}</strong><span>{reviewCount ? `Overall rating · ${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}` : 'No ratings yet'}</span></div>
       </div>
     </div>}
   </section>
+}
+
+function PendingTechnicianOverview({ taskId }) {
+  const [open, setOpen] = useState(false)
+  const [overview, setOverview] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const toggle = async () => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setOpen(true)
+    if (overview || loading) return
+    setLoading(true)
+    setError('')
+    try {
+      setOverview(await request(`/customer/bids/${taskId}/technician`))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const reviews = (overview?.reviews || []).map((item) => {
+    try {
+      const parsed = JSON.parse(item.feedback || '')
+      return {
+        rating: item.rating,
+        text: typeof parsed?.review === 'string' ? parsed.review : '',
+        compliments: Array.isArray(parsed?.compliments) ? parsed.compliments : [],
+      }
+    } catch {
+      return { rating: item.rating, text: item.feedback || '', compliments: [] }
+    }
+  })
+
+  return <section className="pending-technician-overview">
+    <button className="technician-profile-toggle" type="button" aria-expanded={open} onClick={toggle}>
+      <span className="technician-profile-action">{open ? 'Hide technician overview' : 'Review technician before accepting'} <span aria-hidden="true">{open ? '−' : '+'}</span></span>
+    </button>
+    {open && <div className="technician-overview-details">
+      {loading && <p className="muted-label">Loading technician overview...</p>}
+      {error && <p className="form-message" role="alert">{error}</p>}
+      {overview && <>
+        <div className="technician-profile-identity">
+          <ProfileAvatar name={overview.name} image={overview.profileImage} />
+          <div><span className="eyebrow">Technician overview</span><h3>{overview.name}</h3><p>{overview.skills}</p></div>
+        </div>
+        <div className="technician-profile-stats">
+          <div><strong>{Number(overview.completedJobs) || 0}</strong><span>Tasks completed</span></div>
+          <div><strong>{overview.averageRating ? `${Number(overview.averageRating).toFixed(1)} / 5` : 'New'}</strong><span>{overview.reviewCount ? `Overall rating · ${overview.reviewCount} ${Number(overview.reviewCount) === 1 ? 'review' : 'reviews'}` : 'No ratings yet'}</span></div>
+        </div>
+        {(overview.serviceArea || overview.availability) && <p className="muted-label">{[overview.serviceArea, overview.availability].filter(Boolean).join(' · ')}</p>}
+        <div className="technician-overview-columns">
+          <div><h4>Recent completed work</h4>{overview.workHistory.length ? <ul>{overview.workHistory.map((job, index) => <li key={`${job.category}-${index}`}><strong>{job.category}</strong><p>{job.detail}</p></li>)}</ul> : <p className="muted-label">No completed work on HelpLagbe yet.</p>}</div>
+          <div><h4>Recent customer reviews</h4>{reviews.length ? <ul>{reviews.map((review, index) => <li key={`${review.rating}-${index}`}><strong>{'★'.repeat(Number(review.rating))} <span className="muted-label">{review.rating}/5</span></strong>{review.text && <p>{review.text}</p>}{review.compliments.length > 0 && <span className="muted-label">{review.compliments.join(' · ')}</span>}</li>)}</ul> : <p className="muted-label">No customer reviews yet.</p>}</div>
+        </div>
+      </>}
+    </div>}
+  </section>
+}
+
+function TaskServiceLocation({ task }) {
+  if (!task.serviceAddress && !task.customerPhone) return null
+  const address = [task.serviceAddress, task.building, task.flatNo ? `Flat ${task.flatNo}` : ''].filter(Boolean).join(', ')
+  return <div className="task-service-location">
+    <strong>Customer visit details</strong>
+    {address && <span>{address}</span>}
+    {task.customerPhone && <a href={`tel:${task.customerPhone}`}>Customer phone: {task.customerPhone}</a>}
+    {!task.customerPhone && <span className="muted-label">Customer has not added a phone number.</span>}
+  </div>
 }
 
 function ReportForm({ reportType, taskId, messageId, technicianId }) {
@@ -622,7 +696,7 @@ function AuthPage({ mode }) {
       }
     } catch (error) { setMessage(error.message) }
   }
-  return <Shell><section className="auth-page"><div className="auth-panel"><p className="eyebrow">HelpLagbe account</p><h1>{mode === 'login' ? 'Welcome back.' : isTechnician ? 'Put your skills to work.' : 'Start getting help.'}</h1><p className="auth-intro">{mode === 'login' ? 'Sign in to continue to your workspace.' : isTechnician ? 'Apply to join trusted technicians on HelpLagbe.' : 'Create an account and get your next job moving.'}</p><form onSubmit={submit}>{isRegister && <label>Account type<select value={accountType} onChange={(event) => setAccountType(event.target.value)}><option value="customer">Customer</option><option value="technician">Technician</option></select></label>}{isRegister && <label>Name<input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} required /></label>}<label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label><label>Password<div className="password-input-wrap"><input type={showPassword ? 'text' : 'password'} minLength="8" maxLength="72" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /><button className="password-toggle" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>{isTechnician && <><label>National ID<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} required /></label><label>Skills<textarea rows="3" value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} required /></label><label>Address<input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label></>}<button className="primary-button auth-submit" type="submit">{mode === 'login' ? 'Log in' : isTechnician ? 'Submit application' : 'Create account'}</button></form>{message && <p className="form-message">{message}</p>}<div className="auth-links">{mode === 'login' ? <><button type="button" onClick={() => go('/register')}>Need an account? Register</button><button type="button" onClick={() => go('/register-technician')}>Join as a technician</button></> : <button type="button" onClick={() => go('/login')}>Already registered? Log in</button>}</div></div><div className="auth-side"><span className="side-mark">H</span><h2>Help that fits real life.</h2><p>One trusted place for customers, technicians, and the people who keep homes running.</p></div></section></Shell>
+  return <Shell><section className="auth-page"><div className="auth-panel"><p className="eyebrow">HelpLagbe account</p><h1>{mode === 'login' ? 'Welcome back.' : isTechnician ? 'Put your skills to work.' : 'Start getting help.'}</h1><p className="auth-intro">{mode === 'login' ? 'Sign in to continue to your workspace.' : isTechnician ? 'Apply to join trusted technicians on HelpLagbe.' : 'Create an account and get your next job moving.'}</p><form onSubmit={submit}>{isRegister && <label>Account type<select value={accountType} onChange={(event) => setAccountType(event.target.value)}><option value="customer">Customer</option><option value="technician">Technician</option></select></label>}{isRegister && <label>Name<input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} required /></label>}<label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></label>{isRegister && <label>Phone number <span className="muted-label">(optional; can be added later in Edit profile)</span><input type="tel" maxLength="20" autoComplete="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>}<label>Password<div className="password-input-wrap"><input type={showPassword ? 'text' : 'password'} minLength="8" maxLength="72" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required /><button className="password-toggle" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>{isTechnician && <><label>National ID<input value={form.nationalId} onChange={(event) => setForm({ ...form, nationalId: event.target.value })} required /></label><label>Skills<textarea rows="3" value={form.skills} onChange={(event) => setForm({ ...form, skills: event.target.value })} required /></label><label>Address<input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></label></>}<button className="primary-button auth-submit" type="submit">{mode === 'login' ? 'Log in' : isTechnician ? 'Submit application' : 'Create account'}</button></form>{message && <p className="form-message">{message}</p>}<div className="auth-links">{mode === 'login' ? <><button type="button" onClick={() => go('/register')}>Need an account? Register</button><button type="button" onClick={() => go('/register-technician')}>Join as a technician</button></> : <button type="button" onClick={() => go('/login')}>Already registered? Log in</button>}</div></div><div className="auth-side"><span className="side-mark">H</span><h2>Help that fits real life.</h2><p>One trusted place for customers, technicians, and the people who keep homes running.</p></div></section></Shell>
 }
 
 function ProfileEditor({ user }) {
@@ -779,7 +853,7 @@ function DashboardLayout({ user, eyebrow, title, description, children }) {
 
 function CustomerDashboard({ user }) {
   const [posts, setPosts] = useState([])
-  const [form, setForm] = useState({ detail: '', category: 'Appliance', subCategory: '' })
+  const [form, setForm] = useState({ detail: '', category: 'Appliance', subCategory: '', serviceAddress: '', building: '', flatNo: '' })
   const [imageData, setImageData] = useState('')
   const [imageName, setImageName] = useState('')
   const [message, setMessage] = useState('')
@@ -825,7 +899,7 @@ function CustomerDashboard({ user }) {
     setMessage('Posting request...')
     try {
       await request('/posts', { method: 'POST', body: JSON.stringify({ ...form, imageData }) })
-      setForm({ detail: '', category: 'Appliance', subCategory: '' })
+      setForm({ detail: '', category: 'Appliance', subCategory: '', serviceAddress: '', building: '', flatNo: '' })
       setImageData('')
       setImageName('')
       setMessage('Request posted successfully.')
@@ -863,7 +937,7 @@ function CustomerDashboard({ user }) {
         <label className="dashboard-search">Search requests<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Description or category" /></label>
         <button className="primary-button" type="button" onClick={() => { setShowForm((visible) => !visible); setMessage('') }}>{showForm ? 'Close form' : 'New request'}</button>
       </div>
-      {showForm && <div className="panel request-create-panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" maxLength="2000" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button></form></div>}
+      {showForm && <div className="panel request-create-panel"><div className="panel-heading"><div><p className="eyebrow">New request</p><h2>What needs doing?</h2></div></div><form className="request-form" onSubmit={submit}><label>Describe the job<textarea rows="4" maxLength="2000" value={form.detail} onChange={(event) => setForm({ ...form, detail: event.target.value })} required placeholder="Tell technicians what needs fixing..." /></label><div className="form-row"><label>Category<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Appliance</option><option>Plumbing</option><option>Electrical</option><option>Home maintenance</option><option>Computer</option></select></label><label>Subcategory<input maxLength="100" value={form.subCategory} onChange={(event) => setForm({ ...form, subCategory: event.target.value })} placeholder="Optional" /></label></div><fieldset className="request-location-fields"><legend>Where should the technician come?</legend><label>Service address <span className="muted-label">(street, area, city)</span><input autoComplete="street-address" maxLength="500" value={form.serviceAddress} onChange={(event) => setForm({ ...form, serviceAddress: event.target.value })} required placeholder="Road, neighbourhood, city" /></label><div className="form-row"><label>Building / house name <span className="muted-label">(optional)</span><input maxLength="150" value={form.building} onChange={(event) => setForm({ ...form, building: event.target.value })} placeholder="Building or house name" /></label><label>Flat / unit number <span className="muted-label">(optional)</span><input maxLength="100" value={form.flatNo} onChange={(event) => setForm({ ...form, flatNo: event.target.value })} placeholder="Flat or unit" /></label></div><p className="muted-label">Your exact address stays private from other customers and technicians who have not been selected for this job.</p></fieldset><label className="file-field">Photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { setMessage('Image must be 5MB or smaller.'); return } const reader = new FileReader(); reader.onload = () => { setImageData(reader.result); setImageName(file.name) }; reader.readAsDataURL(file) }} /></label>{imageName && <span className="file-name">Attached: {imageName}</span>}<button className="primary-button" type="submit">Post request</button></form></div>}
       {message && <p className="form-message" role="status">{message}</p>}
       {loading ? <LoadingState text="Loading your requests..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : visiblePosts.length ? <div className="customer-request-list">{visiblePosts.map((post) => {
         const bids = posts.filter((bid) => bid.id === post.id && bid.taskId)
@@ -873,7 +947,8 @@ function CustomerDashboard({ user }) {
           || (bids.some((bid) => bid.status === 'completed') ? 'completed' : bids.some((bid) => bid.status === 'cancelled') ? 'cancelled' : 'waiting')
         return <article className="customer-request-item" key={post.id}>
           <div className="customer-request-heading"><div>{post.image && <img className="activity-image" src={getAssetUrl(post.image)} alt="Attached request" />}<span className="request-category">{post.category}</span><h2>{post.detail}</h2><span className="muted-label">{bids.length} {bids.length === 1 ? 'bid' : 'bids'}</span></div><span className={`dashboard-status status-${state}`}>{hasAttention ? 'Review bids' : state === 'waiting' ? 'Waiting for bids' : state.replace('_', ' ')}</span></div>
-          {bids.length > 0 && <div className="customer-bid-list">{bids.map((bid) => <div className="customer-bid-entry" key={bid.taskId}><div className="customer-bid-row"><div><strong>{bid.technicianName || 'Approved technician'}</strong><span>{bid.technicianSkills || 'Technician application approved'}{bid.proposedAt ? ` · Proposed ${new Date(bid.proposedAt).toLocaleString()}` : ' · Appointment time not provided'}</span></div><strong className="bid-price">৳{bid.price}</strong>{bid.status === 'pending' ? <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(bid.taskId, 'accepted')}>Accept</button><button className="quiet-button" type="button" onClick={() => updateBid(bid.taskId, 'rejected')}>Decline</button></div> : <span className={`table-status status-${bid.status}`}>{bid.status.replace('_', ' ')}</span>}</div>{['pending', 'accepted', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(bid.status) && <TaskLifecyclePanel task={bid} userRole="customer" onUpdated={load} />}</div>)}</div>}
+          {post.serviceAddress && <p className="customer-request-location"><strong>Service location:</strong> {[post.serviceAddress, post.building, post.flatNo ? `Flat ${post.flatNo}` : ''].filter(Boolean).join(', ')}</p>}
+          {bids.length > 0 && <div className="customer-bid-list">{bids.map((bid) => <div className="customer-bid-entry" key={bid.taskId}><div className="customer-bid-row"><div><strong>{bid.technicianName || 'Approved technician'}</strong><span>{bid.technicianSkills || 'Technician application approved'}{bid.proposedAt ? ` · Proposed ${new Date(bid.proposedAt).toLocaleString()}` : ' · Appointment time not provided'}</span></div><strong className="bid-price">৳{bid.price}</strong>{bid.status === 'pending' ? <div className="bid-actions"><button className="small-button" type="button" onClick={() => updateBid(bid.taskId, 'accepted')}>Accept</button><button className="quiet-button" type="button" onClick={() => updateBid(bid.taskId, 'rejected')}>Decline</button></div> : <span className={`table-status status-${bid.status}`}>{bid.status.replace('_', ' ')}</span>}</div>{bid.status === 'pending' && <PendingTechnicianOverview taskId={bid.taskId} />}{['pending', 'accepted', 'scheduled', 'in_progress', 'completed', 'cancelled'].includes(bid.status) && <TaskLifecyclePanel task={bid} userRole="customer" onUpdated={load} />}</div>)}</div>}
           {acceptedBid && <AcceptedTechnicianProfile technician={acceptedBid} />}
         </article>
       })}</div> : <EmptyState text={posts.length ? 'No requests match your filters.' : 'Your requests will appear here after you post one.'} />}
@@ -931,8 +1006,8 @@ function TechnicianDashboard({ user }) {
       {loading ? <LoadingState text="Loading your work..." /> : loadError ? <div className="dashboard-error" role="alert"><p>{loadError}</p><button className="small-button" type="button" onClick={load}>Retry</button></div> : <>
         <section className="panel" id="technician-opportunities" data-dashboard-section="technician-opportunities"><div className="panel-heading"><div><p className="eyebrow">Opportunities</p><h2>Requests waiting for an offer</h2></div><span className="count-badge">{visibleRequests.length}</span></div><div className="dashboard-toolbar"><label className="dashboard-search">Search requests<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></label><label className="dashboard-search">Category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item} value={item}>{item === 'all' ? 'All categories' : item}</option>)}</select></label><label className="matching-toggle"><input type="checkbox" checked={localMatchesOnly} onChange={(event) => setLocalMatchesOnly(event.target.checked)} />Show matching service-area requests only ({matchedRequests.length})</label></div>{visibleRequests.length ? <div className="request-grid compact-grid">{visibleRequests.map((item) => <article className="request-card" key={item.id}><span className="request-category">{item.category}{item.areaMatch ? ' · Nearby match' : ''}</span><h3>{item.detail}</h3><p>{item.customerName || 'Anonymous customer'} · {item.subCategory || 'Service request'} · Posted {new Date(item.createdAt).toLocaleDateString()}</p><div className="offer-inputs"><label>Offer price<input type="number" min="0.01" step="0.01" placeholder="Your price" value={prices[item.id] || ''} onChange={(event) => setPrices({ ...prices, [item.id]: event.target.value })} /></label><label>Proposed appointment<input type="datetime-local" value={scheduleDrafts[item.id] || ''} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [item.id]: event.target.value })} /></label><button className="small-button" type="button" onClick={() => bid(item.id)}>Send offer</button></div></article>)}</div> : <EmptyState text={requests.length ? 'No requests match those filters.' : 'There are no open requests right now.'} />}</section>
         <section className="panel" id="technician-offers" data-dashboard-section="technician-offers"><div className="panel-heading"><div><p className="eyebrow">Your offers</p><h2>Pending bids</h2></div><span className="count-badge">{pendingBids.length}</span></div>{pendingBids.length ? <div className="bid-editor-list">{pendingBids.map((task) => <div className="bid-editor-row" key={task.id}><div><strong>{task.detail}</strong><span>Current offer: ৳{task.price}</span></div><input type="number" min="0.01" step="0.01" aria-label={`Updated offer for ${task.detail}`} value={prices[`task-${task.id}`] ?? task.price} onChange={(event) => setPrices({ ...prices, [`task-${task.id}`]: event.target.value })} /><input type="datetime-local" aria-label={`Proposed appointment for ${task.detail}`} value={scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt)} onChange={(event) => setScheduleDrafts({ ...scheduleDrafts, [`task-${task.id}`]: event.target.value })} /><button className="small-button" type="button" onClick={async () => { const schedule = scheduleDrafts[`task-${task.id}`] ?? toDateTimeInputValue(task.proposedAt); try { await request(`/technician/tasks/${task.id}/bid`, { method: 'PATCH', body: JSON.stringify({ price: prices[`task-${task.id}`] ?? task.price, proposedAt: dateTimeToIso(schedule) }) }); setMessage('Offer updated.'); await load() } catch (error) { setMessage(error.message) } }}>Update offer</button></div>)}</div> : <EmptyState text="Bids you place will appear here until the customer decides." />}</section>
-        <section className="panel" id="technician-active" data-dashboard-section="technician-active"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span>{task.status === 'scheduled' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div><TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} /></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
-        <section className="panel history-panel" id="technician-history" data-dashboard-section="technician-history"><div className="panel-heading"><div><p className="eyebrow">Work history</p><h2>Completed and closed jobs</h2></div><span className="count-badge">{completedTasks.length}</span></div>{completedTasks.length > 0 ? <div className="activity-list">{completedTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></div>{task.status === 'completed' && <TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} />}</article>)}</div> : <EmptyState text="Completed and closed jobs will appear here." />}</section>
+        <section className="panel" id="technician-active" data-dashboard-section="technician-active"><div className="panel-heading"><div><p className="eyebrow">Task lifecycle</p><h2>Active jobs</h2></div><span className="count-badge">{activeTasks.length}</span></div>{activeTasks.length ? <div className="activity-list">{activeTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} />{task.status === 'scheduled' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'in_progress')}>Start job</button>}{task.status === 'in_progress' && <button className="small-button" type="button" onClick={() => updateTask(task.id, 'completed')}>Mark complete</button>}</div><TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} /></article>)}</div> : <EmptyState text="Accepted work will appear here." />}</section>
+        <section className="panel history-panel" id="technician-history" data-dashboard-section="technician-history"><div className="panel-heading"><div><p className="eyebrow">Work history</p><h2>Completed and closed jobs</h2></div><span className="count-badge">{completedTasks.length}</span></div>{completedTasks.length > 0 ? <div className="activity-list">{completedTasks.map((task) => <article className="activity-item task-activity-item" key={task.id}><div><span className="request-category">{task.category}</span><h3>{task.detail}</h3><span className="muted-label">Agreed price: ৳{task.agreedPrice ?? task.price}</span><TaskServiceLocation task={task} /><span className={`dashboard-status status-${task.status}`}>{task.status.replace('_', ' ')}</span></div>{task.status === 'completed' && <TaskLifecyclePanel task={task} userRole="technician" onUpdated={load} />}</article>)}</div> : <EmptyState text="Completed and closed jobs will appear here." />}</section>
       </>}
     </section>
   </DashboardLayout>

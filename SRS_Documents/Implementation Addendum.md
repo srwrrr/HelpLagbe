@@ -20,6 +20,7 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 - **FR-004:** The technician registration route shall open the registration form with Technician selected. Applicants shall also be able to select Customer instead.
 - **FR-005:** A technician application shall remain pending until an administrator approves it. Only approved technicians may participate in bidding.
 - **FR-006:** The sign-in experience shall continue to use the account role to route users to the appropriate workspace.
+- **FR-006a:** Customers and technician applicants may provide a phone number during registration; it shall be optional and editable later from the profile. Email and password remain the sign-in credentials.
 
 ### Technician directory
 
@@ -51,6 +52,9 @@ HelpLagbe is a responsive web-based home-services marketplace. Customers post se
 - **FR-026:** Technicians shall also be able to edit their listed skills; profile changes shall update their technician directory information.
 - **FR-027:** Profile changes shall be authenticated, validated, and rejected when the email is already used by another account. Profile photos shall accept JPG, PNG, or WebP images up to 5 MB, be stored as uploaded files, and be removable. A successful update shall refresh the signed-in user's displayed name, email, and avatar.
 - **FR-028:** When a customer accepts a technician's bid, the customer workspace shall provide the technician's full name, skills, completed-task count, and overall customer rating and review count.
+- **FR-028a:** Before accepting a pending bid, a customer shall be able to review the technician's profile, skills, service area, availability, completed-task count, up to five recent completed jobs, overall rating, and up to five recent customer reviews. This preview shall not expose the technician's private contact details.
+- **FR-028b:** Each customer request shall capture its service address, with optional building and flat/unit details. The exact location shall be visible to the requesting customer and only to the selected technician after the bid is accepted; public listings and pending bidders shall not receive it.
+- **FR-028c:** After a bid is accepted, the selected technician shall be able to view the job's service address and the customer's optional phone number in their task workspace; the customer shall be able to view the technician's optional phone number in the accepted technician profile. Neither side's phone number shall be shown to other bidders or in public listings.
 - **FR-029:** After a technician completes a task, its customer shall be able to submit or update a one-to-five-star rating, select up to five suggested compliments, and optionally write a review of up to 500 characters.
 - **FR-030:** A technician's overall customer rating shall be calculated from ratings submitted for completed tasks and displayed with the rating count. Review compliments shall be limited to the application's suggested list.
 - **FR-031:** A saved technician profile photo shall appear in the approved technician directory and in the customer profile shown for an accepted task. Users without a photo shall retain an initial-based avatar.

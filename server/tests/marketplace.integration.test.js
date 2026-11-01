@@ -54,7 +54,9 @@ test('customer, technician, bid, and archive lifecycle works against the configu
   let reportId
 
   try {
-    let response = await request(app).post('/api/auth/register').send({ username: 'Integration Customer', email: customerEmail, password })
+    let response = await request(app).post('/api/auth/register').send({
+      username: 'Integration Customer', email: customerEmail, password, phone: '01325409985',
+    })
     assert.equal(response.status, 201)
     response = await request(app).post('/api/auth/login').send({ email: customerEmail, password })
     assert.equal(response.status, 200)
@@ -62,7 +64,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
 
     response = await request(app).post('/api/auth/register-technician').send({
       username: 'Integration Technician', email: technicianEmail, password,
-      nationalId: `IT-${suffix}`, skills: 'Verified plumbing specialist',
+      phone: '01325409986', nationalId: `IT-${suffix}`, skills: 'Verified plumbing specialist',
     })
     assert.equal(response.status, 201)
     const [[technician]] = await pool.execute(
@@ -77,6 +79,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
 
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`).send({
       detail: `Lifecycle ${suffix}`, category: 'Plumbing',
+      serviceAddress: 'Road 5, Dhanmondi, Dhaka', building: 'Green House', flatNo: '4B',
     })
     assert.equal(response.status, 201)
     const postId = response.body.id
@@ -93,15 +96,18 @@ test('customer, technician, bid, and archive lifecycle works against the configu
       const listedPost = response.body.items.find((post) => post.id === postId)
       assert.ok(listedPost)
       assert.equal(listedPost.customerName, expectedCustomerName)
+      assert.equal(listedPost.serviceAddress, undefined)
     }
 
     response = await request(app).get('/api/technician/requests').set('Authorization', `Bearer ${technicianToken}`)
     assert.equal(response.status, 200)
     assert.equal(response.body.find((post) => post.id === postId)?.customerName, 'Integration Customer')
+    assert.equal(response.body.find((post) => post.id === postId)?.serviceAddress, undefined)
 
     response = await request(app).get('/api/profile').set('Authorization', `Bearer ${technicianToken}`)
     assert.equal(response.status, 200)
     assert.equal(response.body.role, 'technician')
+    assert.equal(response.body.phone, '01325409986')
     response = await request(app).patch('/api/profile').set('Authorization', `Bearer ${technicianToken}`).send({
       name: 'Updated Integration Technician',
       email: technicianEmail,
@@ -153,7 +159,22 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500, proposedAt: proposedAppointment })
     assert.equal(response.status, 409)
 
+    response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${customerToken}`)
+    assert.equal(response.body.find((post) => post.id === postId)?.serviceAddress, 'Road 5, Dhanmondi, Dhaka')
+    assert.equal(response.body.find((post) => post.id === postId)?.building, 'Green House')
+    assert.equal(response.body.find((post) => post.id === postId)?.flatNo, '4B')
     const [[task]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [postId, technician.technician_id])
+    response = await request(app).get(`/api/customer/bids/${task.task_id}/technician`).set('Authorization', `Bearer ${customerToken}`)
+    assert.equal(response.status, 200)
+    assert.equal(response.body.name, 'Updated Integration Technician')
+    assert.equal(Number(response.body.completedJobs), 0)
+    assert.deepEqual(response.body.workHistory, [])
+    assert.deepEqual(response.body.reviews, [])
+    response = await request(app).get('/api/technician/tasks').set('Authorization', `Bearer ${technicianToken}`)
+    assert.equal(response.status, 200)
+    const pendingTechTask = response.body.find((item) => item.id === task.task_id)
+    assert.equal(pendingTechTask.serviceAddress, null)
+    assert.equal(pendingTechTask.customerPhone, null)
     response = await request(app).patch(`/api/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${customerToken}`).send({ status: 'accepted' })
     assert.equal(response.status, 200)
     response = await request(app).patch(`/api/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${customerToken}`).send({ status: 'accepted' })
@@ -166,6 +187,12 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(response.status, 200)
     const [[state]] = await pool.execute('SELECT task_status FROM tasks WHERE task_id = ?', [task.task_id])
     assert.equal(state.task_status, 'scheduled')
+    response = await request(app).get('/api/technician/tasks').set('Authorization', `Bearer ${technicianToken}`)
+    const acceptedTechTask = response.body.find((item) => item.id === task.task_id)
+    assert.equal(acceptedTechTask.serviceAddress, 'Road 5, Dhanmondi, Dhaka')
+    assert.equal(acceptedTechTask.building, 'Green House')
+    assert.equal(acceptedTechTask.flatNo, '4B')
+    assert.equal(acceptedTechTask.customerPhone, '01325409985')
     const [[notice]] = await pool.execute("SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? AND type = 'bid_accepted'", [technician.user_id])
     assert.ok(Number(notice.total) > 0)
 
@@ -188,6 +215,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.ok(completedTask)
     assert.equal(completedTask.technicianId, technician.technician_id)
     assert.equal(completedTask.technicianName, 'Updated Integration Technician')
+    assert.equal(completedTask.technicianPhone, '01234567890')
     assert.equal(Number(completedTask.technicianCompletedJobs), 1)
     assert.equal(Number(completedTask.technicianReviewCount), 0)
 
@@ -212,7 +240,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     response = await request(app).post('/api/auth/login').send({ email: archiveEmail, password })
     assert.equal(response.status, 200)
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${response.body.token}`).send({
-      detail: `Restored history ${suffix}`, category: 'Appliance',
+      detail: `Restored history ${suffix}`, category: 'Appliance', serviceAddress: 'Dhaka, Bangladesh',
     })
     assert.equal(response.status, 201)
 
@@ -239,7 +267,9 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     response = await request(app).post('/api/auth/login').send({ email: archiveEmail, password })
     assert.equal(response.status, 200)
     response = await request(app).get('/api/customer/posts').set('Authorization', `Bearer ${response.body.token}`)
-    assert.ok(response.body.some((post) => post.detail === `Restored history ${suffix}`))
+    const restoredRequest = response.body.find((post) => post.detail === `Restored history ${suffix}`)
+    assert.ok(restoredRequest)
+    assert.equal(restoredRequest.serviceAddress, 'Dhaka, Bangladesh')
 
     response = await request(app).delete(`/api/admin/users/${archiveUserId}`).set('Authorization', `Bearer ${adminToken}`)
     assert.equal(response.status, 200)

@@ -81,6 +81,23 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }h1 { margin: 0; font-siz
 .customer-bid-entry { display: grid; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .customer-bid-entry .customer-bid-row { border-bottom: 0; padding: 3px 4px; }
 .customer-bid-entry .task-lifecycle-panel { margin: 0 4px 4px; }
+.pending-technician-overview { margin: 0 4px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, .02); }
+.pending-technician-overview > .technician-profile-toggle { width: 100%; padding: 12px 14px; }
+.technician-overview-details { display: grid; gap: 14px; padding: 14px; border-top: 1px solid var(--line); }
+.technician-overview-details .technician-profile-identity { margin: 0; }
+.technician-overview-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.technician-overview-columns h4 { margin: 0 0 8px; }
+.technician-overview-columns ul { display: grid; gap: 10px; margin: 0; padding-left: 18px; color: var(--muted); font-size: .8rem; }
+.technician-overview-columns li p { margin: 4px 0; color: var(--ink); line-height: 1.45; }
+.request-location-fields { display: grid; gap: 12px; min-width: 0; margin: 4px 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; }
+.request-location-fields legend { padding: 0 6px; color: var(--ink); font-weight: 700; }
+.request-location-fields label { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.request-location-fields input { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; background: var(--panel); color: var(--ink); }
+.request-location-fields > .muted-label { margin: 0; }
+.customer-request-location { margin: 10px 0; color: var(--muted); font-size: .82rem; }
+.customer-request-location strong, .task-service-location strong { color: var(--ink); }
+.task-service-location { display: grid; gap: 5px; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
+.task-service-location a { color: var(--orange); font-weight: 700; }
 .technician-filters label, .offer-inputs label, .task-lifecycle-panel label, .admin-report-actions label { display: grid; gap: 6px; color: var(--muted); font-size: .76rem; font-weight: 700; }
 .technician-filters input, .technician-filters select, .offer-inputs input, .task-lifecycle-panel input, .task-lifecycle-panel select, .admin-report-actions input, .inline-report-form textarea, .inline-report-form select { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; background: var(--panel); color: var(--ink); }
 .offer-inputs { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(170px, 1fr) auto; align-items: end; gap: 10px; margin-top: 16px; }
@@ -117,7 +134,7 @@ h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }h1 { margin: 0; font-siz
 .admin-report-actions button:disabled { cursor: not-allowed; opacity: .5; }
 .danger-button { color: #ff8e83; }
 @media (max-width: 850px) { .technician-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }.task-activity-item { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .technician-filters { grid-template-columns: 1fr; }.offer-inputs { grid-template-columns: 1fr; }.booking-timeline { gap: 2px; }.booking-step small { font-size: .55rem; }.task-lifecycle-actions, .task-cancel-actions { align-items: stretch; flex-direction: column; }.admin-report-card > header { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 600px) { .technician-filters { grid-template-columns: 1fr; }.offer-inputs { grid-template-columns: 1fr; }.booking-timeline { gap: 2px; }.booking-step small { font-size: .55rem; }.task-lifecycle-actions, .task-cancel-actions { align-items: stretch; flex-direction: column; }.admin-report-card > header { align-items: flex-start; flex-direction: column; }.technician-overview-columns { grid-template-columns: 1fr; }.request-location-fields .form-row { grid-template-columns: 1fr; } }
 
 .theme-toggle { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 20px; padding: 8px 12px; background: transparent; color: var(--ink); font-size: .78rem; font-weight: 700; }
 .theme-toggle span:first-child { color: var(--orange); font-size: 1rem; line-height: 1; }

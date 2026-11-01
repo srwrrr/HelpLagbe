@@ -124,6 +124,9 @@ CREATE TABLE `posts` (
   `Image` varchar(255) DEFAULT NULL,
   `Category` varchar(100) NOT NULL,
   `Sub-Category` varchar(100) DEFAULT NULL,
+  `service_address` varchar(500) DEFAULT NULL,
+  `building` varchar(150) DEFAULT NULL,
+  `flat_no` varchar(100) DEFAULT NULL,
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
