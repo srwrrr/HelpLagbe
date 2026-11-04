@@ -36,7 +36,10 @@ function getAssetUrl(path) {
 const technicianTransitions = { pending: ['approved', 'rejected'], approved: ['suspended', 'rejected'], suspended: ['approved', 'rejected'], rejected: ['approved'] }
 
 function ProfileAvatar({ name, image, className = 'profile-avatar' }) {
-  return <span className={className}>{image ? <img src={getAssetUrl(image)} alt="" /> : (name?.slice(0, 1) || '?')}</span>
+  // If the saved photo cannot be loaded (for example the file was lost), show the initial instead of an empty circle.
+  const [failedImage, setFailedImage] = useState(null)
+  const showImage = image && failedImage !== image
+  return <span className={className}>{showImage ? <img src={getAssetUrl(image)} alt="" onError={() => setFailedImage(image)} /> : (name?.slice(0, 1) || '?')}</span>
 }
 
 function toDateTimeInputValue(value) {
