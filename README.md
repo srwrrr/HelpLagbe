@@ -192,7 +192,9 @@ Each workspace has a sidebar. Besides Overview, Messages and Edit profile, the n
 - Users can block each other. A block stops messages and offers in both directions and hides each person's requests from the other.
 - A customer can report a problem with a finished job for 7 days. The technician accepts, declines or resolves it with a note, and the customer is notified at each step.
 - Dispute reports accept a photo as evidence. When resolving a report an admin can send a warning or suspend the reported technician; both are recorded and the user is notified.
-- A technician profile shows an "ID verified" badge when a national ID and document are on file. It means the documents exist, not that an admin has reviewed them.
+- **ID verification.** A technician uploads a photo of their national ID from Edit profile. An administrator opens the photo, compares it with the national ID number on file, and verifies or rejects it (a rejection needs a reason, which the technician sees). Only a verified ID earns the "ID verified" badge on the technician's profile, and uploading a replacement photo removes the badge until it is reviewed again.
+- ID photos are private. They are saved in a `private/` folder outside the public uploads folder, are never served to the public, and only administrators can open them, through an authenticated request. Every time an administrator opens a document it is recorded in the audit log. The `private/` folder is ignored by Git.
+- **Admin user details.** From the Users, Technicians and Applications lists, an administrator can open a full details view for any customer or technician: contact details, national ID number and skills, activity and payment totals, ratings, recent requests or jobs, reports filed and received, blocks, and the admin actions taken on that account. Passwords are never returned.
 
 ### Convenience
 
@@ -262,7 +264,7 @@ This Blueprint pins the API to Render's free compute plan, and Render static sit
 
 The API also accepts a provider's `DATABASE_URL` instead of separate `DB_*` values. Set `DB_SSL=true` if that database requires TLS.
 
-Free API services may sleep while idle. The API filesystem is ephemeral, so uploaded images can disappear after restarts or redeploys; use S3-compatible object storage for durable uploads. Free database plans may limit storage, connections, backups, and uptime. Keep separate backups and do not rely on this setup for business-critical data without reviewing the provider's terms and recovery guarantees.
+Free API services may sleep while idle. The API filesystem is ephemeral, so uploaded files can disappear after restarts or redeploys. That includes profile photos, request and message photos, dispute evidence and technicians' ID photos, and the database keeps pointing at files that no longer exist. Use private, S3-compatible object storage for durable uploads. A technician whose ID photo has been lost has to upload it again before an administrator can verify it. Free database plans may limit storage, connections, backups, and uptime. Keep separate backups and do not rely on this setup for business-critical data without reviewing the provider's terms and recovery guarantees.
 
 ## Troubleshooting
 

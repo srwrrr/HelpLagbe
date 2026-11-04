@@ -4,8 +4,8 @@ import { after, before, test } from 'node:test'
 import jwt from 'jsonwebtoken'
 import mysql from 'mysql2/promise'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
-import { unlink } from 'node:fs/promises'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { unlink, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import request from 'supertest'
 import { app, closeDatabasePool, ensureTiDBIdSequences } from '../src/server.js'
@@ -67,8 +67,16 @@ async function makeTechnician(label, { verified = false } = {}) {
   assert.equal(response.status, 201, `register technician ${label}`)
   const [[row]] = await pool.execute('SELECT technician_id, user_id FROM technician WHERE user_id = (SELECT user_id FROM users WHERE email = ?)', [email])
   await pool.execute("UPDATE technician SET status = 'approved' WHERE technician_id = ?", [row.technician_id])
-  if (verified) await pool.execute("UPDATE technician SET Required_Documents = 'uploads/test-doc.png' WHERE technician_id = ?", [row.technician_id])
-  return { token: jwt.sign({ userId: row.user_id, role: 'technician' }, secret, { expiresIn: '10m' }), userId: row.user_id, technicianId: row.technician_id, email }
+  const technician = { token: jwt.sign({ userId: row.user_id, role: 'technician' }, secret, { expiresIn: '10m' }), userId: row.user_id, technicianId: row.technician_id, email }
+  if (verified) {
+    response = await as('post', '/api/technician/id-document', technician.token).send({ imageData: tinyPng })
+    assert.equal(response.status, 200, 'verified technician: upload')
+    const [[document]] = await pool.execute('SELECT Required_Documents FROM technician WHERE technician_id = ?', [row.technician_id])
+    uploads.push(document.Required_Documents)
+    response = await as('patch', `/api/admin/technicians/${row.technician_id}/id-verification`, adminToken).send({ decision: 'verified' })
+    assert.equal(response.status, 200, 'verified technician: review')
+  }
+  return technician
 }
 
 async function postRequest(customer, detail = 'Leaking kitchen tap needs repair', extra = {}) {
@@ -152,8 +160,8 @@ test('phase 1: ID-verified badge, onboarding checklist, earnings and analytics',
   let response = await request(app).get('/api/technicians').query({ search: 'Phases p1' })
   assert.equal(response.status, 200)
   const byId = Object.fromEntries(response.body.items.map((item) => [item.id, item]))
-  assert.equal(Number(byId[verified.technicianId].idVerified), 1, 'technician with ID and documents is verified')
-  assert.equal(Number(byId[plain.technicianId].idVerified), 0, 'technician without documents is not verified')
+  assert.equal(Number(byId[verified.technicianId].idVerified), 1, 'technician whose ID an admin verified shows the badge')
+  assert.equal(Number(byId[plain.technicianId].idVerified), 0, 'technician without a verified ID has no badge')
 
   // Onboarding checklist
   response = await as('get', '/api/technician/account-status', plain.token)
@@ -705,8 +713,12 @@ test('phase 3: photos in messages', opts, async () => {
   assert.equal(response.status, 400, 'fake image rejected')
   response = await as('post', `/api/messages/${taskId}`, customer.token).send({ body: '', imageData: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' })
   assert.equal(response.status, 400, 'unsupported image type rejected')
+  const uploadFolder = resolve(process.cwd(), '..', 'uploads')
+  const messagePhotos = () => readdirSync(uploadFolder).filter((name) => name.startsWith('message_')).length
+  const filesBefore = messagePhotos()
   response = await as('post', `/api/messages/${taskId}`, stranger.token).send({ body: 'hi', imageData: tinyPng })
   assert.equal(response.status, 404, 'non-participants cannot post')
+  assert.equal(messagePhotos(), filesBefore, 'a rejected post leaves no photo on disk')
   response = await as('post', `/api/messages/${taskId}`, customer.token).send({ body: '', imageData: tinyPng })
   assert.equal(response.status, 201, 'a photo alone is a valid message')
   response = await as('post', `/api/messages/${taskId}`, technician.token).send({ body: 'Got it, thanks', imageData: tinyPng })
@@ -942,4 +954,215 @@ test('history: customers and technicians can filter, page and export finished jo
   assert.match(response.text.split('\n')[0], /"Customer"/)
   response = await as('get', '/api/history/export', adminToken)
   assert.equal(response.status, 403)
+})
+
+// ---------------------------------------------------------------- ID verification and admin user details
+
+const pngBytes = Buffer.from(tinyPng.split(',')[1], 'base64')
+
+async function uploadIdDocument(technician, imageData = tinyPng) {
+  const response = await as('post', '/api/technician/id-document', technician.token).send({ imageData })
+  assert.equal(response.status, 200, `upload: ${JSON.stringify(response.body)}`)
+  const [[row]] = await pool.execute('SELECT Required_Documents FROM technician WHERE technician_id = ?', [technician.technicianId])
+  uploads.push(row.Required_Documents)
+  return row.Required_Documents
+}
+
+test('ID verification: documents stay private, admins review them, and only then does the badge show', opts, async () => {
+  const customer = await makeCustomer('idv-customer')
+  const technician = await makeTechnician('idv-tech')
+  const bare = await makeTechnician('idv-bare')
+  const badgeFor = async (target) => {
+    const response = await request(app).get('/api/technicians').query({ search: `Phases ${target.label}` })
+    return Number(response.body.items.find((item) => item.id === target.technicianId).idVerified)
+  }
+  technician.label = 'idv-tech'
+  bare.label = 'idv-bare'
+  const review = (target, body, token = adminToken) => as('patch', `/api/admin/technicians/${target.technicianId}/id-verification`, token).send(body)
+
+  // Upload rules
+  let response = await as('post', '/api/technician/id-document', customer.token).send({ imageData: tinyPng })
+  assert.equal(response.status, 403, 'customers cannot upload an ID document')
+  response = await as('post', '/api/technician/id-document', technician.token).send({ imageData: 'data:image/png;base64,bm90IGFuIGltYWdl' })
+  assert.equal(response.status, 400, 'a fake image is rejected')
+  response = await as('post', '/api/technician/id-document', technician.token).send({})
+  assert.equal(response.status, 400)
+  response = await as('get', '/api/technician/account-status', technician.token)
+  assert.deepEqual(response.body.idVerification, { status: 'unverified', note: null, hasDocument: false })
+  assert.equal(await badgeFor(technician), 0)
+
+  // Stored privately, never reachable through the public uploads route
+  const firstPath = await uploadIdDocument(technician)
+  assert.match(firstPath, /^private\/id-documents\/[0-9a-f-]+\.png$/)
+  const firstFile = resolve(process.cwd(), '..', firstPath)
+  assert.ok(existsSync(firstFile), 'file written to the private folder')
+  assert.ok(!existsSync(resolve(process.cwd(), '..', 'uploads', firstPath.split('/').pop())), 'not in the public uploads folder')
+  for (const url of [`/${firstPath}`, `/uploads/${firstPath.split('/').pop()}`, `/uploads/../${firstPath}`]) {
+    response = await request(app).get(url)
+    assert.ok([404, 400].includes(response.status), `${url} is not public (${response.status})`)
+  }
+  response = await as('get', '/api/technician/account-status', technician.token)
+  assert.deepEqual(response.body.idVerification, { status: 'unverified', note: null, hasDocument: true })
+  assert.equal(response.body.checklist.find((item) => item.id === 'documents').done, true)
+  assert.equal(await badgeFor(technician), 0, 'uploading alone does not earn the badge')
+  response = await as('get', '/api/admin/overview', adminToken)
+  assert.ok(Number(response.body.counts.idReviewsWaiting) >= 1, 'the admin overview counts reviews waiting')
+  assert.equal(response.body.technicians.find((item) => item.id === technician.technicianId).hasDocument, 1)
+
+  // Only admins can open the document, and every view is audited
+  for (const token of [customer.token, technician.token]) {
+    response = await as('get', `/api/admin/technicians/${technician.technicianId}/id-document`, token)
+    assert.equal(response.status, 403)
+  }
+  response = await request(app).get(`/api/admin/technicians/${technician.technicianId}/id-document`)
+  assert.equal(response.status, 401)
+  response = await as('get', `/api/admin/technicians/${technician.technicianId}/id-document`, adminToken).buffer(true).parse((res, done) => { const chunks = []; res.on('data', (chunk) => chunks.push(chunk)); res.on('end', () => done(null, Buffer.concat(chunks))) })
+  assert.equal(response.status, 200)
+  assert.equal(response.headers['content-type'], 'image/png')
+  assert.equal(response.headers['cache-control'], 'no-store')
+  assert.equal(response.headers['x-content-type-options'], 'nosniff')
+  assert.ok(Buffer.compare(response.body, pngBytes) === 0, 'the admin receives the uploaded bytes')
+  const [[viewed]] = await pool.execute("SELECT COUNT(*) AS total FROM admin_audit_log WHERE action = 'id_document_viewed' AND target_id = ?", [technician.technicianId])
+  assert.ok(Number(viewed.total) >= 1)
+  response = await as('get', `/api/admin/technicians/${bare.technicianId}/id-document`, adminToken)
+  assert.equal(response.status, 404, 'no document, nothing to show')
+
+  // Review rules
+  response = await review(bare, { decision: 'verified' })
+  assert.equal(response.status, 409, 'cannot verify without a document')
+  response = await review(technician, { decision: 'maybe' })
+  assert.equal(response.status, 400)
+  response = await review(technician, { decision: 'rejected' })
+  assert.equal(response.status, 400, 'a rejection needs a reason')
+  response = await review(technician, { decision: 'verified' }, customer.token)
+  assert.equal(response.status, 403)
+  response = await review({ technicianId: 99999999 }, { decision: 'verified' })
+  assert.equal(response.status, 404)
+  response = await review(technician, { decision: 'rejected', note: 'The photo is too blurry to read.' })
+  assert.equal(response.status, 200)
+  response = await as('get', '/api/technician/account-status', technician.token)
+  assert.deepEqual(response.body.idVerification, { status: 'rejected', note: 'The photo is too blurry to read.', hasDocument: true })
+  assert.equal(await badgeFor(technician), 0)
+  const [[rejectedNotice]] = await pool.execute("SELECT message FROM notifications WHERE user_id = ? AND type = 'id_verification'", [technician.userId])
+  assert.match(rejectedNotice.message, /too blurry/)
+
+  response = await review(technician, { decision: 'verified' })
+  assert.equal(response.status, 200)
+  assert.equal(await badgeFor(technician), 1, 'verified by an admin: the badge shows')
+  const [[stamped]] = await pool.execute('SELECT id_verification_status, id_verified_by, id_verified_at, id_verification_note FROM technician WHERE technician_id = ?', [technician.technicianId])
+  assert.equal(stamped.id_verification_status, 'verified')
+  assert.ok(stamped.id_verified_by && stamped.id_verified_at)
+  assert.equal(stamped.id_verification_note, null)
+  const [[audited]] = await pool.execute("SELECT COUNT(*) AS total FROM admin_audit_log WHERE action IN ('id_verified', 'id_rejected') AND target_id = ?", [technician.technicianId])
+  assert.equal(Number(audited.total), 2)
+
+  // A replacement document must be reviewed again and the old file is removed
+  const secondPath = await uploadIdDocument(technician)
+  assert.notEqual(secondPath, firstPath)
+  assert.ok(!existsSync(firstFile), 'the previous private file is deleted')
+  assert.ok(existsSync(resolve(process.cwd(), '..', secondPath)))
+  assert.equal(await badgeFor(technician), 0, 'a new document removes the badge until reviewed')
+  response = await as('get', '/api/technician/account-status', technician.token)
+  assert.equal(response.body.idVerification.status, 'unverified')
+
+  // Stored paths can never lead outside the two document folders
+  for (const hostile of ['private/../../server/.env', 'uploads/../src/server.js', '../server/.env', '/etc/passwd', 'private/id-documents/missing.png', 'uploads/not-an-image.txt']) {
+    await pool.execute('UPDATE technician SET Required_Documents = ? WHERE technician_id = ?', [hostile, technician.technicianId])
+    response = await as('get', `/api/admin/technicians/${technician.technicianId}/id-document`, adminToken)
+    assert.equal(response.status, 404, `${hostile} is refused`)
+    response = await review(technician, { decision: 'verified' })
+    assert.equal(response.status, 409, `${hostile} cannot be verified`)
+  }
+
+  // Older documents in the public folder can still be reviewed
+  const legacyName = `legacy-id-${suffix}.png`
+  const legacyFile = resolve(process.cwd(), '..', 'uploads', legacyName)
+  await writeFile(legacyFile, pngBytes)
+  uploads.push(`uploads/${legacyName}`)
+  await pool.execute('UPDATE technician SET Required_Documents = ? WHERE technician_id = ?', [`uploads/${legacyName}`, technician.technicianId])
+  response = await as('get', `/api/admin/technicians/${technician.technicianId}/id-document`, adminToken)
+  assert.equal(response.status, 200)
+  response = await review(technician, { decision: 'verified' })
+  assert.equal(response.status, 200)
+  response = await as('get', `/api/admin/users/${technician.userId}/details`, adminToken)
+  assert.equal(response.body.technician.idVerification.legacyPublicFile, true, 'admins are told when a document is in the public folder')
+})
+
+test('admin details: full profile, activity and history for customers and technicians', opts, async () => {
+  const f = await analyticsFixture('detail')
+  const details = (userId, token = adminToken) => as('get', `/api/admin/users/${userId}/details`, token)
+
+  let response = await details(f.customer.userId, f.customer.token)
+  assert.equal(response.status, 403, 'customers cannot read other accounts')
+  response = await details(f.customer.userId, f.technician.token)
+  assert.equal(response.status, 403)
+  response = await request(app).get(`/api/admin/users/${f.customer.userId}/details`)
+  assert.equal(response.status, 401)
+  response = await details(99999999)
+  assert.equal(response.status, 404)
+  response = await details('abc')
+  assert.equal(response.status, 404)
+
+  // Customer
+  await postRequest(f.customer, 'Still waiting for the first offer')
+  await as('post', '/api/blocks', f.customer.token).send({ userId: f.technician.userId })
+  response = await as('post', '/api/reports', f.customer.token).send({ reportType: 'dispute', taskId: f.paid.taskId, category: 'Other', description: 'Reporting this technician for the admin to see.' })
+  assert.equal(response.status, 201)
+  response = await details(f.customer.userId)
+  assert.equal(response.status, 200)
+  assert.equal(response.body.role, 'customer')
+  assert.equal(response.body.user.email, f.customer.email)
+  assert.equal(response.body.user.accountStatus, 'active')
+  assert.ok(!JSON.stringify(response.body).toLowerCase().includes('password'), 'no password data is ever returned')
+  const customerKpis = response.body.customer.kpis
+  assert.equal(customerKpis.completedJobs, 2)
+  assert.equal(customerKpis.cancelledJobs, 1)
+  assert.equal(customerKpis.paid, 750)
+  assert.equal(customerKpis.outstanding, 250)
+  assert.equal(customerKpis.reviewsGiven, 1)
+  assert.equal(customerKpis.averageRatingGiven, 5)
+  assert.equal(customerKpis.requests, 5)
+  assert.equal(customerKpis.openRequests, 1, 'only the request with no hire yet is open; hired, completed and cancelled ones are not')
+  assert.ok(response.body.customer.recentRequests.length >= 4)
+  assert.ok(response.body.customer.recentRequests.some((item) => item.technicianName === 'Phases detail-tech'))
+  assert.equal(response.body.blocks.blocking, 1)
+  assert.ok(response.body.reports.some((item) => item.direction === 'filed' && item.type === 'dispute'))
+  assert.equal(response.body.technician, undefined, 'customers have no technician section')
+
+  // Technician
+  response = await details(f.technician.userId)
+  assert.equal(response.status, 200)
+  assert.equal(response.body.role, 'technician')
+  assert.match(response.body.technician.nationalId, /^PH-detail-tech-/, 'admins see the national ID number')
+  assert.equal(response.body.technician.status, 'approved')
+  assert.deepEqual(response.body.technician.idVerification, { status: 'unverified', note: null, verifiedAt: null, verifiedBy: null, hasDocument: false, legacyPublicFile: false })
+  const techKpis = response.body.technician.kpis
+  assert.equal(techKpis.completedJobs, 2)
+  assert.equal(techKpis.offersSent, 4)
+  assert.equal(techKpis.offersHired, 3)
+  assert.equal(techKpis.offersDeclined, 0)
+  assert.equal(techKpis.paid, 750)
+  assert.equal(techKpis.averageRating, 5)
+  assert.equal(response.body.technician.recentJobs.length, 4)
+  assert.ok(response.body.technician.recentJobs.every((item) => item.customerName === 'Phases detail-customer'))
+  assert.ok(Array.isArray(response.body.technician.serviceAreas))
+  assert.equal(response.body.blocks.blockedBy, 1)
+  assert.ok(response.body.reports.some((item) => item.direction === 'against'))
+  response = await details(f.rival.userId)
+  assert.equal(response.body.technician.kpis.offersDeclined, 1)
+
+  // Admin actions on the account show up in its history
+  response = await as('patch', `/api/admin/technicians/${f.technician.technicianId}/status`, adminToken).send({ status: 'suspended', reason: 'Pausing the account while a report is reviewed.' })
+  assert.equal(response.status, 200)
+  response = await details(f.technician.userId)
+  assert.equal(response.body.technician.status, 'suspended')
+  assert.ok(response.body.adminHistory.some((item) => item.action === 'technician_suspended' && /Pausing/.test(item.details)))
+
+  // Administrators can be looked up too, but only for their basic details
+  const [[adminRow]] = await pool.query('SELECT user_id FROM users WHERE admin_id IS NOT NULL LIMIT 1')
+  response = await details(adminRow.user_id)
+  assert.equal(response.status, 200)
+  assert.equal(response.body.role, 'admin')
+  assert.equal(response.body.customer, undefined)
+  assert.equal(response.body.technician, undefined)
 })

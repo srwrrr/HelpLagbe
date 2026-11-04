@@ -5,9 +5,9 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import mysql from 'mysql2/promise'
-import { readFileSync } from 'node:fs'
-import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { mkdir, unlink, writeFile, readFile } from 'node:fs/promises'
+import { extname, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
@@ -328,6 +328,10 @@ async function ensureNotificationTable() {
     await pool.query("ALTER TABLE technician MODIFY status ENUM('pending','approved','suspended','rejected') DEFAULT 'pending'")
   }
   const additions = [
+    ['technician', 'id_verification_status', "ENUM('unverified', 'verified', 'rejected') NOT NULL DEFAULT 'unverified'"],
+    ['technician', 'id_verified_at', 'DATETIME NULL'],
+    ['technician', 'id_verified_by', 'INT NULL'],
+    ['technician', 'id_verification_note', 'VARCHAR(255) NULL'],
     ['posts', 'area', 'VARCHAR(80) NULL'],
     ['saved_addresses', 'area', 'VARCHAR(80) NULL'],
     ['task_messages', 'image', 'VARCHAR(255) NULL'],
@@ -521,6 +525,21 @@ function technicianCoversRequest(serviceArea, requestArea, address) {
   return serviceAreaMatches(serviceArea, address)
 }
 
+// ID documents are sensitive: new ones live outside the public /uploads folder and are only served to admins.
+const PRIVATE_DIRECTORY = resolve(process.cwd(), '../private')
+const PUBLIC_UPLOAD_DIRECTORY = resolve(process.cwd(), '../uploads')
+
+// Maps a stored document path to a file inside one of the two known folders, or null if it points anywhere else.
+function resolveStoredDocument(storedPath) {
+  const value = String(storedPath || '')
+  const base = value.startsWith('private/') ? PRIVATE_DIRECTORY : value.startsWith('uploads/') ? PUBLIC_UPLOAD_DIRECTORY : null
+  if (!base) return null
+  const absolute = resolve(base, value.slice(value.indexOf('/') + 1))
+  return absolute.startsWith(`${base}${sep}`) ? absolute : null
+}
+
+const documentContentTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }
+
 function toCsvCell(value) {
   const text = String(value ?? '')
   const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text
@@ -709,20 +728,13 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
   const body = typeof request.body?.body === 'string' ? request.body.body.trim() : ''
   const hasImage = Boolean(request.body?.imageData)
   if ((!body && !hasImage) || body.length > 1000) return response.status(400).json({ message: 'Message must be between 1 and 1000 characters, or include a photo.' })
-  let imagePath = null
+  // Validate the photo up front, but only write it to disk once we know the sender may post here.
+  let image = null
   if (hasImage) {
-    const image = decodeImageDataUrl(request.body.imageData)
+    image = decodeImageDataUrl(request.body.imageData)
     if (!image || image.error) return response.status(400).json({ message: image?.error || 'Attach a JPG, PNG or WebP photo.' })
-    try {
-      const uploadDirectory = resolve(process.cwd(), '../uploads')
-      await mkdir(uploadDirectory, { recursive: true })
-      const fileName = `message_${randomUUID()}.${image.extension}`
-      await writeFile(resolve(uploadDirectory, fileName), image.buffer)
-      imagePath = `uploads/${fileName}`
-    } catch (error) {
-      return response.status(500).json({ message: 'Could not save the photo.' })
-    }
   }
+  let imagePath = null
   try {
     const [access] = await pool.execute(
       `SELECT t.task_id, p.user_id AS customerId, tech.user_id AS technicianUserId, p.Post_detail
@@ -735,8 +747,15 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
     if (await usersBlocked(request.user.userId, otherParty)) {
       return response.status(403).json({ message: 'You cannot message this person because one of you has blocked the other.' })
     }
+    if (image) {
+      const uploadDirectory = resolve(process.cwd(), '../uploads')
+      await mkdir(uploadDirectory, { recursive: true })
+      const fileName = `message_${randomUUID()}.${image.extension}`
+      await writeFile(resolve(uploadDirectory, fileName), image.buffer)
+      imagePath = `uploads/${fileName}`
+    }
     await pool.execute('INSERT INTO task_messages (task_id, sender_id, body, image) VALUES (?, ?, ?, ?)', [request.params.taskId, request.user.userId, body, imagePath])
-    const recipient = Number(access[0].customerId) === Number(request.user.userId) ? access[0].technicianUserId : access[0].customerId
+    const recipient = otherParty
     try {
       await createNotification(recipient, 'message', 'New task message', `You have a new message about: ${access[0].Post_detail}`, 'task', access[0].task_id)
     } catch (error) {
@@ -744,6 +763,8 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
     }
     response.status(201).json({ message: 'Message sent.' })
   } catch (error) {
+    if (imagePath) await unlink(resolve(process.cwd(), '..', imagePath)).catch(() => {})
+    console.error('Could not send message.', error.message)
     response.status(500).json({ message: 'Could not send message.' })
   }
 })
@@ -835,7 +856,7 @@ app.get('/api/technicians', optionalAuthenticate, async (request, response) => {
               profile_user.Image AS profileImage,
               EXISTS (SELECT 1 FROM favorite_technicians fav WHERE fav.customer_id = ? AND fav.technician_id = tech.technician_id) AS favorite,
               COALESCE(tech.service_area, tech.address) AS location, tech.availability,
-              MAX(CASE WHEN tech.Required_Documents IS NOT NULL AND tech.Required_Documents <> '' AND tech.national_id IS NOT NULL AND tech.national_id <> '' THEN 1 ELSE 0 END) AS idVerified,
+              MAX(CASE WHEN tech.id_verification_status = 'verified' THEN 1 ELSE 0 END) AS idVerified,
               COUNT(CASE WHEN t.task_status = 'completed' THEN 1 END) AS completedJobs,
               ROUND(AVG(tf.consumer_rating), 1) AS averageRating, COUNT(tf.consumer_rating) AS reviewCount,
               (SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, response_post.created_at, response_task.created_at)))
@@ -1079,6 +1100,7 @@ app.get('/api/technician/account-status', authenticate, async (request, response
     const [rows] = await pool.execute(
       `SELECT tech.status, tech.Skill_details AS skills, tech.service_area AS serviceArea, tech.availability,
               tech.national_id AS nationalId, tech.Required_Documents AS documents,
+              tech.id_verification_status AS idStatus, tech.id_verification_note AS idNote,
               u.Image AS profileImage, u.phone_no AS phone, u.address
        FROM technician tech JOIN users u ON u.user_id = tech.user_id WHERE tech.user_id = ? LIMIT 1`,
       [request.user.userId],
@@ -1091,9 +1113,12 @@ app.get('/api/technician/account-status', authenticate, async (request, response
       { id: 'skills', label: 'Describe your skills (at least 20 characters)', done: String(row.skills || '').trim().length >= 20 },
       { id: 'area', label: 'Set your service area', done: Boolean(row.serviceArea) },
       { id: 'availability', label: 'Set your availability', done: Boolean(row.availability) },
-      { id: 'documents', label: 'Upload your ID documents', done: Boolean(row.documents) && Boolean(row.nationalId) },
+      { id: 'documents', label: 'Upload a photo of your national ID', done: Boolean(row.documents) && Boolean(row.nationalId) },
     ]
-    response.json({ status: row.status, checklist })
+    response.json({
+      status: row.status, checklist,
+      idVerification: { status: row.idStatus, note: row.idStatus === 'rejected' ? row.idNote : null, hasDocument: Boolean(row.documents) },
+    })
   } catch (error) {
     response.status(500).json({ message: 'Could not load account status.' })
   }
@@ -1821,13 +1846,14 @@ app.get('/api/admin/overview', authenticate, requireAdmin, async (_request, resp
       (SELECT COUNT(*) FROM users) AS users,
       (SELECT COUNT(*) FROM technician) AS technicians,
       (SELECT COUNT(*) FROM technician WHERE status = 'pending') AS pendingTechnicians,
+      (SELECT COUNT(*) FROM technician WHERE Required_Documents IS NOT NULL AND Required_Documents <> '' AND id_verification_status = 'unverified') AS idReviewsWaiting,
       (SELECT COUNT(*) FROM posts) AS requests,
       (SELECT COUNT(*) FROM tasks) AS tasks,
       (SELECT COUNT(*) FROM tasks WHERE task_status = 'completed') AS completedTasks`)
     const counts = countRows[0]
     const [pendingTechnicians] = await pool.query(
       `SELECT technician_id AS id, Full_Name AS name, national_id AS nationalId,
-              Skill_details AS skills, address, status
+              Skill_details AS skills, address, status, user_id AS userId
        FROM technician WHERE status = 'pending' ORDER BY created_at DESC`,
     )
     const [users] = await pool.query(
@@ -1865,7 +1891,8 @@ app.get('/api/admin/overview', authenticate, requireAdmin, async (_request, resp
      )
      const [technicians] = await pool.query(
       `SELECT technician_id AS id, Full_Name AS name, national_id AS nationalId,
-            Skill_details AS skills, address, status, user_id AS userId
+            Skill_details AS skills, address, status, user_id AS userId,
+            id_verification_status AS idStatus, (Required_Documents IS NOT NULL AND Required_Documents <> '') AS hasDocument
        FROM technician ORDER BY created_at DESC LIMIT 50`,
      )
      response.json({ counts, pendingTechnicians, users, tasks, posts, technicians })
@@ -1983,6 +2010,220 @@ const technicianTransitions = {
   suspended: ['approved', 'rejected'],
   rejected: ['approved'],
 }
+
+app.post('/api/technician/id-document', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  const image = decodeImageDataUrl(request.body?.imageData)
+  if (!image || image.error) return response.status(400).json({ message: image?.error || 'Upload a JPG, PNG or WebP photo of your national ID.' })
+  let storedPath
+  try {
+    const directory = resolve(PRIVATE_DIRECTORY, 'id-documents')
+    await mkdir(directory, { recursive: true })
+    const fileName = `${randomUUID()}.${image.extension}`
+    await writeFile(resolve(directory, fileName), image.buffer)
+    storedPath = `private/id-documents/${fileName}`
+  } catch (error) {
+    console.error('Could not store ID document.', error.message)
+    return response.status(500).json({ message: 'Could not save your document.' })
+  }
+  try {
+    const [rows] = await pool.execute('SELECT technician_id, Full_Name, Required_Documents FROM technician WHERE user_id = ? LIMIT 1', [request.user.userId])
+    const technician = rows[0]
+    if (!technician) {
+      await unlink(resolveStoredDocument(storedPath)).catch(() => {})
+      return response.status(404).json({ message: 'Technician profile not found.' })
+    }
+    await pool.execute(
+      `UPDATE technician SET Required_Documents = ?, id_verification_status = 'unverified', id_verified_at = NULL,
+       id_verified_by = NULL, id_verification_note = NULL, updated_at = NOW() WHERE technician_id = ?`,
+      [storedPath, technician.technician_id],
+    )
+    // Replacing a document discards the old private file; legacy public files are left alone.
+    if (String(technician.Required_Documents || '').startsWith('private/')) {
+      const previous = resolveStoredDocument(technician.Required_Documents)
+      if (previous) await unlink(previous).catch(() => {})
+    }
+    response.json({ message: 'Your ID photo was uploaded. An administrator will review it.', idVerification: { status: 'unverified', note: null, hasDocument: true } })
+  } catch (error) {
+    await unlink(resolveStoredDocument(storedPath)).catch(() => {})
+    console.error('Could not record ID document.', error.message)
+    response.status(500).json({ message: 'Could not save your document.' })
+  }
+})
+
+app.get('/api/admin/technicians/:technicianId/id-document', authenticate, requireAdmin, async (request, response) => {
+  try {
+    const [rows] = await pool.execute('SELECT technician_id, Full_Name, Required_Documents FROM technician WHERE technician_id = ? LIMIT 1', [request.params.technicianId])
+    const technician = rows[0]
+    if (!technician?.Required_Documents) return response.status(404).json({ message: 'No ID document has been uploaded.' })
+    const file = resolveStoredDocument(technician.Required_Documents)
+    const contentType = file ? documentContentTypes[extname(file).toLowerCase()] : null
+    if (!file || !contentType) return response.status(404).json({ message: 'The ID document is unavailable.' })
+    let data
+    try { data = await readFile(file) } catch (error) { return response.status(404).json({ message: 'The ID document file is missing. Ask the technician to upload it again.' }) }
+    await createAudit(request.user.userId, 'id_document_viewed', 'technician', technician.technician_id, `Viewed the ID document of ${technician.Full_Name}.`)
+    response.setHeader('Content-Type', contentType)
+    response.setHeader('Cache-Control', 'no-store')
+    response.setHeader('X-Content-Type-Options', 'nosniff')
+    response.send(data)
+  } catch (error) {
+    console.error('Could not open ID document.', error.message)
+    response.status(500).json({ message: 'Could not open the ID document.' })
+  }
+})
+
+app.patch('/api/admin/technicians/:technicianId/id-verification', authenticate, requireAdmin, async (request, response) => {
+  const decision = request.body?.decision
+  const note = sanitizeText(request.body?.note, 255)
+  if (!['verified', 'rejected'].includes(decision)) return response.status(400).json({ message: 'Choose verified or rejected.' })
+  if (decision === 'rejected' && note.length < 5) return response.status(400).json({ message: 'Tell the technician why the document was rejected (at least 5 characters).' })
+  try {
+    const [rows] = await pool.execute('SELECT technician_id, user_id, Full_Name, national_id, Required_Documents FROM technician WHERE technician_id = ? LIMIT 1', [request.params.technicianId])
+    const technician = rows[0]
+    if (!technician) return response.status(404).json({ message: 'Technician not found.' })
+    if (!technician.Required_Documents || !technician.national_id) return response.status(409).json({ message: 'There is no ID document and national ID number to review yet.' })
+    const file = resolveStoredDocument(technician.Required_Documents)
+    if (decision === 'verified' && !(file && existsSync(file))) return response.status(409).json({ message: 'The document file is missing, so it cannot be verified. Ask the technician to upload it again.' })
+    await pool.execute(
+      `UPDATE technician SET id_verification_status = ?, id_verified_at = IF(? = 'verified', NOW(), NULL),
+       id_verified_by = ?, id_verification_note = ?, updated_at = NOW() WHERE technician_id = ?`,
+      [decision, decision, request.user.userId, note || null, technician.technician_id],
+    )
+    await createAudit(request.user.userId, `id_${decision}`, 'technician', technician.technician_id, `${technician.Full_Name}: ID ${decision}.${note ? ` ${note}` : ''}`)
+    try {
+      await createNotification(technician.user_id, 'id_verification', decision === 'verified' ? 'Your ID was verified' : 'Your ID photo needs attention',
+        decision === 'verified' ? 'An administrator verified your ID. Your profile now shows the ID verified badge.' : `Your ID photo was not accepted. ${note} Upload a clearer photo from Edit profile.`)
+    } catch (error) {
+      console.error('Could not notify technician about ID review.', error.message)
+    }
+    response.json({ message: decision === 'verified' ? 'ID verified. The badge now shows on the technician profile.' : 'ID rejected and the technician was told why.' })
+  } catch (error) {
+    console.error('Could not record ID review.', error.message)
+    response.status(500).json({ message: 'Could not save the review.' })
+  }
+})
+
+app.get('/api/admin/users/:userId/details', authenticate, requireAdmin, async (request, response) => {
+  const userId = Number(request.params.userId)
+  if (!Number.isInteger(userId) || userId < 1) return response.status(404).json({ message: 'User not found.' })
+  try {
+    const [users] = await pool.execute(
+      `SELECT u.user_id AS id, u.username AS name, u.email, u.phone_no AS phone, u.address, u.Image AS profileImage, u.created_at AS createdAt,
+              u.admin_id AS adminId, COALESCE(controls.status, 'active') AS accountStatus,
+              tech.technician_id AS technicianId, tech.national_id AS nationalId, tech.Skill_details AS skills, tech.service_area AS serviceArea,
+              tech.availability, tech.status AS technicianStatus, tech.Required_Documents AS document,
+              tech.id_verification_status AS idStatus, tech.id_verification_note AS idNote, tech.id_verified_at AS idVerifiedAt,
+              verifier.username AS idVerifiedBy
+       FROM users u LEFT JOIN technician tech ON tech.user_id = u.user_id
+       LEFT JOIN admin_user_controls controls ON controls.user_id = u.user_id
+       LEFT JOIN users verifier ON verifier.user_id = tech.id_verified_by
+       WHERE u.user_id = ? LIMIT 1`,
+      [userId],
+    )
+    const row = users[0]
+    if (!row) return response.status(404).json({ message: 'User not found.' })
+    const role = row.adminId ? 'admin' : row.technicianId ? 'technician' : 'customer'
+    const result = {
+      role,
+      user: { id: row.id, name: row.name, email: row.email, phone: row.phone, address: row.address, profileImage: row.profileImage, createdAt: row.createdAt, accountStatus: row.accountStatus },
+    }
+    const [reports] = await pool.execute(
+      `SELECT r.report_id AS id, r.report_type AS type, r.category, r.status, r.created_at AS createdAt,
+              CASE WHEN r.reporter_id = ? THEN 'filed' ELSE 'against' END AS direction
+       FROM marketplace_reports r WHERE r.reporter_id = ? OR r.target_user_id = ? ORDER BY r.created_at DESC LIMIT 8`,
+      [userId, userId, userId],
+    )
+    const [blocks] = await pool.execute(
+      'SELECT SUM(blocker_id = ?) AS blocking, SUM(blocked_id = ?) AS blockedBy FROM user_blocks WHERE blocker_id = ? OR blocked_id = ?',
+      [userId, userId, userId, userId],
+    )
+    const [history] = await pool.execute(
+      `SELECT a.action, a.details, a.created_at AS createdAt, admin_user.username AS adminName
+       FROM admin_audit_log a JOIN users admin_user ON admin_user.user_id = a.admin_id
+       WHERE (a.target_type = 'user' AND a.target_id = ?) OR (a.target_type = 'technician' AND a.target_id = ?)
+       ORDER BY a.audit_id DESC LIMIT 10`,
+      [userId, row.technicianId || 0],
+    )
+    result.reports = reports
+    result.blocks = { blocking: Number(blocks[0]?.blocking || 0), blockedBy: Number(blocks[0]?.blockedBy || 0) }
+    result.adminHistory = history
+    if (role === 'admin') return response.json(result)
+
+    if (role === 'customer') {
+      const [[requests]] = await pool.execute(
+        `SELECT COUNT(*) AS total,
+                COALESCE(SUM(p.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM tasks h WHERE h.post_id = p.post_id AND h.task_status IN ('accepted','scheduled','in_progress','completed','cancelled'))), 0) AS open
+         FROM posts p WHERE p.user_id = ?`,
+        [userId],
+      )
+      const [[jobs]] = await pool.execute(
+        `SELECT COALESCE(SUM(t.task_status = 'completed'), 0) AS completed, COALESCE(SUM(t.task_status = 'cancelled'), 0) AS cancelled,
+                COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END), 0) AS paid,
+                COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status <> 'paid' THEN ${taskValue} ELSE 0 END), 0) AS outstanding,
+                ROUND(AVG(tf.consumer_rating), 1) AS avgRating, COUNT(tf.consumer_rating) AS reviews
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id LEFT JOIN task_feedback tf ON tf.task_id = t.task_id WHERE p.user_id = ?`,
+        [userId],
+      )
+      const [[theirRating]] = await pool.execute('SELECT ROUND(AVG(rating), 1) AS rating, COUNT(*) AS total FROM customer_reviews WHERE customer_id = ?', [userId])
+      const [[saved]] = await pool.execute('SELECT COUNT(*) AS total FROM saved_addresses WHERE user_id = ?', [userId])
+      const [recent] = await pool.execute(
+        `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.area, p.created_at AS createdAt, p.closed_at AS closedAt,
+                (SELECT t.task_status FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN ('accepted','scheduled','in_progress','completed','cancelled') ORDER BY t.task_id DESC LIMIT 1) AS jobStatus,
+                (SELECT tech.Full_Name FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id WHERE t.post_id = p.post_id AND t.task_status IN ('accepted','scheduled','in_progress','completed') ORDER BY t.task_id DESC LIMIT 1) AS technicianName
+         FROM posts p WHERE p.user_id = ? ORDER BY p.created_at DESC LIMIT 10`,
+        [userId],
+      )
+      result.customer = {
+        kpis: {
+          requests: Number(requests.total), openRequests: Number(requests.open), completedJobs: Number(jobs.completed), cancelledJobs: Number(jobs.cancelled),
+          paid: Number(jobs.paid), outstanding: Number(jobs.outstanding), averageRatingGiven: asNumber(jobs.avgRating), reviewsGiven: Number(jobs.reviews),
+          ratingFromTechnicians: asNumber(theirRating.rating), ratingsFromTechnicians: Number(theirRating.total), savedAddresses: Number(saved.total),
+        },
+        recentRequests: recent,
+      }
+      return response.json(result)
+    }
+
+    const technicianId = row.technicianId
+    const [[jobs]] = await pool.execute(
+      `SELECT COALESCE(SUM(t.task_status = 'completed'), 0) AS completed, COUNT(*) AS offers,
+              COALESCE(SUM(t.task_status IN ('accepted','scheduled','in_progress','completed')), 0) AS hired,
+              COALESCE(SUM(t.task_status = 'rejected'), 0) AS declined,
+              COALESCE(SUM(t.task_status = 'cancelled' AND t.cancelled_by = ?), 0) AS cancelledByThem,
+              COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END), 0) AS paid,
+              COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status <> 'paid' THEN ${taskValue} ELSE 0 END), 0) AS outstanding,
+              ROUND(AVG(tf.consumer_rating), 1) AS avgRating, COUNT(tf.consumer_rating) AS reviews
+       FROM tasks t LEFT JOIN task_feedback tf ON tf.task_id = t.task_id WHERE t.technician_id = ?`,
+      [userId, technicianId],
+    )
+    const [[claims]] = await pool.execute(
+      `SELECT COUNT(*) AS total, COALESCE(SUM(w.status IN ('open','accepted')), 0) AS open
+       FROM warranty_claims w JOIN tasks t ON t.task_id = w.task_id WHERE t.technician_id = ?`,
+      [technicianId],
+    )
+    const [recent] = await pool.execute(
+      `SELECT t.task_id AS id, p.Post_detail AS detail, p.Category AS category, p.area, t.task_status AS status, ${taskValue} AS value,
+              t.payment_status AS paymentStatus, ${taskEventDate} AS date, customer.username AS customerName
+       FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN users customer ON customer.user_id = p.user_id
+       WHERE t.technician_id = ? ORDER BY t.created_at DESC LIMIT 10`,
+      [technicianId],
+    )
+    result.technician = {
+      technicianId, nationalId: row.nationalId, skills: row.skills, serviceAreas: splitStoredAreas(row.serviceArea), availability: row.availability, status: row.technicianStatus,
+      idVerification: { status: row.idStatus, note: row.idNote, verifiedAt: row.idVerifiedAt, verifiedBy: row.idVerifiedBy, hasDocument: Boolean(row.document), legacyPublicFile: String(row.document || '').startsWith('uploads/') },
+      kpis: {
+        completedJobs: Number(jobs.completed), offersSent: Number(jobs.offers), offersHired: Number(jobs.hired), offersDeclined: Number(jobs.declined),
+        paid: Number(jobs.paid), outstanding: Number(jobs.outstanding), averageRating: asNumber(jobs.avgRating), reviews: Number(jobs.reviews),
+        cancelledByThem: Number(jobs.cancelledByThem), problemClaims: Number(claims.total), openProblemClaims: Number(claims.open),
+      },
+      recentJobs: recent,
+    }
+    return response.json(result)
+  } catch (error) {
+    console.error('Could not load user details.', error.message)
+    response.status(500).json({ message: 'Could not load user details.' })
+  }
+})
 
 app.patch('/api/admin/technicians/:technicianId/status', authenticate, requireAdmin, async (request, response) => {
   const rawStatus = request.body?.status

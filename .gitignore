@@ -3,3 +3,6 @@ client/dist/
 client/.env
 server/node_modules/
 server/.env
+
+# Sensitive uploads (ID documents) must never be committed
+private/

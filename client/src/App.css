@@ -619,3 +619,51 @@ select option:checked { background: #ff6b35; color: #fff; }
 @media (forced-colors: active) {
   .viz-bar-fill, .viz-swatch, .viz-key { forced-color-adjust: none; }
 }
+
+/* ---- Admin user details and ID verification ---- */
+.table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.table-status.id-verified { background: rgba(168, 215, 186, .14); color: var(--green); }
+.table-status.id-unverified { background: rgba(255, 255, 255, .06); color: var(--muted); }
+.table-status.id-rejected { background: rgba(255, 123, 123, .12); color: #ff7b7b; }
+.status-id-verified { color: var(--green); }
+.status-id-rejected { color: #ff7b7b; }
+.status-id-unverified { color: var(--muted); }
+.id-document-card { display: grid; gap: 12px; }
+.details-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: start center; padding: 4vh 16px; overflow-y: auto; background: rgba(0, 0, 0, .6); }
+.details-modal { width: min(880px, 100%); border: 1px solid var(--line); border-radius: 14px; background: var(--viz-surface); box-shadow: 0 24px 60px rgba(0, 0, 0, .5); outline: none; }
+.details-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.details-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.details-identity h2 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.details-identity p { margin: 4px 0 0; }
+.details-avatar { width: 52px; height: 52px; flex: 0 0 52px; font-size: 1.3rem; }
+.details-body { display: grid; gap: 22px; padding: 18px 22px 24px; }
+.details-section h3 { margin: 0 0 10px; font-size: .95rem; }
+.details-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 7px 18px; margin: 0; font-size: .86rem; }
+.details-list dt { color: var(--muted); }
+.details-list dd { margin: 0; overflow-wrap: anywhere; }
+.details-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.details-rows li { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: .86rem; }
+.details-rows li > div { display: grid; gap: 3px; min-width: 0; }
+.details-rows strong { overflow-wrap: anywhere; font-weight: 600; }
+.details-when { flex: 0 0 auto; white-space: nowrap; }
+.details-id-status { margin: 0 0 8px; }
+.details-id-image { display: block; max-width: 100%; max-height: 380px; margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; }
+.details-review { display: grid; gap: 10px; margin-top: 10px; }
+.details-review label { display: grid; gap: 6px; color: var(--muted); font-size: .8rem; }
+.details-review input { width: 100%; min-height: 40px; border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; background: transparent; color: var(--ink); }
+.details-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.details-warning { color: #ffb86b; }
+@media (max-width: 640px) {
+  .details-backdrop { padding: 0; }
+  .details-modal { border-radius: 0; min-height: 100vh; }
+  .details-list { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .details-list dd { margin-bottom: 8px; }
+  .details-rows li { flex-direction: column; }
+}
+
+/* Checkbox rows must win over the generic full-width form-input rules */
+.request-form .availability-day, .profile-form .area-picker-option, .request-form .favorites-toggle, .favorites-toggle { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.request-form .availability-day input, .profile-form .area-picker-option input, .request-form .area-picker-option input, .favorites-toggle input { display: inline-block; flex: 0 0 auto; width: auto; margin: 0; padding: 0; }
+.request-form .availability-row input[type='time'] { display: inline-block; width: auto; margin: 0; }
+.id-document-card .file-field { display: grid; gap: 8px; }
+.id-document-card .file-field input { width: 100%; }
