@@ -13,6 +13,8 @@ The original [Software Requirements Specification (PDF)](SRS_Documents/Software%
 - MySQL or MariaDB database
 - JWT authentication and bcrypt password hashing
 - Hash-based client routes for static hosting
+- Installable as an app on phones (web app manifest and a small service worker)
+- Hand-built SVG charts with no charting library
 
 ## Requirements
 
@@ -80,6 +82,11 @@ notepad .env
 
 For local development, use `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_NAME=helplagbe`, `DB_SSL=false`, and `NODE_ENV=development`. Set `DB_PASSWORD` to your local database root password, or leave it empty if that account has no password. Keep `.env` private; Git ignores it.
 
+Optional settings in `server/.env` (both have safe defaults):
+
+- `APP_TIME_ZONE` - time zone used to check technician working hours. Default `Asia/Dhaka`.
+- `API_RATE_LIMIT` - requests per 15 minutes allowed from one address across the API. Default `200`. Raise it only for load or automated tests.
+
 Install dependencies and start the API:
 
 ```powershell
@@ -87,7 +94,7 @@ npm ci
 npm start
 ```
 
-Leave this terminal open. The API listens on `http://localhost:4000` and creates its supporting tables on first startup. Check the database connection in another PowerShell window:
+Leave this terminal open. The API listens on `http://localhost:4000` and, on startup, creates its supporting tables and adds any columns newer versions need to an existing database, so pulling an update does not require re-importing the schema. Check the database connection in another PowerShell window:
 
 ```powershell
 Invoke-RestMethod 'http://localhost:4000/api/health'
@@ -143,6 +150,8 @@ npm run seed:realistic
 - `/#/technician` - technician workspace
 - `/#/admin` - administrator workspace
 
+Each workspace has a sidebar. Besides Overview, Messages and Edit profile, the newer screens are **Analytics** for every role and **History** for customers and technicians. A section can be opened directly with `?section=`, for example `/#/customer?section=customer-history`.
+
 ## Features
 
 - Customer requests with optional JPG, PNG, or WebP images up to 5MB
@@ -167,6 +176,32 @@ npm run seed:realistic
 - Admin user management, audit log, and two-stage account deletion: archiving removes the user from the active system while preserving a recoverable snapshot; the Archived accounts panel refreshes after archiving and supports restore or confirmed permanent deletion
 - Public contact links, persistent light/dark mode, and responsive layouts
 
+### Analytics and history
+
+- **Analytics for every role**, with a 3, 6 or 12 month range. Every chart has hover details and a table view.
+  - Customers: paid and unpaid spending by month, jobs by category, most-hired technicians, average job cost and rating given, time to first offer, and what happened to their requests.
+  - Technicians: earnings and jobs by month, offers sent, hired and completed, share of offers accepted, ratings received, response time, repeat customers, and how often they cancel.
+  - Admins: completion and cancellation rates, requests against completed jobs, paid job value, new members, open reports, technician account counts, and unmet demand by category and Dhaka area.
+- **History for customers and technicians**: finished jobs with search, status and date filters, paging and CSV export. Each row opens to receipts and the job's payment, warranty, review and timeline actions. Technicians also see offers that were not taken, without the customer's identity.
+
+### Trust and safety
+
+- Technician status follows fixed rules: pending can become approved or rejected, approved can be suspended or rejected, suspended can return to approved or be rejected, and rejected can be approved again. An approved technician can never go back to pending.
+- Suspending or rejecting needs a written reason, which is sent to the technician and saved in the audit log. It also withdraws the technician's open offers and tells the affected customers. Rejection is blocked while the technician has active jobs; suspension is allowed and tells the admin how many remain. Technicians who are not approved see a banner on their dashboard.
+- Technicians rate customers after a completed job, and customers' average ratings are shown to technicians on open requests.
+- Users can block each other. A block stops messages and offers in both directions and hides each person's requests from the other.
+- A customer can report a problem with a finished job for 7 days. The technician accepts, declines or resolves it with a note, and the customer is notified at each step.
+- Dispute reports accept a photo as evidence. When resolving a report an admin can send a warning or suspend the reported technician; both are recorded and the user is notified.
+- A technician profile shows an "ID verified" badge when a national ID and document are on file. It means the documents exist, not that an admin has reviewed them.
+
+### Convenience
+
+- **Dhaka area list.** Requests and technician service areas are chosen from a fixed list of Dhaka areas, so matching is exact and misspellings cannot cause misses. To cover another city, extend the `SERVICE_AREAS` list in `server/src/server.js`. On startup, existing free-text areas and addresses are mapped to the list where they clearly name a listed area; older entries that do not are left as they were and keep the older text matching.
+- Technicians in the area of a new request get a notification and can turn alerts off in their availability settings.
+- Technicians set weekly working hours. Offers and appointment times outside those hours are refused for both sides, and customers see a summary such as "Mon-Fri 09:00-18:00" on the technician's profile.
+- Customers can save up to five addresses, mark favourite technicians, and rebook a past request. Technicians can tell a customer they are running late, and either side can attach photos to messages.
+- Technicians see a profile checklist until their profile is complete.
+
 ### Archived account lifecycle
 
 Administrators archive users from the Users section. The account and its marketplace data are saved for recovery, and the archive appears in the Archived accounts section without requiring a page reload. From there, an administrator can restore the account or permanently delete its saved archive. Permanent deletion cannot be undone; personal details are removed from the relevant archive/restore audit entries while a non-personal deletion record is retained.
@@ -183,15 +218,22 @@ npm run build
 npm run lint
 ```
 
-The optional database integration test creates and deletes test users, posts, bids, notifications, and archive entries. Run it only against a disposable test database, never a live customer database:
+`npm test` runs the checks that do not need a database. The integration tests in `server/tests/marketplace.integration.test.js` and `server/tests/phases.integration.test.js` run the real API against a real database. They create and delete test users, requests, offers, payments, reports, messages and uploaded images. Run them only against a disposable database, never one that holds real data. They are skipped unless both variables below are set, and they refuse to run with `NODE_ENV=production`.
+
+The test database needs the schema imported once and at least one administrator account, which `helplagbe.sql` provides. Point the server at it with environment variables, which take priority over `server/.env`:
 
 ```powershell
 Set-Location 'C:\path\to\HelpLagbe\server'
+$env:DB_HOST = '127.0.0.1'; $env:DB_PORT = '3306'; $env:DB_NAME = 'helplagbe_test'
+$env:DB_USER = 'root'; $env:DB_PASSWORD = ''; $env:DB_SSL = 'false'
+$env:DB_SSL_CA_PATH = ''; $env:DATABASE_URL = ''; $env:NODE_ENV = 'test'
+$env:API_RATE_LIMIT = '100000'
 $env:RUN_DATABASE_INTEGRATION_TESTS = '1'
 $env:INTEGRATION_DB_IS_DISPOSABLE = '1'
-npm run test:integration
-Remove-Item Env:RUN_DATABASE_INTEGRATION_TESTS,Env:INTEGRATION_DB_IS_DISPOSABLE
+node --test tests/auth-validation.test.js tests/marketplace.integration.test.js tests/phases.integration.test.js
 ```
+
+Close that PowerShell window afterwards, or remove those variables, so a later `npm start` does not use the test database. If your `server/.env` points at a hosted database, the empty `DATABASE_URL` and `DB_SSL_CA_PATH` values above stop it being used by accident.
 
 ## Legacy files
 
@@ -230,4 +272,7 @@ Free API services may sleep while idle. The API filesystem is ephemeral, so uplo
 - **API health reports the database unavailable:** Check the API terminal and confirm the database is still running.
 - **CORS error after deployment:** Set API `CLIENT_ORIGIN` to the exact static-site origin, save, and redeploy the API.
 - **Deployed frontend still calls localhost:** Set static-site `VITE_API_URL` to the deployed API URL ending in `/api`, then rebuild/redeploy the static site.
+- **Import prints "Foreign key constraint is incorrectly formed" for `task_lifecycle_events` or `marketplace_reports`:** The dump creates these two tables before the keys they point to exist. The API creates both itself on startup, so the errors are harmless. To avoid them, import with `SET FOREIGN_KEY_CHECKS=0;` at the top of the file.
+- **Offers or appointments are refused as outside working hours:** Check the technician's weekly availability and the `APP_TIME_ZONE` setting.
+- **"Too many requests" during testing:** Raise `API_RATE_LIMIT` in the environment. Sign-in has its own limit of 10 attempts per 15 minutes.
 - **`npm ci` reports a lockfile error:** Run `npm install` in that app folder to regenerate its lockfile, then retry `npm ci`.

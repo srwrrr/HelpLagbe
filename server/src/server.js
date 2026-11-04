@@ -57,7 +57,7 @@ let usesTiDBSequences = /tidb/i.test(databaseUrl?.hostname || process.env.DB_HOS
 
 const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: Number(process.env.API_RATE_LIMIT) || 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: 'Too many requests. Please wait a few moments and try again.' },
@@ -259,6 +259,60 @@ async function ensureNotificationTable() {
     CONSTRAINT marketplace_reports_target_fk FOREIGN KEY (target_user_id) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT marketplace_reports_reviewer_fk FOREIGN KEY (reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS customer_reviews (
+    review_id INT NOT NULL AUTO_INCREMENT,
+    task_id INT NOT NULL,
+    reviewer_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    rating TINYINT NOT NULL,
+    comment VARCHAR(500) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (review_id),
+    UNIQUE KEY uniq_customer_review_task (task_id),
+    KEY idx_customer_reviews_customer (customer_id),
+    CONSTRAINT customer_reviews_task_fk FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS user_blocks (
+    block_id INT NOT NULL AUTO_INCREMENT,
+    blocker_id INT NOT NULL,
+    blocked_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (block_id),
+    UNIQUE KEY uniq_user_block (blocker_id, blocked_id),
+    KEY idx_user_blocks_blocked (blocked_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS warranty_claims (
+    claim_id INT NOT NULL AUTO_INCREMENT,
+    task_id INT NOT NULL,
+    customer_id INT NOT NULL,
+    description VARCHAR(1000) NOT NULL,
+    status ENUM('open', 'accepted', 'declined', 'resolved') NOT NULL DEFAULT 'open',
+    response_note VARCHAR(500) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (claim_id),
+    KEY idx_warranty_task (task_id),
+    CONSTRAINT warranty_claims_task_fk FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS saved_addresses (
+    address_id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    label VARCHAR(60) NOT NULL,
+    service_address VARCHAR(500) NOT NULL,
+    building VARCHAR(150) NULL,
+    flat_no VARCHAR(100) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (address_id),
+    KEY idx_saved_addresses_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS favorite_technicians (
+    favorite_id INT NOT NULL AUTO_INCREMENT,
+    customer_id INT NOT NULL,
+    technician_id INT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (favorite_id),
+    UNIQUE KEY uniq_favorite (customer_id, technician_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
   const [taskStatusColumns] = await pool.execute(
     "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tasks' AND COLUMN_NAME = 'task_status'",
   )
@@ -267,7 +321,20 @@ async function ensureNotificationTable() {
       || !String(taskStatusColumns[0].COLUMN_TYPE).includes("'withdrawn'"))) {
     await pool.query("ALTER TABLE tasks MODIFY task_status ENUM('pending','accepted','scheduled','rejected','withdrawn','in_progress','completed','cancelled') DEFAULT 'pending'")
   }
+  const [technicianStatusColumns] = await pool.execute(
+    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'technician' AND COLUMN_NAME = 'status'",
+  )
+  if (technicianStatusColumns[0] && !String(technicianStatusColumns[0].COLUMN_TYPE).includes("'suspended'")) {
+    await pool.query("ALTER TABLE technician MODIFY status ENUM('pending','approved','suspended','rejected') DEFAULT 'pending'")
+  }
   const additions = [
+    ['posts', 'area', 'VARCHAR(80) NULL'],
+    ['saved_addresses', 'area', 'VARCHAR(80) NULL'],
+    ['task_messages', 'image', 'VARCHAR(255) NULL'],
+    ['technician', 'availability_schedule', 'TEXT NULL'],
+    ['technician', 'request_alerts', 'TINYINT(1) NOT NULL DEFAULT 1'],
+    ['marketplace_reports', 'evidence_image', 'VARCHAR(255) NULL'],
+    ['marketplace_reports', 'outcome', "ENUM('none', 'warning', 'technician_suspended') NOT NULL DEFAULT 'none'"],
     ['tasks', 'proposed_at', 'DATETIME NULL'],
     ['tasks', 'customer_schedule_confirmed_at', 'DATETIME NULL'],
     ['tasks', 'technician_schedule_confirmed_at', 'DATETIME NULL'],
@@ -304,6 +371,22 @@ async function ensureNotificationTable() {
     )
     if (!columns.length) await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${columnDefinition}`)
   }
+  try {
+    const [legacyAreas] = await pool.query("SELECT technician_id, service_area FROM technician WHERE service_area IS NOT NULL AND service_area <> ''")
+    for (const row of legacyAreas) {
+      const known = splitStoredAreas(row.service_area).every((part) => serviceAreaLookup.has(part.toLowerCase()))
+      if (known) continue
+      const matched = SERVICE_AREAS.filter((area) => serviceAreaMatches(area, row.service_area))
+      if (matched.length) await pool.execute('UPDATE technician SET service_area = ? WHERE technician_id = ?', [matched.join(', '), row.technician_id])
+    }
+    const [legacyPosts] = await pool.query("SELECT post_id, service_address FROM posts WHERE area IS NULL AND service_address IS NOT NULL AND service_address <> ''")
+    for (const row of legacyPosts) {
+      const matched = SERVICE_AREAS.find((area) => serviceAreaMatches(area, row.service_address))
+      if (matched) await pool.execute('UPDATE posts SET area = ? WHERE post_id = ?', [matched, row.post_id])
+    }
+  } catch (error) {
+    console.error('Could not map existing service areas to the area list.', error.message)
+  }
 }
 
 async function createNotification(userId, type, title, message, targetType = null, targetId = null) {
@@ -319,6 +402,123 @@ async function createAudit(adminId, action, targetType, targetId, details) {
     'INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
     [adminId, action, targetType, targetId || null, details || null],
   )
+}
+
+
+async function usersBlocked(userA, userB) {
+  const [rows] = await pool.execute(
+    'SELECT 1 FROM user_blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1',
+    [userA, userB, userB, userA],
+  )
+  return rows.length > 0
+}
+
+async function notifyMatchingTechnicians(customerUserId, serviceAddress, category, area) {
+  const [candidates] = await pool.execute(
+    `SELECT tech.user_id, tech.service_area FROM technician tech
+     WHERE tech.status = 'approved' AND tech.request_alerts = 1 AND tech.user_id <> ?
+       AND tech.service_area IS NOT NULL AND tech.service_area <> ''
+       AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ? AND b.blocked_id = tech.user_id) OR (b.blocker_id = tech.user_id AND b.blocked_id = ?))
+     LIMIT 1000`,
+    [customerUserId, customerUserId, customerUserId],
+  )
+  const matches = candidates.filter((technician) => technicianCoversRequest(technician.service_area, area, serviceAddress)).slice(0, 50)
+  for (const technician of matches) {
+    await createNotification(technician.user_id, 'new_request_nearby', `New ${category.toLowerCase()} request in your area`, 'A customer in your service area is looking for help. Open Opportunities to send an offer.')
+  }
+}
+
+function summarizeSchedule(schedule) {
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+  const parts = []
+  let index = 0
+  while (index < keys.length) {
+    const day = schedule[keys[index]]
+    if (!day?.enabled) { index += 1; continue }
+    let end = index
+    while (end + 1 < keys.length && schedule[keys[end + 1]]?.enabled && schedule[keys[end + 1]].start === day.start && schedule[keys[end + 1]].end === day.end) end += 1
+    parts.push(`${end > index ? `${names[index]}-${names[end]}` : names[index]} ${day.start}-${day.end}`)
+    index = end + 1
+  }
+  return parts.join(', ')
+}
+
+const APP_TIME_ZONE = process.env.APP_TIME_ZONE || 'Asia/Dhaka'
+const scheduleKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+// Returns an explanation if the UTC datetime ('YYYY-MM-DD HH:MM:SS') falls outside the technician's weekly hours.
+function scheduleViolation(scheduleJson, utcDateTime) {
+  if (!scheduleJson) return null
+  let schedule
+  try { schedule = typeof scheduleJson === 'string' ? JSON.parse(scheduleJson) : scheduleJson } catch (error) { return null }
+  if (!schedule || typeof schedule !== 'object') return null
+  const date = new Date(`${String(utcDateTime).replace(' ', 'T')}Z`)
+  if (Number.isNaN(date.getTime())) return null
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: APP_TIME_ZONE, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date).map((part) => [part.type, part.value]))
+  const dayKey = String(parts.weekday).slice(0, 3).toLowerCase()
+  const time = `${parts.hour}:${parts.minute}`
+  const hours = summarizeSchedule(schedule)
+  if (!hours) return 'This technician is not currently taking appointments.'
+  const day = schedule[dayKey]
+  if (!day?.enabled || time < day.start || time >= day.end) {
+    return `That time is outside the technician's working hours (${hours}). Please choose a time within them.`
+  }
+  return null
+}
+
+function normalizeAreaText(value) {
+  return String(value || '').toLowerCase().replace(/[0-9]+/g, ' ').replace(/[^\p{L}\s]/gu, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// A service area like "Dhanmondi 27, Mirpur" matches an address if any listed area appears in it (numbers and punctuation ignored).
+function serviceAreaMatches(serviceArea, address) {
+  const normalizedAddress = ` ${normalizeAreaText(address)} `
+  return String(serviceArea || '').split(/[,;/\n]+/)
+    .map(normalizeAreaText)
+    .filter((area) => area.length >= 3)
+    .some((area) => normalizedAddress.includes(` ${area} `))
+}
+
+const SERVICE_CITY = 'Dhaka'
+const SERVICE_AREAS = [
+  'Adabor', 'Aftabnagar', 'Agargaon', 'Azimpur', 'Badda', 'Banani', 'Banasree', 'Bangshal', 'Baridhara', 'Bashabo',
+  'Bashundhara R/A', 'Cantonment', 'Chawkbazar', 'Dakshinkhan', 'Dania', 'Demra', 'Dhanmondi', 'Eskaton', 'Farmgate',
+  'Gandaria', 'Green Road', 'Gulistan', 'Gulshan', 'Hatirjheel', 'Hazaribagh', 'Jatrabari', 'Jurain', 'Kafrul',
+  'Kakrail', 'Kalabagan', 'Kamalapur', 'Kamrangirchar', 'Karwan Bazar', 'Keraniganj', 'Khilgaon', 'Khilkhet',
+  'Kotwali', 'Lalbagh', 'Lalmatia', 'Malibagh', 'Matuail', 'Mirpur', 'Mohakhali', 'Mohammadpur', 'Motijheel', 'Mugda',
+  'Nadda', 'Narinda', 'New Market', 'Niketan', 'Old Dhaka', 'Paltan', 'Panthapath', 'Purbachal', 'Rampura', 'Ramna',
+  'Sabujbagh', 'Savar', 'Segunbagicha', 'Shahbagh', 'Shahjadpur', 'Shantinagar', 'Shyamoli', 'Shyampur', 'Sutrapur',
+  'Tejgaon', 'Tikatuli', 'Turag', 'Uttara', 'Uttarkhan', 'Wari',
+]
+const serviceAreaLookup = new Map(SERVICE_AREAS.map((area) => [area.toLowerCase(), area]))
+
+// Returns the canonical names for a list of areas, or null if any entry is not a known area.
+function parseServiceAreas(input) {
+  if (!Array.isArray(input) || input.length > 30) return null
+  const result = []
+  for (const entry of input) {
+    const canonical = typeof entry === 'string' ? serviceAreaLookup.get(entry.trim().toLowerCase()) : null
+    if (!canonical) return null
+    if (!result.includes(canonical)) result.push(canonical)
+  }
+  return result
+}
+
+function splitStoredAreas(value) {
+  return String(value || '').split(',').map((part) => part.trim()).filter(Boolean)
+}
+
+// Does a technician's stored service area cover this request? Requests with a chosen area match exactly;
+// older requests without one fall back to matching the address text.
+function technicianCoversRequest(serviceArea, requestArea, address) {
+  if (requestArea) {
+    const wanted = String(requestArea).toLowerCase()
+    return splitStoredAreas(serviceArea).some((area) => area.toLowerCase() === wanted) || serviceAreaMatches(serviceArea, requestArea)
+  }
+  return serviceAreaMatches(serviceArea, address)
 }
 
 function toCsvCell(value) {
@@ -344,13 +544,18 @@ async function recordTaskEvent(connection, taskId, actorId, eventType, fromStatu
   )
 }
 
+// Snapshots store timestamps as ISO strings; strict MySQL/MariaDB servers need 'YYYY-MM-DD HH:MM:SS'.
+function toSqlDateTime(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ? value.slice(0, 19).replace('T', ' ') : value
+}
+
 async function insertSnapshotRows(connection, tableName, rows, allowedColumns) {
   for (const row of rows || []) {
     const columns = allowedColumns.filter((column) => Object.hasOwn(row, column))
     if (!columns.length) continue
     const columnList = columns.map((column) => `\`${column}\``).join(', ')
     const placeholders = columns.map(() => '?').join(', ')
-    const values = columns.map((column) => row[column])
+    const values = columns.map((column) => toSqlDateTime(row[column]))
     await connection.execute(`INSERT INTO \`${tableName}\` (${columnList}) VALUES (${placeholders})`, values)
   }
 }
@@ -461,6 +666,8 @@ app.get('/api/messages', authenticate, async (request, response) => {
     const [rows] = await pool.execute(
       `SELECT t.task_id AS taskId, p.Post_detail AS detail, t.task_status AS status,
               customer.username AS customerName, tech.Full_Name AS technicianName,
+              CASE WHEN p.user_id = ? THEN tech.user_id ELSE p.user_id END AS otherUserId,
+              EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker_id = ? AND b.blocked_id = (CASE WHEN p.user_id = ? THEN tech.user_id ELSE p.user_id END)) AS blockedByMe,
               MAX(m.created_at) AS lastMessageAt
        FROM tasks t JOIN posts p ON p.post_id = t.post_id
        JOIN users customer ON customer.user_id = p.user_id
@@ -468,12 +675,13 @@ app.get('/api/messages', authenticate, async (request, response) => {
        LEFT JOIN task_messages m ON m.task_id = t.task_id
        WHERE t.task_status IN ('accepted', 'scheduled', 'in_progress', 'completed')
          AND (p.user_id = ? OR tech.user_id = ?)
-       GROUP BY t.task_id, p.Post_detail, t.task_status, customer.username, tech.Full_Name
-       ORDER BY COALESCE(lastMessageAt, t.updated_at) DESC LIMIT 30`,
-      [request.user.userId, request.user.userId],
+       GROUP BY t.task_id, p.Post_detail, t.task_status, customer.username, tech.Full_Name, p.user_id, tech.user_id
+       ORDER BY COALESCE(MAX(m.created_at), t.updated_at) DESC LIMIT 30`,
+      [request.user.userId, request.user.userId, request.user.userId, request.user.userId, request.user.userId],
     )
     response.json(rows)
   } catch (error) {
+    console.error('Could not load conversations.', error.message)
     response.status(500).json({ message: 'Could not load conversations.' })
   }
 })
@@ -487,7 +695,7 @@ app.get('/api/messages/:taskId', authenticate, async (request, response) => {
     )
     if (!access[0]) return response.status(404).json({ message: 'Conversation not found.' })
     const [rows] = await pool.execute(
-      `SELECT m.message_id AS id, m.sender_id AS senderId, u.username AS senderName, m.body, m.created_at AS createdAt
+      `SELECT m.message_id AS id, m.sender_id AS senderId, u.username AS senderName, m.body, m.image, m.created_at AS createdAt
        FROM task_messages m JOIN users u ON u.user_id = m.sender_id WHERE m.task_id = ? ORDER BY m.created_at ASC LIMIT 100`,
       [request.params.taskId],
     )
@@ -499,7 +707,22 @@ app.get('/api/messages/:taskId', authenticate, async (request, response) => {
 
 app.post('/api/messages/:taskId', authenticate, async (request, response) => {
   const body = typeof request.body?.body === 'string' ? request.body.body.trim() : ''
-  if (!body || body.length > 1000) return response.status(400).json({ message: 'Message must be between 1 and 1000 characters.' })
+  const hasImage = Boolean(request.body?.imageData)
+  if ((!body && !hasImage) || body.length > 1000) return response.status(400).json({ message: 'Message must be between 1 and 1000 characters, or include a photo.' })
+  let imagePath = null
+  if (hasImage) {
+    const image = decodeImageDataUrl(request.body.imageData)
+    if (!image || image.error) return response.status(400).json({ message: image?.error || 'Attach a JPG, PNG or WebP photo.' })
+    try {
+      const uploadDirectory = resolve(process.cwd(), '../uploads')
+      await mkdir(uploadDirectory, { recursive: true })
+      const fileName = `message_${randomUUID()}.${image.extension}`
+      await writeFile(resolve(uploadDirectory, fileName), image.buffer)
+      imagePath = `uploads/${fileName}`
+    } catch (error) {
+      return response.status(500).json({ message: 'Could not save the photo.' })
+    }
+  }
   try {
     const [access] = await pool.execute(
       `SELECT t.task_id, p.user_id AS customerId, tech.user_id AS technicianUserId, p.Post_detail
@@ -508,7 +731,11 @@ app.post('/api/messages/:taskId', authenticate, async (request, response) => {
       [request.params.taskId, request.user.userId, request.user.userId],
     )
     if (!access[0]) return response.status(404).json({ message: 'Conversation not found.' })
-    await pool.execute('INSERT INTO task_messages (task_id, sender_id, body) VALUES (?, ?, ?)', [request.params.taskId, request.user.userId, body])
+    const otherParty = Number(access[0].customerId) === Number(request.user.userId) ? access[0].technicianUserId : access[0].customerId
+    if (await usersBlocked(request.user.userId, otherParty)) {
+      return response.status(403).json({ message: 'You cannot message this person because one of you has blocked the other.' })
+    }
+    await pool.execute('INSERT INTO task_messages (task_id, sender_id, body, image) VALUES (?, ?, ?, ?)', [request.params.taskId, request.user.userId, body, imagePath])
     const recipient = Number(access[0].customerId) === Number(request.user.userId) ? access[0].technicianUserId : access[0].customerId
     try {
       await createNotification(recipient, 'message', 'New task message', `You have a new message about: ${access[0].Post_detail}`, 'task', access[0].task_id)
@@ -560,7 +787,7 @@ app.get('/api/posts', optionalAuthenticate, async (request, response) => {
   }
 })
 
-app.get('/api/technicians', async (request, response) => {
+app.get('/api/technicians', optionalAuthenticate, async (request, response) => {
   try {
     const { page, limit, offset } = parsePagination(request, 12)
     const search = sanitizeText(request.query.search || '', 100)
@@ -597,7 +824,7 @@ app.get('/api/technicians', async (request, response) => {
     }
     const relevanceExpression = relevanceTerms.length ? `(${relevanceTerms.join(' + ')})` : '0'
     const orderBy = sort === 'rating'
-      ? 'averageRating IS NULL ASC, averageRating DESC, completedJobs DESC'
+      ? 'AVG(tf.consumer_rating) IS NULL ASC, averageRating DESC, completedJobs DESC'
       : sort === 'response'
         ? 'averageResponseMinutes IS NULL ASC, averageResponseMinutes ASC, completedJobs DESC'
         : sort === 'completed'
@@ -606,7 +833,9 @@ app.get('/api/technicians', async (request, response) => {
     const [rows] = await pool.execute(
       `SELECT tech.technician_id AS id, tech.Full_Name AS name, tech.Skill_details AS skills,
               profile_user.Image AS profileImage,
+              EXISTS (SELECT 1 FROM favorite_technicians fav WHERE fav.customer_id = ? AND fav.technician_id = tech.technician_id) AS favorite,
               COALESCE(tech.service_area, tech.address) AS location, tech.availability,
+              MAX(CASE WHEN tech.Required_Documents IS NOT NULL AND tech.Required_Documents <> '' AND tech.national_id IS NOT NULL AND tech.national_id <> '' THEN 1 ELSE 0 END) AS idVerified,
               COUNT(CASE WHEN t.task_status = 'completed' THEN 1 END) AS completedJobs,
               ROUND(AVG(tf.consumer_rating), 1) AS averageRating, COUNT(tf.consumer_rating) AS reviewCount,
               (SELECT ROUND(AVG(TIMESTAMPDIFF(MINUTE, response_post.created_at, response_task.created_at)))
@@ -619,7 +848,7 @@ app.get('/api/technicians', async (request, response) => {
        LEFT JOIN task_feedback tf ON tf.task_id = t.task_id ${whereClause}
        GROUP BY tech.technician_id, tech.Full_Name, tech.Skill_details, tech.address, tech.service_area, tech.availability, profile_user.Image
        ORDER BY ${orderBy}, tech.Full_Name ASC LIMIT ? OFFSET ?`,
-      [...relevanceValues, ...values, limit, offset],
+      [request.user?.userId || 0, ...relevanceValues, ...values, limit, offset],
     )
     const [totalRows] = await pool.execute(
       `SELECT COUNT(*) AS total FROM technician tech ${whereClause}`,
@@ -627,6 +856,7 @@ app.get('/api/technicians', async (request, response) => {
     )
     response.json({ items: rows, pagination: { page, limit, total: Number(totalRows[0]?.total || 0) } })
   } catch (error) {
+    console.error('Could not load technicians.', error.message)
     response.status(500).json({ message: 'Could not load technicians.' })
   }
 })
@@ -640,6 +870,7 @@ app.post('/api/posts', authenticate, async (request, response) => {
   const serviceAddress = sanitizeText(body.serviceAddress, 500)
   const building = sanitizeText(body.building, 150)
   const flatNo = sanitizeText(body.flatNo, 100)
+  const area = serviceAreaLookup.get(String(body.area || '').trim().toLowerCase())
   const categories = ['Appliance', 'Plumbing', 'Electrical', 'Home maintenance', 'Computer']
   const category = categories.find((item) => item.toLowerCase() === requestedCategory.toLowerCase())
   const imageData = body.imageData
@@ -648,6 +879,7 @@ app.post('/api/posts', authenticate, async (request, response) => {
     return response.status(400).json({ message: 'Request details must be between 10 and 2000 characters.' })
   }
   if (!category) return response.status(400).json({ message: 'Choose a valid service category.' })
+  if (!area) return response.status(400).json({ message: `Choose the ${SERVICE_CITY} area where the job is.` })
   if (serviceAddress.length < 5 || (typeof body.serviceAddress === 'string' && body.serviceAddress.trim().length > 500)) {
     return response.status(400).json({ message: 'Enter a service address between 5 and 500 characters.' })
   }
@@ -676,12 +908,13 @@ app.post('/api/posts', authenticate, async (request, response) => {
       const postId = await nextGeneratedId(pool, 'helplagbe_posts_post_id_seq')
       const [result] = await pool.execute(
         usesTiDBSequences
-          ? 'INSERT INTO posts (post_id, Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-          : 'INSERT INTO posts (Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          ? 'INSERT INTO posts (post_id, Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no, area) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          : 'INSERT INTO posts (Post_detail, Category, `Sub-Category`, Image, user_id, service_address, building, flat_no, area) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         usesTiDBSequences
-          ? [postId, detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null]
-          : [detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null],
+          ? [postId, detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null, area]
+          : [detail, category, subCategory || null, imagePath, request.user.userId, serviceAddress, building || null, flatNo || null, area],
       )
+      notifyMatchingTechnicians(request.user.userId, serviceAddress, category, area).catch((error) => console.error('Could not send request alerts.', error.message))
       response.status(201).json({ id: result.insertId || postId, message: 'Service request posted.' })
     } catch (error) {
       if (imagePath) await unlink(resolve(process.cwd(), '../', imagePath)).catch(() => {})
@@ -701,8 +934,10 @@ app.patch('/api/customer/posts/:postId', authenticate, async (request, response)
   const serviceAddress = sanitizeText(body.serviceAddress, 500)
   const building = sanitizeText(body.building, 150)
   const flatNo = sanitizeText(body.flatNo, 100)
+  const area = serviceAreaLookup.get(String(body.area || '').trim().toLowerCase())
   const categories = ['Appliance', 'Plumbing', 'Electrical', 'Home maintenance', 'Computer']
   const category = categories.find((item) => item.toLowerCase() === requestedCategory.toLowerCase())
+  if (!area) return response.status(400).json({ message: `Choose the ${SERVICE_CITY} area where the job is.` })
   if (detail.length < 10 || (typeof body.detail === 'string' && body.detail.trim().length > 2000)) {
     return response.status(400).json({ message: 'Request details must be between 10 and 2000 characters.' })
   }
@@ -718,6 +953,7 @@ app.patch('/api/customer/posts/:postId', authenticate, async (request, response)
 
   const connection = await pool.getConnection()
   let affectedTechnicians = []
+  let pending = []
   try {
     await connection.beginTransaction()
     const [posts] = await connection.execute(
@@ -741,15 +977,15 @@ app.patch('/api/customer/posts/:postId', authenticate, async (request, response)
       await connection.rollback()
       return response.status(409).json({ message: 'Requests cannot be edited after a technician has been accepted.' })
     }
-    const [pending] = await connection.execute(
+    ;[pending] = await connection.execute(
       "SELECT t.task_id, tech.user_id FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id WHERE t.post_id = ? AND t.task_status = 'pending'",
       [post.post_id],
     )
     affectedTechnicians = pending.map((bid) => bid.user_id)
     await connection.execute(
       `UPDATE posts SET Post_detail = ?, Category = ?, \`Sub-Category\` = ?, service_address = ?,
-       building = ?, flat_no = ?, updated_at = NOW() WHERE post_id = ?`,
-      [detail, category, subCategory || null, serviceAddress, building || null, flatNo || null, post.post_id],
+       building = ?, flat_no = ?, area = ?, updated_at = NOW() WHERE post_id = ?`,
+      [detail, category, subCategory || null, serviceAddress, building || null, flatNo || null, area, post.post_id],
     )
     for (const bid of pending) {
       await recordTaskEvent(connection, bid.task_id, request.user.userId, 'request_updated', 'pending', 'pending', null, 'Customer updated request details')
@@ -780,6 +1016,7 @@ app.post('/api/customer/posts/:postId/close', authenticate, async (request, resp
 
   const connection = await pool.getConnection()
   let affectedTechnicians = []
+  let pending = []
   try {
     await connection.beginTransaction()
     const [posts] = await connection.execute(
@@ -803,7 +1040,7 @@ app.post('/api/customer/posts/:postId/close', authenticate, async (request, resp
       await connection.rollback()
       return response.status(409).json({ message: 'A request with an accepted technician cannot be closed here. Cancel the task with its reason instead.' })
     }
-    const [pending] = await connection.execute(
+    ;[pending] = await connection.execute(
       "SELECT t.task_id, tech.user_id FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id WHERE t.post_id = ? AND t.task_status = 'pending'",
       [post.post_id],
     )
@@ -836,6 +1073,431 @@ app.post('/api/customer/posts/:postId/close', authenticate, async (request, resp
   response.json({ message: 'Request closed and pending offers were declined.' })
 })
 
+app.get('/api/technician/account-status', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  try {
+    const [rows] = await pool.execute(
+      `SELECT tech.status, tech.Skill_details AS skills, tech.service_area AS serviceArea, tech.availability,
+              tech.national_id AS nationalId, tech.Required_Documents AS documents,
+              u.Image AS profileImage, u.phone_no AS phone, u.address
+       FROM technician tech JOIN users u ON u.user_id = tech.user_id WHERE tech.user_id = ? LIMIT 1`,
+      [request.user.userId],
+    )
+    const row = rows[0]
+    if (!row) return response.json({ status: 'pending', checklist: [] })
+    const checklist = [
+      { id: 'photo', label: 'Add a profile photo', done: Boolean(row.profileImage) },
+      { id: 'phone', label: 'Add a phone number', done: Boolean(row.phone) },
+      { id: 'skills', label: 'Describe your skills (at least 20 characters)', done: String(row.skills || '').trim().length >= 20 },
+      { id: 'area', label: 'Set your service area', done: Boolean(row.serviceArea) },
+      { id: 'availability', label: 'Set your availability', done: Boolean(row.availability) },
+      { id: 'documents', label: 'Upload your ID documents', done: Boolean(row.documents) && Boolean(row.nationalId) },
+    ]
+    response.json({ status: row.status, checklist })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load account status.' })
+  }
+})
+
+app.get('/api/technician/earnings', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  try {
+    const [months] = await pool.execute(
+      `SELECT DATE_FORMAT(COALESCE(t.paid_at, t.updated_at), '%Y-%m') AS month,
+              COUNT(*) AS jobs,
+              SUM(CASE WHEN t.payment_status = 'paid' THEN COALESCE(t.agreed_price, t.price) ELSE 0 END) AS paid,
+              SUM(CASE WHEN t.payment_status = 'paid' THEN 0 ELSE COALESCE(t.agreed_price, t.price) END) AS outstanding
+       FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE tech.user_id = ? AND t.task_status = 'completed'
+       GROUP BY month ORDER BY month DESC LIMIT 12`,
+      [request.user.userId],
+    )
+    const items = months.map((row) => ({ month: row.month, jobs: Number(row.jobs), paid: Number(row.paid || 0), outstanding: Number(row.outstanding || 0) }))
+    const totals = items.reduce((sum, row) => ({ jobs: sum.jobs + row.jobs, paid: sum.paid + row.paid, outstanding: sum.outstanding + row.outstanding }), { jobs: 0, paid: 0, outstanding: 0 })
+    response.json({ months: items, totals })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load earnings.' })
+  }
+})
+
+// ---------------------------------------------------------------- Analytics & history
+
+function parseMonths(value) {
+  const months = Number(value)
+  return [3, 6, 12].includes(months) ? months : 6
+}
+
+// ['2026-06', ..., '2026-11'] ending with the current month (UTC), oldest first.
+function monthKeys(months) {
+  const keys = []
+  const now = new Date()
+  for (let offset = months - 1; offset >= 0; offset -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1))
+    keys.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`)
+  }
+  return keys
+}
+
+function windowStart(months) {
+  const now = new Date()
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1))
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function fillMonths(keys, rows, fields) {
+  const byMonth = new Map(rows.map((row) => [row.month, row]))
+  return keys.map((month) => {
+    const row = byMonth.get(month)
+    return { month, ...Object.fromEntries(fields.map((field) => [field, Number(row?.[field] || 0)])) }
+  })
+}
+
+const asNumber = (value) => (value === null || value === undefined ? null : Number(value))
+const percent = (part, whole) => (Number(whole) > 0 ? Math.round((Number(part) / Number(whole)) * 100) : null)
+const taskValue = 'COALESCE(t.agreed_price, t.price)'
+const taskEventDate = 'COALESCE(t.completed_at, t.cancelled_at, t.updated_at)'
+
+app.get('/api/analytics/me', authenticate, async (request, response) => {
+  const months = parseMonths(request.query.months)
+  const keys = monthKeys(months)
+  const since = windowStart(months)
+  const userId = request.user.userId
+  try {
+    if (request.user.role === 'customer') {
+      const [monthly] = await pool.execute(
+        `SELECT DATE_FORMAT(${taskEventDate}, '%Y-%m') AS month, COUNT(*) AS jobs,
+                SUM(CASE WHEN t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END) AS paid,
+                SUM(CASE WHEN t.payment_status = 'paid' THEN 0 ELSE ${taskValue} END) AS outstanding
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id
+         WHERE p.user_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?
+         GROUP BY month`,
+        [userId, since],
+      )
+      const [categories] = await pool.execute(
+        `SELECT p.Category AS category, COUNT(*) AS jobs, SUM(${taskValue}) AS spent
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id
+         WHERE p.user_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?
+         GROUP BY p.Category ORDER BY jobs DESC, spent DESC LIMIT 8`,
+        [userId, since],
+      )
+      const [technicians] = await pool.execute(
+        `SELECT tech.technician_id AS technicianId, tech.Full_Name AS name, COUNT(*) AS jobs, SUM(${taskValue}) AS spent,
+                ROUND(AVG(tf.consumer_rating), 1) AS rating
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+         LEFT JOIN task_feedback tf ON tf.task_id = t.task_id
+         WHERE p.user_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?
+         GROUP BY tech.technician_id, tech.Full_Name ORDER BY jobs DESC, spent DESC LIMIT 5`,
+        [userId, since],
+      )
+      const [[summary]] = await pool.execute(
+        `SELECT COUNT(*) AS completed, COALESCE(SUM(CASE WHEN t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END), 0) AS paid,
+                COALESCE(SUM(CASE WHEN t.payment_status = 'paid' THEN 0 ELSE ${taskValue} END), 0) AS outstanding,
+                ROUND(AVG(tf.consumer_rating), 1) AS avgRating, COUNT(tf.consumer_rating) AS reviews
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id LEFT JOIN task_feedback tf ON tf.task_id = t.task_id
+         WHERE p.user_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?`,
+        [userId, since],
+      )
+      const [[cancelled]] = await pool.execute(
+        `SELECT COUNT(*) AS total FROM tasks t JOIN posts p ON p.post_id = t.post_id
+         WHERE p.user_id = ? AND t.task_status = 'cancelled' AND ${taskEventDate} >= ?`,
+        [userId, since],
+      )
+      const [[requests]] = await pool.execute(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN EXISTS (SELECT 1 FROM tasks h WHERE h.post_id = p.post_id AND h.task_status IN ('accepted','scheduled','in_progress','completed')) THEN 1 ELSE 0 END) AS hired,
+                SUM(CASE WHEN p.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM tasks h WHERE h.post_id = p.post_id AND h.task_status IN ('accepted','scheduled','in_progress','completed','cancelled')) THEN 1 ELSE 0 END) AS open,
+                SUM(CASE WHEN p.closed_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tasks h WHERE h.post_id = p.post_id AND h.task_status IN ('accepted','scheduled','in_progress','completed')) THEN 1 ELSE 0 END) AS closedWithoutHire
+         FROM posts p WHERE p.user_id = ? AND p.created_at >= ?`,
+        [userId, since],
+      )
+      const [[offers]] = await pool.execute(
+        `SELECT ROUND(AVG(first_offer.minutes)) AS minutes, ROUND(AVG(first_offer.offers), 1) AS offersPerRequest FROM (
+           SELECT TIMESTAMPDIFF(MINUTE, p.created_at, MIN(t.created_at)) AS minutes, COUNT(t.task_id) AS offers
+           FROM posts p JOIN tasks t ON t.post_id = p.post_id WHERE p.user_id = ? AND p.created_at >= ? GROUP BY p.post_id
+         ) first_offer`,
+        [userId, since],
+      )
+      const [[repeat]] = await pool.execute(
+        `SELECT COUNT(*) AS total FROM (
+           SELECT t.technician_id FROM tasks t JOIN posts p ON p.post_id = t.post_id
+           WHERE p.user_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ? GROUP BY t.technician_id HAVING COUNT(*) >= 2
+         ) repeat_technicians`,
+        [userId, since],
+      )
+      return response.json({
+        role: 'customer', months,
+        kpis: {
+          paid: Number(summary.paid), outstanding: Number(summary.outstanding), completedJobs: Number(summary.completed),
+          averageJobCost: Number(summary.completed) ? Math.round((Number(summary.paid) + Number(summary.outstanding)) / Number(summary.completed)) : null,
+          averageRatingGiven: asNumber(summary.avgRating), reviewsGiven: Number(summary.reviews),
+          cancelledJobs: Number(cancelled.total), repeatTechnicians: Number(repeat.total),
+          averageMinutesToFirstOffer: asNumber(offers?.minutes), averageOffersPerRequest: asNumber(offers?.offersPerRequest),
+        },
+        requests: { total: Number(requests.total || 0), hired: Number(requests.hired || 0), open: Number(requests.open || 0), closedWithoutHire: Number(requests.closedWithoutHire || 0) },
+        monthly: fillMonths(keys, monthly, ['jobs', 'paid', 'outstanding']),
+        categories: categories.map((row) => ({ category: row.category, jobs: Number(row.jobs), spent: Number(row.spent || 0) })),
+        topTechnicians: technicians.map((row) => ({ technicianId: row.technicianId, name: row.name, jobs: Number(row.jobs), spent: Number(row.spent || 0), rating: asNumber(row.rating) })),
+      })
+    }
+
+    if (request.user.role === 'technician') {
+      const [techRows] = await pool.execute('SELECT technician_id FROM technician WHERE user_id = ? LIMIT 1', [userId])
+      if (!techRows[0]) return response.status(404).json({ message: 'Technician profile not found.' })
+      const technicianId = techRows[0].technician_id
+      const [monthly] = await pool.execute(
+        `SELECT DATE_FORMAT(${taskEventDate}, '%Y-%m') AS month, COUNT(*) AS jobs,
+                SUM(CASE WHEN t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END) AS paid,
+                SUM(CASE WHEN t.payment_status = 'paid' THEN 0 ELSE ${taskValue} END) AS outstanding
+         FROM tasks t WHERE t.technician_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?
+         GROUP BY month`,
+        [technicianId, since],
+      )
+      const [categories] = await pool.execute(
+        `SELECT p.Category AS category, COUNT(*) AS jobs, SUM(${taskValue}) AS earned
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id
+         WHERE t.technician_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?
+         GROUP BY p.Category ORDER BY jobs DESC, earned DESC LIMIT 8`,
+        [technicianId, since],
+      )
+      const [ratingRows] = await pool.execute(
+        `SELECT tf.consumer_rating AS rating, COUNT(*) AS total FROM tasks t JOIN task_feedback tf ON tf.task_id = t.task_id
+         WHERE t.technician_id = ? AND t.task_status = 'completed' AND tf.consumer_rating IS NOT NULL AND ${taskEventDate} >= ?
+         GROUP BY tf.consumer_rating`,
+        [technicianId, since],
+      )
+      const [[offers]] = await pool.execute(
+        `SELECT COUNT(*) AS sent,
+                SUM(t.task_status IN ('accepted','scheduled','in_progress','completed')) AS hired,
+                SUM(t.task_status = 'completed') AS completed,
+                SUM(t.task_status = 'rejected') AS declined,
+                SUM(t.task_status = 'withdrawn') AS withdrawn,
+                SUM(t.task_status = 'pending') AS waiting,
+                SUM(t.task_status = 'cancelled') AS cancelled,
+                SUM(t.task_status = 'cancelled' AND t.cancelled_by = ?) AS cancelledByYou,
+                ROUND(AVG(TIMESTAMPDIFF(MINUTE, p.created_at, t.created_at))) AS minutes
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id WHERE t.technician_id = ? AND t.created_at >= ?`,
+        [userId, technicianId, since],
+      )
+      const [[summary]] = await pool.execute(
+        `SELECT COUNT(*) AS completed,
+                COALESCE(SUM(CASE WHEN t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END), 0) AS paid,
+                COALESCE(SUM(CASE WHEN t.payment_status = 'paid' THEN 0 ELSE ${taskValue} END), 0) AS outstanding,
+                ROUND(AVG(tf.consumer_rating), 1) AS avgRating, COUNT(tf.consumer_rating) AS reviews
+         FROM tasks t LEFT JOIN task_feedback tf ON tf.task_id = t.task_id
+         WHERE t.technician_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ?`,
+        [technicianId, since],
+      )
+      const [[repeat]] = await pool.execute(
+        `SELECT COUNT(*) AS total FROM (
+           SELECT p.user_id FROM tasks t JOIN posts p ON p.post_id = t.post_id
+           WHERE t.technician_id = ? AND t.task_status = 'completed' AND ${taskEventDate} >= ? GROUP BY p.user_id HAVING COUNT(*) >= 2
+         ) repeat_customers`,
+        [technicianId, since],
+      )
+      const decided = Number(offers.hired || 0) + Number(offers.declined || 0)
+      const distribution = [5, 4, 3, 2, 1].map((rating) => ({ rating, total: Number(ratingRows.find((row) => Number(row.rating) === rating)?.total || 0) }))
+      return response.json({
+        role: 'technician', months,
+        kpis: {
+          paid: Number(summary.paid), outstanding: Number(summary.outstanding), completedJobs: Number(summary.completed),
+          averageJobValue: Number(summary.completed) ? Math.round((Number(summary.paid) + Number(summary.outstanding)) / Number(summary.completed)) : null,
+          averageRating: asNumber(summary.avgRating), reviews: Number(summary.reviews),
+          offerWinRate: percent(offers.hired, decided), averageResponseMinutes: asNumber(offers.minutes),
+          repeatCustomers: Number(repeat.total), cancelledByYouRate: percent(offers.cancelledByYou, offers.hired),
+        },
+        offers: {
+          sent: Number(offers.sent || 0), hired: Number(offers.hired || 0), completed: Number(offers.completed || 0),
+          declined: Number(offers.declined || 0), withdrawn: Number(offers.withdrawn || 0), waiting: Number(offers.waiting || 0),
+        },
+        monthly: fillMonths(keys, monthly, ['jobs', 'paid', 'outstanding']),
+        categories: categories.map((row) => ({ category: row.category, jobs: Number(row.jobs), earned: Number(row.earned || 0) })),
+        ratings: distribution,
+      })
+    }
+
+    return response.status(403).json({ message: 'Use the admin analytics view.' })
+  } catch (error) {
+    console.error('Could not load analytics.', error.message)
+    response.status(500).json({ message: 'Could not load analytics.' })
+  }
+})
+
+app.get('/api/admin/analytics', authenticate, requireAdmin, async (request, response) => {
+  const months = parseMonths(request.query.months)
+  const keys = monthKeys(months)
+  const since = windowStart(months)
+  try {
+    const [[tasks]] = await pool.execute(
+      `SELECT COUNT(*) AS total, SUM(task_status = 'completed') AS completed,
+              SUM(task_status IN ('cancelled', 'withdrawn', 'rejected')) AS dropped
+       FROM tasks WHERE created_at >= ?`,
+      [since],
+    )
+    const [[firstOffer]] = await pool.execute(
+      `SELECT ROUND(AVG(first_offer.minutes)) AS minutes FROM (
+         SELECT TIMESTAMPDIFF(MINUTE, p.created_at, MIN(t.created_at)) AS minutes
+         FROM posts p JOIN tasks t ON t.post_id = p.post_id WHERE p.created_at >= ? GROUP BY p.post_id
+       ) first_offer`,
+      [since],
+    )
+    const [[reports]] = await pool.execute(
+      `SELECT COUNT(*) AS total, SUM(status IN ('open', 'reviewing')) AS open,
+              ROUND(AVG(CASE WHEN reviewed_at IS NOT NULL THEN TIMESTAMPDIFF(HOUR, created_at, reviewed_at) END)) AS hoursToResolve
+       FROM marketplace_reports WHERE created_at >= ?`,
+      [since],
+    )
+    const [requestMonths] = await pool.execute("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS requests FROM posts WHERE created_at >= ? GROUP BY month", [since])
+    const [jobMonths] = await pool.execute(
+      `SELECT DATE_FORMAT(${taskEventDate}, '%Y-%m') AS month, COUNT(*) AS completed,
+              SUM(CASE WHEN t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END) AS paid
+       FROM tasks t WHERE t.task_status = 'completed' AND ${taskEventDate} >= ? GROUP BY month`,
+      [since],
+    )
+    const [userMonths] = await pool.execute(
+      `SELECT DATE_FORMAT(u.created_at, '%Y-%m') AS month,
+              SUM(tech.technician_id IS NULL AND u.admin_id IS NULL) AS customers, SUM(tech.technician_id IS NOT NULL) AS technicians
+       FROM users u LEFT JOIN technician tech ON tech.user_id = u.user_id WHERE u.created_at >= ? GROUP BY month`,
+      [since],
+    )
+    const [categories] = await pool.execute(
+      'SELECT Category AS category, COUNT(*) AS requests FROM posts WHERE created_at >= ? GROUP BY Category ORDER BY requests DESC LIMIT 8',
+      [since],
+    )
+    const [uncoveredCategories] = await pool.query(
+      `SELECT p.Category AS category, COUNT(*) AS requests FROM posts p
+       WHERE p.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id)
+       GROUP BY p.Category ORDER BY requests DESC LIMIT 8`,
+    )
+    const [uncoveredAreas] = await pool.query(
+      `SELECT p.area AS area, COUNT(*) AS requests FROM posts p
+       WHERE p.closed_at IS NULL AND p.area IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id)
+       GROUP BY p.area ORDER BY requests DESC LIMIT 8`,
+    )
+    const [technicianStatus] = await pool.query('SELECT status, COUNT(*) AS total FROM technician GROUP BY status')
+    const total = Number(tasks.total || 0)
+    response.json({
+      months,
+      completionRate: percent(tasks.completed, total) ?? 0,
+      droppedRate: percent(tasks.dropped, total) ?? 0,
+      averageMinutesToFirstOffer: asNumber(firstOffer?.minutes),
+      reports: { total: Number(reports?.total || 0), open: Number(reports?.open || 0), hoursToResolve: asNumber(reports?.hoursToResolve) },
+      monthly: keys.map((month) => {
+        const requestsRow = requestMonths.find((row) => row.month === month)
+        const jobsRow = jobMonths.find((row) => row.month === month)
+        const usersRow = userMonths.find((row) => row.month === month)
+        return {
+          month, requests: Number(requestsRow?.requests || 0), completed: Number(jobsRow?.completed || 0), paid: Number(jobsRow?.paid || 0),
+          customers: Number(usersRow?.customers || 0), technicians: Number(usersRow?.technicians || 0),
+        }
+      }),
+      categories: categories.map((row) => ({ category: row.category, requests: Number(row.requests) })),
+      requestsWithoutOffers: uncoveredCategories.map((row) => ({ category: row.category, requests: Number(row.requests) })),
+      requestsWithoutOffersByArea: uncoveredAreas.map((row) => ({ area: row.area, requests: Number(row.requests) })),
+      technicianStatus: Object.fromEntries(['pending', 'approved', 'suspended', 'rejected'].map((status) => [status, Number(technicianStatus.find((row) => row.status === status)?.total || 0)])),
+    })
+  } catch (error) {
+    console.error('Could not load analytics.', error.message)
+    response.status(500).json({ message: 'Could not load analytics.' })
+  }
+})
+
+// History: finished jobs for customers and technicians, with filters, totals and CSV export.
+function buildHistoryQuery(request) {
+  const isTechnician = request.user.role === 'technician'
+  const statusFilter = ['completed', 'cancelled', 'declined'].includes(request.query.status) ? request.query.status : 'all'
+  const search = sanitizeText(request.query.q || '', 100)
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(request.query.from || '') ? request.query.from : null
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(request.query.to || '') ? request.query.to : null
+  const filters = [isTechnician ? 'tech.user_id = ?' : 'p.user_id = ?']
+  const values = [request.user.userId]
+  const allowed = isTechnician ? ['completed', 'cancelled', 'rejected', 'withdrawn'] : ['completed', 'cancelled']
+  const statuses = statusFilter === 'all' ? allowed
+    : statusFilter === 'declined' ? allowed.filter((status) => ['rejected', 'withdrawn'].includes(status))
+      : allowed.filter((status) => status === statusFilter)
+  if (!statuses.length) filters.push('1 = 0')
+  else {
+    filters.push(`t.task_status IN (${statuses.map(() => '?').join(', ')})`)
+    values.push(...statuses)
+  }
+  if (from) { filters.push(`${taskEventDate} >= ?`); values.push(`${from} 00:00:00`) }
+  if (to) { filters.push(`${taskEventDate} < DATE_ADD(?, INTERVAL 1 DAY)`); values.push(`${to} 00:00:00`) }
+  if (search) {
+    filters.push(isTechnician
+      ? '(p.Post_detail LIKE ? OR p.Category LIKE ? OR t.receipt_number LIKE ?)'
+      : '(p.Post_detail LIKE ? OR p.Category LIKE ? OR tech.Full_Name LIKE ? OR t.receipt_number LIKE ?)')
+    const pattern = `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`
+    values.push(pattern, pattern, pattern)
+    if (!isTechnician) values.push(pattern)
+  }
+  const from_clause = `FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+    JOIN users customer ON customer.user_id = p.user_id LEFT JOIN task_feedback tf ON tf.task_id = t.task_id
+    WHERE ${filters.join(' AND ')}`
+  return { isTechnician, from_clause, values }
+}
+
+function shapeHistoryRow(row, isTechnician) {
+  const knownCounterpart = !isTechnician || Boolean(row.acceptedAt) || ['completed', 'cancelled'].includes(row.status)
+  return {
+    taskId: row.taskId, postId: row.postId, category: row.category, area: row.area,
+    detail: isTechnician ? redactPersonalDetails(row.detail) : row.detail,
+    status: row.status, value: Number(row.value || 0), paymentStatus: row.paymentStatus, paymentMethod: row.paymentMethod,
+    receiptNumber: row.receiptNumber, date: row.eventDate, cancelReason: row.cancelReason,
+    counterpart: isTechnician ? (knownCounterpart ? row.customerName : null) : row.technicianName,
+    rating: row.rating === null ? null : Number(row.rating),
+  }
+}
+
+const historySelect = `SELECT t.task_id AS taskId, p.post_id AS postId, p.Category AS category, p.area, p.Post_detail AS detail,
+  t.task_status AS status, ${taskValue} AS value, t.payment_status AS paymentStatus, t.payment_method AS paymentMethod,
+  t.receipt_number AS receiptNumber, ${taskEventDate} AS eventDate, t.cancel_reason AS cancelReason, t.accepted_at AS acceptedAt,
+  tech.Full_Name AS technicianName, customer.username AS customerName, tf.consumer_rating AS rating`
+
+app.get('/api/history', authenticate, async (request, response) => {
+  if (!['customer', 'technician'].includes(request.user.role)) return response.status(403).json({ message: 'History is available to customers and technicians.' })
+  try {
+    const { page, limit, offset } = parsePagination(request, 10)
+    const { isTechnician, from_clause, values } = buildHistoryQuery(request)
+    const [rows] = await pool.execute(`${historySelect} ${from_clause} ORDER BY eventDate DESC, t.task_id DESC LIMIT ? OFFSET ?`, [...values, limit, offset])
+    const [[totals]] = await pool.execute(
+      `SELECT COUNT(*) AS total, SUM(t.task_status = 'completed') AS completed, SUM(t.task_status = 'cancelled') AS cancelled,
+              COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status = 'paid' THEN ${taskValue} ELSE 0 END), 0) AS paid,
+              COALESCE(SUM(CASE WHEN t.task_status = 'completed' AND t.payment_status <> 'paid' THEN ${taskValue} ELSE 0 END), 0) AS outstanding
+       ${from_clause}`,
+      values,
+    )
+    response.json({
+      items: rows.map((row) => shapeHistoryRow(row, isTechnician)),
+      totals: { total: Number(totals.total || 0), completed: Number(totals.completed || 0), cancelled: Number(totals.cancelled || 0), paid: Number(totals.paid), outstanding: Number(totals.outstanding) },
+      pagination: { page, limit, total: Number(totals.total || 0) },
+    })
+  } catch (error) {
+    console.error('Could not load history.', error.message)
+    response.status(500).json({ message: 'Could not load history.' })
+  }
+})
+
+app.get('/api/history/export', authenticate, async (request, response) => {
+  if (!['customer', 'technician'].includes(request.user.role)) return response.status(403).json({ message: 'History is available to customers and technicians.' })
+  try {
+    const { isTechnician, from_clause, values } = buildHistoryQuery(request)
+    const [rows] = await pool.execute(`${historySelect} ${from_clause} ORDER BY eventDate DESC, t.task_id DESC LIMIT 5000`, values)
+    const header = ['Date', 'Job', 'Category', 'Area', isTechnician ? 'Customer' : 'Technician', 'Status', 'Amount (BDT)', 'Payment', 'Receipt', 'Rating']
+    const lines = rows.map((row) => {
+      const item = shapeHistoryRow(row, isTechnician)
+      return [
+        item.date ? new Date(item.date).toISOString().slice(0, 10) : '', item.detail, item.category, item.area || '', item.counterpart || '',
+        item.status, item.value, item.status === 'completed' ? item.paymentStatus : '', item.receiptNumber || '', item.rating ?? '',
+      ].map(toCsvCell).join(',')
+    })
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    response.setHeader('Content-Disposition', 'attachment; filename="helplagbe-history.csv"')
+    response.send(`${header.map(toCsvCell).join(',')}\n${lines.join('\n')}\n`)
+  } catch (error) {
+    console.error('Could not export history.', error.message)
+    response.status(500).json({ message: 'Could not export history.' })
+  }
+})
+
 app.get('/api/technician/requests', authenticate, async (request, response) => {
   if (request.user.role !== 'technician') {
     return response.status(403).json({ message: 'Only technicians can view this workspace.' })
@@ -844,18 +1506,26 @@ app.get('/api/technician/requests', authenticate, async (request, response) => {
   try {
     const [rows] = await pool.execute(
       `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category, p.\`Sub-Category\` AS subCategory, p.Image AS image, p.created_at AS createdAt,
-              CASE WHEN viewerTech.service_area IS NOT NULL AND COALESCE(p.service_address, customer.address) IS NOT NULL
-                    AND LOWER(COALESCE(p.service_address, customer.address)) LIKE CONCAT('%', LOWER(viewerTech.service_area), '%') THEN 1 ELSE 0 END AS areaMatch,
+              viewerTech.service_area AS viewerServiceArea, p.area AS matchArea, COALESCE(p.service_address, customer.address) AS matchAddress,
               CASE WHEN viewerTech.service_area IS NULL THEN 0 ELSE 1 END AS hasServiceArea,
+              (SELECT ROUND(AVG(cr.rating), 1) FROM customer_reviews cr WHERE cr.customer_id = p.user_id) AS customerRating,
+              (SELECT COUNT(*) FROM customer_reviews cr WHERE cr.customer_id = p.user_id) AS customerReviewCount,
               CASE WHEN EXISTS (SELECT 1 FROM technician approvedViewer WHERE approvedViewer.user_id = ? AND approvedViewer.status = 'approved') THEN customer.username ELSE NULL END AS customerName
        FROM posts p LEFT JOIN users customer ON customer.user_id = p.user_id
        JOIN technician viewerTech ON viewerTech.user_id = ? AND viewerTech.status = 'approved'
        WHERE p.closed_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.post_id = p.post_id AND t.task_status IN ('accepted', 'scheduled', 'in_progress', 'completed'))
-       ORDER BY areaMatch DESC, p.created_at DESC LIMIT 30`,
-      [request.user.userId, request.user.userId],
+         AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = ?))
+       ORDER BY p.created_at DESC LIMIT 30`,
+      [request.user.userId, request.user.userId, request.user.userId, request.user.userId],
     )
-    response.json(rows.map((row) => ({ ...row, detail: redactPersonalDetails(row.detail) })))
+    const items = rows.map(({ viewerServiceArea, matchArea, matchAddress, ...row }) => ({
+      ...row,
+      area: matchArea,
+      areaMatch: technicianCoversRequest(viewerServiceArea, matchArea, matchAddress) ? 1 : 0,
+      detail: redactPersonalDetails(row.detail),
+    }))
+    response.json(items.sort((first, second) => second.areaMatch - first.areaMatch))
   } catch (error) {
     response.status(500).json({ message: 'Could not load technician requests.' })
   }
@@ -883,13 +1553,18 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
   try {
     await connection.beginTransaction()
     const [technicians] = await connection.execute(
-      'SELECT technician_id FROM technician WHERE user_id = ? AND status = \'approved\' LIMIT 1',
+      'SELECT technician_id, availability_schedule FROM technician WHERE user_id = ? AND status = \'approved\' LIMIT 1',
       [request.user.userId],
     )
     const technician = technicians[0]
     if (!technician) {
       await connection.rollback()
       return response.status(403).json({ message: 'Your technician account is not approved.' })
+    }
+    const outsideHours = scheduleViolation(technician.availability_schedule, proposedAt)
+    if (outsideHours) {
+      await connection.rollback()
+      return response.status(409).json({ message: outsideHours.replace("the technician's", 'your').replace('This technician is not', 'You are not') })
     }
 
     const [posts] = await connection.execute(
@@ -908,6 +1583,14 @@ app.post('/api/tasks/bid', authenticate, async (request, response) => {
     if (Number(post.user_id) === Number(request.user.userId)) {
       await connection.rollback()
       return response.status(400).json({ message: 'You cannot bid on your own request.' })
+    }
+    const [blockRows] = await connection.execute(
+      'SELECT 1 FROM user_blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1',
+      [request.user.userId, post.user_id, post.user_id, request.user.userId],
+    )
+    if (blockRows.length) {
+      await connection.rollback()
+      return response.status(403).json({ message: 'You cannot send an offer on this request.' })
     }
 
     const [activeTasks] = await connection.execute(
@@ -965,13 +1648,18 @@ app.patch('/api/technician/tasks/:taskId/bid', authenticate, async (request, res
   try {
     await connection.beginTransaction()
     const [tasks] = await connection.execute(
-      `SELECT t.task_id, t.task_status FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id
+      `SELECT t.task_id, t.task_status, tech.availability_schedule FROM tasks t JOIN technician tech ON tech.technician_id = t.technician_id
        WHERE t.task_id = ? AND tech.user_id = ? FOR UPDATE`,
       [request.params.taskId, request.user.userId],
     )
     if (!tasks[0] || tasks[0].task_status !== 'pending') {
       await connection.rollback()
       return response.status(409).json({ message: 'Only pending bids can be edited.' })
+    }
+    const outsideHours = scheduleViolation(tasks[0].availability_schedule, proposedAt)
+    if (outsideHours) {
+      await connection.rollback()
+      return response.status(409).json({ message: outsideHours.replace("the technician's", 'your').replace('This technician is not', 'You are not') })
     }
     const [result] = await connection.execute(
       `UPDATE tasks t JOIN technician tech ON tech.technician_id = t.technician_id
@@ -1289,33 +1977,94 @@ app.patch('/api/admin/users/:userId/status', authenticate, requireAdmin, async (
   }
 })
 
+const technicianTransitions = {
+  pending: ['approved', 'rejected'],
+  approved: ['suspended', 'rejected'],
+  suspended: ['approved', 'rejected'],
+  rejected: ['approved'],
+}
+
 app.patch('/api/admin/technicians/:technicianId/status', authenticate, requireAdmin, async (request, response) => {
   const rawStatus = request.body?.status
   const status = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : ''
-  const validStatuses = ['pending', 'approved', 'rejected']
+  const reason = typeof request.body?.reason === 'string' ? request.body.reason.trim().slice(0, 500) : ''
 
-  if (!validStatuses.includes(status)) {
+  if (!['pending', 'approved', 'suspended', 'rejected'].includes(status)) {
     return response.status(400).json({ message: 'Invalid technician status.' })
   }
 
+  const connection = await pool.getConnection()
+  let technician
+  let withdrawn = []
+  let activeJobs = 0
   try {
-    const [result] = await pool.execute(
-      'UPDATE technician SET status = ?, updated_at = NOW() WHERE technician_id = ?',
-      [status, request.params.technicianId],
+    await connection.beginTransaction()
+    const [rows] = await connection.execute(
+      'SELECT technician_id, user_id, Full_Name, status FROM technician WHERE technician_id = ? FOR UPDATE',
+      [request.params.technicianId],
     )
-    if (!result.affectedRows) return response.status(404).json({ message: 'Technician not found.' })
-    const [technicianRows] = await pool.execute('SELECT user_id FROM technician WHERE technician_id = ?', [request.params.technicianId])
-    if (technicianRows[0]) {
-      try {
-        await createNotification(technicianRows[0].user_id, 'technician_status', 'Application status updated', `Your technician application was ${status}.`)
-      } catch (error) {
-        console.error('Could not create technician status notification.', error.message)
+    technician = rows[0]
+    if (!technician) {
+      await connection.rollback()
+      return response.status(404).json({ message: 'Technician not found.' })
+    }
+    const allowed = technicianTransitions[technician.status] || []
+    if (!allowed.includes(status)) {
+      await connection.rollback()
+      return response.status(409).json({ message: `A ${technician.status} technician cannot be changed to ${status}.` })
+    }
+    const removesAccess = status === 'suspended' || status === 'rejected'
+    if (removesAccess && !reason) {
+      await connection.rollback()
+      return response.status(400).json({ message: `Please give a reason for ${status === 'suspended' ? 'suspending' : 'rejecting'} this technician.` })
+    }
+    if (removesAccess) {
+      const [active] = await connection.execute(
+        "SELECT COUNT(*) AS total FROM tasks WHERE technician_id = ? AND task_status IN ('accepted', 'scheduled', 'in_progress')",
+        [technician.technician_id],
+      )
+      activeJobs = Number(active[0].total)
+      if (status === 'rejected' && activeJobs > 0) {
+        await connection.rollback()
+        return response.status(409).json({ message: `This technician has ${activeJobs} active job(s). Reassign or cancel them first, or suspend instead.` })
+      }
+      const [open] = await connection.execute(
+        `SELECT t.task_id, p.user_id AS customerId
+         FROM tasks t JOIN posts p ON p.post_id = t.post_id
+         WHERE t.technician_id = ? AND t.task_status = 'pending' FOR UPDATE`,
+        [technician.technician_id],
+      )
+      withdrawn = open
+      for (const bid of open) {
+        await connection.execute("UPDATE tasks SET task_status = 'withdrawn', updated_at = NOW() WHERE task_id = ?", [bid.task_id])
+        await recordTaskEvent(connection, bid.task_id, request.user.userId, 'offer_withdrawn', 'pending', 'withdrawn', null, `Technician ${status}: ${reason}`)
       }
     }
-    response.json({ message: `Technician ${status}.` })
+    await connection.execute('UPDATE technician SET status = ?, updated_at = NOW() WHERE technician_id = ?', [status, technician.technician_id])
+    await connection.commit()
   } catch (error) {
-    response.status(500).json({ message: 'Could not update technician.' })
+    await connection.rollback()
+    console.error('Could not update technician status.', error.message)
+    return response.status(500).json({ message: 'Could not update technician.' })
+  } finally {
+    connection.release()
   }
+
+  try {
+    const detail = reason ? ` Reason: ${reason}` : ''
+    await createAudit(request.user.userId, `technician_${status}`, 'technician', technician.technician_id, `${technician.Full_Name}: ${technician.status} -> ${status}.${detail}`)
+    await createNotification(technician.user_id, 'technician_status', 'Application status updated', `Your technician account was ${status}.${detail}`)
+    for (const bid of withdrawn) {
+      await createNotification(bid.customerId, 'bid_withdrawn', 'Offer no longer available', 'A technician offer on your request was withdrawn because the technician is no longer available.', 'task', bid.task_id)
+    }
+  } catch (error) {
+    console.error('Could not record technician status side effects.', error.message)
+  }
+  const extra = [
+    withdrawn.length ? `${withdrawn.length} open offer(s) withdrawn` : '',
+    status === 'suspended' && activeJobs ? `${activeJobs} active job(s) still need attention` : '',
+  ].filter(Boolean).join('; ')
+  response.json({ message: `Technician ${status}.${extra ? ` ${extra}.` : ''}` })
 })
 
 app.patch('/api/admin/tasks/:taskId/status', authenticate, requireAdmin, async (request, response) => {
@@ -1465,14 +2214,14 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
       [archive.original_user_id, archivedUser.username, archivedUser.email, archivedUser.phone_no || null,
         archivedUser.password, archivedUser.address || null, archivedUser.Image || null,
-        archivedUser.created_at, archivedUser.updated_at],
+        toSqlDateTime(archivedUser.created_at), toSqlDateTime(archivedUser.updated_at)],
     )
     await insertSnapshotRows(connection, 'technician', snapshot.technicians, [
       'technician_id', 'national_id', 'Full_Name', 'Required_Documents', 'Skill_details', 'status', 'user_id', 'created_at', 'updated_at', 'address', 'service_area', 'availability',
     ])
     await insertSnapshotRows(connection, 'posts', snapshot.posts, [
       'post_id', 'Post_detail', 'Image', 'Category', 'Sub-Category', 'service_address', 'building', 'flat_no',
-      'user_id', 'created_at', 'updated_at',
+      'user_id', 'created_at', 'updated_at', 'area',
     ])
     await insertSnapshotRows(connection, 'tasks', snapshot.tasks, [
       'task_id', 'task_status', 'price', 'post_id', 'technician_id', 'accepted_at', 'completed_at', 'created_at', 'updated_at',
@@ -1516,6 +2265,7 @@ app.patch('/api/admin/archived-users/:archiveId/restore', authenticate, requireA
     if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
       return response.status(409).json({ message: 'Related account or marketplace data is no longer available. The archive was left unchanged.' })
     }
+    console.error('Could not restore archived user.', error.message)
     response.status(500).json({ message: 'Could not restore archived user.' })
   } finally {
     connection.release()
@@ -1579,7 +2329,7 @@ app.get('/api/customer/posts', authenticate, async (request, response) => {
     const [rows] = await pool.execute(
       `SELECT p.post_id AS id, p.Post_detail AS detail, p.Category AS category,
               p.created_at AS createdAt, p.Image AS image, p.\`Sub-Category\` AS subCategory, p.service_address AS serviceAddress,
-              p.building, p.flat_no AS flatNo, p.closed_at AS closedAt, p.close_reason AS closeReason,
+              p.building, p.flat_no AS flatNo, p.area, p.closed_at AS closedAt, p.close_reason AS closeReason,
               t.task_id AS taskId, t.price, t.price_details AS priceDetails,
               COALESCE(t.agreed_price, t.price) AS agreedPrice,
               t.price_change_proposed AS priceChangeProposed, t.price_change_reason AS priceChangeReason,
@@ -1945,6 +2695,12 @@ app.post('/api/tasks/:taskId/schedule', authenticate, async (request, response) 
       await connection.rollback()
       return response.status(409).json({ message: 'Appointments can only be changed before work starts.' })
     }
+    const [scheduleRows] = await connection.execute('SELECT availability_schedule FROM technician WHERE technician_id = ? LIMIT 1', [task.technician_id])
+    const outsideHours = scheduleViolation(scheduleRows[0]?.availability_schedule, proposedAt)
+    if (outsideHours) {
+      await connection.rollback()
+      return response.status(409).json({ message: outsideHours })
+    }
     const customerConfirmed = task.actorRole === 'customer' ? new Date() : null
     const technicianConfirmed = task.actorRole === 'technician' ? new Date() : null
     await connection.execute(
@@ -2108,6 +2864,299 @@ app.post('/api/tasks/:taskId/payment/confirm', authenticate, async (request, res
   })
 })
 
+app.get('/api/areas', (_request, response) => {
+  response.json({ city: SERVICE_CITY, areas: SERVICE_AREAS })
+})
+
+app.get('/api/saved-addresses', authenticate, async (request, response) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT address_id AS id, label, service_address AS serviceAddress, building, flat_no AS flatNo, area FROM saved_addresses WHERE user_id = ? ORDER BY created_at DESC',
+      [request.user.userId],
+    )
+    response.json(rows)
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load saved addresses.' })
+  }
+})
+
+app.post('/api/saved-addresses', authenticate, async (request, response) => {
+  const label = sanitizeText(request.body?.label, 60)
+  const serviceAddress = sanitizeText(request.body?.serviceAddress, 500)
+  const building = sanitizeText(request.body?.building, 150)
+  const flatNo = sanitizeText(request.body?.flatNo, 100)
+  const area = serviceAreaLookup.get(String(request.body?.area || '').trim().toLowerCase()) || null
+  if (!label || serviceAddress.length < 5) return response.status(400).json({ message: 'Give the address a name and enter at least 5 characters.' })
+  try {
+    const [count] = await pool.execute('SELECT COUNT(*) AS total FROM saved_addresses WHERE user_id = ?', [request.user.userId])
+    if (Number(count[0].total) >= 5) return response.status(409).json({ message: 'You can save up to 5 addresses. Remove one first.' })
+    await pool.execute(
+      'INSERT INTO saved_addresses (user_id, label, service_address, building, flat_no, area) VALUES (?, ?, ?, ?, ?, ?)',
+      [request.user.userId, label, serviceAddress, building || null, flatNo || null, area],
+    )
+    response.status(201).json({ message: 'Address saved.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not save this address.' })
+  }
+})
+
+app.delete('/api/saved-addresses/:addressId', authenticate, async (request, response) => {
+  try {
+    await pool.execute('DELETE FROM saved_addresses WHERE address_id = ? AND user_id = ?', [request.params.addressId, request.user.userId])
+    response.json({ message: 'Address removed.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not remove this address.' })
+  }
+})
+
+app.post('/api/favorites', authenticate, async (request, response) => {
+  if (request.user.role !== 'customer') return response.status(403).json({ message: 'Only customers can save favourite technicians.' })
+  const technicianId = Number(request.body?.technicianId)
+  if (!Number.isInteger(technicianId) || technicianId < 1) return response.status(400).json({ message: 'Choose a technician.' })
+  try {
+    const [rows] = await pool.execute("SELECT technician_id FROM technician WHERE technician_id = ? AND status = 'approved' LIMIT 1", [technicianId])
+    if (!rows[0]) return response.status(404).json({ message: 'Technician not found.' })
+    await pool.execute('INSERT IGNORE INTO favorite_technicians (customer_id, technician_id) VALUES (?, ?)', [request.user.userId, technicianId])
+    response.status(201).json({ message: 'Added to your favourites.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not save this favourite.' })
+  }
+})
+
+app.delete('/api/favorites/:technicianId', authenticate, async (request, response) => {
+  try {
+    await pool.execute('DELETE FROM favorite_technicians WHERE customer_id = ? AND technician_id = ?', [request.user.userId, request.params.technicianId])
+    response.json({ message: 'Removed from your favourites.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not remove this favourite.' })
+  }
+})
+
+app.post('/api/tasks/:taskId/running-late', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Only the technician can send a running-late notice.' })
+  const minutes = Number(request.body?.minutes)
+  if (!Number.isInteger(minutes) || minutes < 5 || minutes > 240) return response.status(400).json({ message: 'Choose a delay between 5 and 240 minutes.' })
+  try {
+    const [rows] = await pool.execute(
+      `SELECT t.task_id, t.task_status, p.user_id AS customerId, p.Post_detail
+       FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE t.task_id = ? AND tech.user_id = ? LIMIT 1`,
+      [request.params.taskId, request.user.userId],
+    )
+    const task = rows[0]
+    if (!task) return response.status(404).json({ message: 'Task not found.' })
+    if (!['accepted', 'scheduled'].includes(task.task_status)) return response.status(409).json({ message: 'You can send a running-late notice before the job starts.' })
+    await recordTaskEvent(pool, task.task_id, request.user.userId, 'running_late', task.task_status, task.task_status, null, `Technician is running about ${minutes} minutes late`)
+    await createNotification(task.customerId, 'running_late', 'Your technician is running late', `Your technician expects to arrive about ${minutes} minutes later than planned for: ${redactPersonalDetails(task.Post_detail)}`, 'task', task.task_id)
+    response.json({ message: `The customer has been told you are about ${minutes} minutes late.` })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not send the notice.' })
+  }
+})
+
+const scheduleDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+app.get('/api/technician/availability', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  try {
+    const [rows] = await pool.execute('SELECT availability_schedule AS schedule, request_alerts AS alerts FROM technician WHERE user_id = ? LIMIT 1', [request.user.userId])
+    let schedule = null
+    try { schedule = rows[0]?.schedule ? JSON.parse(rows[0].schedule) : null } catch (error) { schedule = null }
+    response.json({ schedule, alerts: rows[0] ? Boolean(rows[0].alerts) : true })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load your availability.' })
+  }
+})
+
+app.put('/api/technician/availability', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Technician access required.' })
+  const input = request.body?.schedule
+  if (!input || typeof input !== 'object') return response.status(400).json({ message: 'Send a weekly schedule.' })
+  const schedule = {}
+  for (const day of scheduleDays) {
+    const entry = input[day] || {}
+    const enabled = Boolean(entry.enabled)
+    const start = String(entry.start || '09:00')
+    const end = String(entry.end || '18:00')
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end)) return response.status(400).json({ message: 'Use valid times.' })
+    if (enabled && start >= end) return response.status(400).json({ message: 'Finish time must be after start time.' })
+    schedule[day] = { enabled, start, end }
+  }
+  const summary = summarizeSchedule(schedule) || 'Not currently available'
+  try {
+    const [result] = await pool.execute(
+      'UPDATE technician SET availability_schedule = ?, availability = ?, request_alerts = ?, updated_at = NOW() WHERE user_id = ?',
+      [JSON.stringify(schedule), summary, request.body?.alerts === false ? 0 : 1, request.user.userId],
+    )
+    if (!result.affectedRows) return response.status(404).json({ message: 'Technician profile not found.' })
+    response.json({ message: 'Availability saved.', summary })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not save your availability.' })
+  }
+})
+
+const WARRANTY_DAYS = 7
+
+app.post('/api/tasks/:taskId/customer-review', authenticate, async (request, response) => {
+  if (request.user.role !== 'technician') return response.status(403).json({ message: 'Only technicians can review customers.' })
+  const rating = Number(request.body?.rating)
+  const comment = sanitizeText(request.body?.comment, 500)
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return response.status(400).json({ message: 'Choose a rating from 1 to 5.' })
+  try {
+    const [rows] = await pool.execute(
+      `SELECT t.task_id, p.user_id AS customerId FROM tasks t
+       JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE t.task_id = ? AND tech.user_id = ? AND t.task_status = 'completed' LIMIT 1`,
+      [request.params.taskId, request.user.userId],
+    )
+    if (!rows[0]) return response.status(404).json({ message: 'Only your completed jobs can be reviewed.' })
+    await pool.execute(
+      `INSERT INTO customer_reviews (task_id, reviewer_id, customer_id, rating, comment) VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment)`,
+      [rows[0].task_id, request.user.userId, rows[0].customerId, rating, comment || null],
+    )
+    response.json({ message: 'Customer review saved.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not save the review.' })
+  }
+})
+
+app.get('/api/tasks/:taskId/customer-review', authenticate, async (request, response) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT cr.rating, cr.comment FROM customer_reviews cr JOIN tasks t ON t.task_id = cr.task_id
+       JOIN technician tech ON tech.technician_id = t.technician_id WHERE cr.task_id = ? AND tech.user_id = ? LIMIT 1`,
+      [request.params.taskId, request.user.userId],
+    )
+    response.json(rows[0] || null)
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load the review.' })
+  }
+})
+
+app.get('/api/blocks', authenticate, async (request, response) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT b.blocked_id AS userId, u.username AS name, b.created_at AS createdAt
+       FROM user_blocks b JOIN users u ON u.user_id = b.blocked_id WHERE b.blocker_id = ? ORDER BY b.created_at DESC`,
+      [request.user.userId],
+    )
+    response.json(rows)
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load blocked users.' })
+  }
+})
+
+app.post('/api/blocks', authenticate, async (request, response) => {
+  const blockedId = Number(request.body?.userId)
+  if (!Number.isInteger(blockedId) || blockedId < 1 || blockedId === Number(request.user.userId)) {
+    return response.status(400).json({ message: 'Choose another user to block.' })
+  }
+  try {
+    const [users] = await pool.execute('SELECT user_id, admin_id FROM users WHERE user_id = ? LIMIT 1', [blockedId])
+    if (!users[0] || users[0].admin_id) return response.status(404).json({ message: 'User not found.' })
+    await pool.execute('INSERT IGNORE INTO user_blocks (blocker_id, blocked_id) VALUES (?, ?)', [request.user.userId, blockedId])
+    response.status(201).json({ message: 'User blocked. You will not see each other in new requests or messages.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not block this user.' })
+  }
+})
+
+app.delete('/api/blocks/:userId', authenticate, async (request, response) => {
+  try {
+    await pool.execute('DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?', [request.user.userId, request.params.userId])
+    response.json({ message: 'User unblocked.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not unblock this user.' })
+  }
+})
+
+app.get('/api/tasks/:taskId/warranty', authenticate, async (request, response) => {
+  try {
+    const [tasks] = await pool.execute(
+      `SELECT t.task_id, t.task_status, t.completed_at, p.user_id AS customerId, tech.user_id AS technicianUserId
+       FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE t.task_id = ? AND (p.user_id = ? OR tech.user_id = ?) LIMIT 1`,
+      [request.params.taskId, request.user.userId, request.user.userId],
+    )
+    const task = tasks[0]
+    if (!task) return response.status(404).json({ message: 'Task not found.' })
+    const [claims] = await pool.execute(
+      `SELECT claim_id AS id, description, status, response_note AS responseNote, created_at AS createdAt, responded_at AS respondedAt
+       FROM warranty_claims WHERE task_id = ? ORDER BY created_at DESC`,
+      [task.task_id],
+    )
+    const completedAt = task.completed_at ? new Date(task.completed_at) : null
+    const expiresAt = completedAt ? new Date(completedAt.getTime() + WARRANTY_DAYS * 86400000) : null
+    response.json({
+      claims,
+      windowDays: WARRANTY_DAYS,
+      expiresAt,
+      canClaim: Number(task.customerId) === Number(request.user.userId) && task.task_status === 'completed'
+        && Boolean(expiresAt) && expiresAt > new Date() && !claims.some((claim) => claim.status === 'open'),
+    })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not load warranty claims.' })
+  }
+})
+
+app.post('/api/tasks/:taskId/warranty', authenticate, async (request, response) => {
+  const description = sanitizeText(request.body?.description, 1000)
+  if (description.length < 10) return response.status(400).json({ message: 'Describe the problem in at least 10 characters.' })
+  try {
+    const [tasks] = await pool.execute(
+      `SELECT t.task_id, t.completed_at, tech.user_id AS technicianUserId, p.Post_detail
+       FROM tasks t JOIN posts p ON p.post_id = t.post_id JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE t.task_id = ? AND p.user_id = ? AND t.task_status = 'completed' LIMIT 1`,
+      [request.params.taskId, request.user.userId],
+    )
+    const task = tasks[0]
+    if (!task) return response.status(404).json({ message: 'Only completed jobs you requested can have a warranty claim.' })
+    if (!task.completed_at || new Date(task.completed_at).getTime() + WARRANTY_DAYS * 86400000 < Date.now()) {
+      return response.status(409).json({ message: `The ${WARRANTY_DAYS}-day problem window for this job has closed. You can still report a dispute.` })
+    }
+    const [open] = await pool.execute("SELECT claim_id FROM warranty_claims WHERE task_id = ? AND status = 'open' LIMIT 1", [task.task_id])
+    if (open[0]) return response.status(409).json({ message: 'You already have an open claim for this job.' })
+    await pool.execute('INSERT INTO warranty_claims (task_id, customer_id, description) VALUES (?, ?, ?)', [task.task_id, request.user.userId, description])
+    try {
+      await createNotification(task.technicianUserId, 'warranty_claim', 'Problem reported on a finished job', `A customer reported a problem with: ${redactPersonalDetails(task.Post_detail)}`, 'task', task.task_id)
+    } catch (error) {
+      console.error('Could not notify technician about warranty claim.', error.message)
+    }
+    response.status(201).json({ message: 'Problem reported. The technician has been notified.' })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not submit the claim.' })
+  }
+})
+
+app.patch('/api/warranty/:claimId', authenticate, async (request, response) => {
+  const status = request.body?.status
+  const note = sanitizeText(request.body?.note, 500)
+  if (!['accepted', 'declined', 'resolved'].includes(status)) return response.status(400).json({ message: 'Choose accepted, declined, or resolved.' })
+  if (note.length < 5) return response.status(400).json({ message: 'Add a note of at least 5 characters.' })
+  try {
+    const [rows] = await pool.execute(
+      `SELECT w.claim_id, w.task_id, w.status, w.customer_id FROM warranty_claims w
+       JOIN tasks t ON t.task_id = w.task_id JOIN technician tech ON tech.technician_id = t.technician_id
+       WHERE w.claim_id = ? AND tech.user_id = ? LIMIT 1`,
+      [request.params.claimId, request.user.userId],
+    )
+    const claim = rows[0]
+    if (!claim) return response.status(404).json({ message: 'Claim not found.' })
+    const allowed = { open: ['accepted', 'declined'], accepted: ['resolved'] }
+    if (!(allowed[claim.status] || []).includes(status)) return response.status(409).json({ message: `A ${claim.status} claim cannot be marked ${status}.` })
+    await pool.execute('UPDATE warranty_claims SET status = ?, response_note = ?, responded_at = NOW() WHERE claim_id = ?', [status, note, claim.claim_id])
+    try {
+      await createNotification(claim.customer_id, 'warranty_update', 'Update on your reported problem', `The technician marked your claim ${status}: ${note}`, 'task', claim.task_id)
+    } catch (error) {
+      console.error('Could not notify customer about warranty update.', error.message)
+    }
+    response.json({ message: `Claim marked ${status}.` })
+  } catch (error) {
+    response.status(500).json({ message: 'Could not update the claim.' })
+  }
+})
+
 app.post('/api/reports', authenticate, async (request, response) => {
   const reportType = request.body?.reportType
   const category = sanitizeText(request.body?.category, 60)
@@ -2159,10 +3208,24 @@ app.post('/api/reports', authenticate, async (request, response) => {
       connection.release()
     }
   }
+  let evidencePath = null
+  if (request.body?.evidenceImage) {
+    const evidence = decodeImageDataUrl(request.body.evidenceImage)
+    if (!evidence || evidence.error) return response.status(400).json({ message: evidence?.error || 'Evidence must be a JPG, PNG or WebP image.' })
+    try {
+      const uploadDirectory = resolve(process.cwd(), '../uploads')
+      await mkdir(uploadDirectory, { recursive: true })
+      const fileName = `evidence_${randomUUID()}.${evidence.extension}`
+      await writeFile(resolve(uploadDirectory, fileName), evidence.buffer)
+      evidencePath = `uploads/${fileName}`
+    } catch (error) {
+      return response.status(500).json({ message: 'Could not save the evidence image.' })
+    }
+  }
   try {
     const [result] = await pool.execute(
-      'INSERT INTO marketplace_reports (reporter_id, task_id, target_user_id, message_id, report_type, category, description, task_detail, reported_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [request.user.userId, taskId, targetUserId, messageId, reportType, category, description, taskDetail, reportedContent],
+      'INSERT INTO marketplace_reports (reporter_id, task_id, target_user_id, message_id, report_type, category, description, task_detail, reported_content, evidence_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [request.user.userId, taskId, targetUserId, messageId, reportType, category, description, taskDetail, reportedContent, evidencePath],
     )
     response.status(201).json({ id: result.insertId, message: 'Report submitted to the safety team.' })
   } catch (error) {
@@ -2174,7 +3237,7 @@ app.get('/api/admin/reports', authenticate, requireAdmin, async (_request, respo
   try {
     const [rows] = await pool.execute(
       `SELECT r.report_id AS id, r.report_type AS reportType, r.category, r.description, r.status,
-              r.resolution_note AS resolutionNote, r.created_at AS createdAt, r.reviewed_at AS reviewedAt,
+              r.resolution_note AS resolutionNote, r.evidence_image AS evidenceImage, r.outcome, r.created_at AS createdAt, r.reviewed_at AS reviewedAt,
               reporter.username AS reporterName, target.username AS targetName,
               r.task_id AS taskId, COALESCE(r.task_detail, p.Post_detail) AS taskDetail,
               COALESCE(r.reported_content, message.body) AS reportedMessage
@@ -2195,20 +3258,47 @@ app.get('/api/admin/reports', authenticate, requireAdmin, async (_request, respo
 app.patch('/api/admin/reports/:reportId', authenticate, requireAdmin, async (request, response) => {
   const status = request.body?.status
   const resolutionNote = sanitizeText(request.body?.resolutionNote, 500)
+  const outcome = request.body?.outcome || 'none'
   if (!['reviewing', 'resolved', 'dismissed'].includes(status)) {
     return response.status(400).json({ message: 'Choose reviewing, resolved, or dismissed.' })
+  }
+  if (!['none', 'warning', 'technician_suspended'].includes(outcome)) {
+    return response.status(400).json({ message: 'Choose a valid outcome.' })
   }
   if (['resolved', 'dismissed'].includes(status) && resolutionNote.length < 5) {
     return response.status(400).json({ message: 'Add a resolution note of at least 5 characters.' })
   }
+  if (outcome !== 'none' && status !== 'resolved') {
+    return response.status(400).json({ message: 'An outcome can only be applied when resolving a report.' })
+  }
   try {
-    const [result] = await pool.execute(
-      'UPDATE marketplace_reports SET status = ?, resolution_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE report_id = ?',
-      [status, resolutionNote || null, request.user.userId, request.params.reportId],
+    const [reports] = await pool.execute('SELECT report_id, target_user_id, status FROM marketplace_reports WHERE report_id = ? LIMIT 1', [request.params.reportId])
+    const report = reports[0]
+    if (!report) return response.status(404).json({ message: 'Report not found.' })
+    if (['resolved', 'dismissed'].includes(report.status)) return response.status(409).json({ message: 'This report is already closed.' })
+    let outcomeNote = ''
+    if (outcome === 'technician_suspended') {
+      const [techs] = await pool.execute('SELECT technician_id, status FROM technician WHERE user_id = ? LIMIT 1', [report.target_user_id])
+      if (!techs[0]) return response.status(400).json({ message: 'The reported user is not a technician, so they cannot be suspended.' })
+      if (techs[0].status === 'approved') {
+        await pool.execute("UPDATE technician SET status = 'suspended', updated_at = NOW() WHERE technician_id = ?", [techs[0].technician_id])
+        await createAudit(request.user.userId, 'technician_suspended', 'technician', techs[0].technician_id, `Suspended after report ${report.report_id}: ${resolutionNote}`)
+        outcomeNote = ' Technician suspended.'
+      }
+    }
+    await pool.execute(
+      'UPDATE marketplace_reports SET status = ?, resolution_note = ?, outcome = ?, reviewed_by = ?, reviewed_at = NOW() WHERE report_id = ?',
+      [status, resolutionNote || null, outcome, request.user.userId, report.report_id],
     )
-    if (!result.affectedRows) return response.status(404).json({ message: 'Report not found.' })
-    await createAudit(request.user.userId, 'marketplace_report_updated', 'report', Number(request.params.reportId), `Report marked ${status}.`)
-    response.json({ message: 'Report updated.' })
+    await createAudit(request.user.userId, 'marketplace_report_updated', 'report', Number(report.report_id), `Report marked ${status}${outcome !== 'none' ? ` (${outcome})` : ''}.`)
+    if (outcome !== 'none' && report.target_user_id) {
+      try {
+        await createNotification(report.target_user_id, 'report_outcome', outcome === 'warning' ? 'Warning from HelpLagbe' : 'Your technician account was suspended', `A report about your account was reviewed. ${resolutionNote}`)
+      } catch (error) {
+        console.error('Could not notify reported user.', error.message)
+      }
+    }
+    response.json({ message: `Report updated.${outcomeNote}` })
   } catch (error) {
     response.status(500).json({ message: 'Could not update report.' })
   }
@@ -2363,7 +3453,8 @@ app.get('/api/profile', authenticate, async (request, response) => {
     )
     if (!rows[0]) return response.status(404).json({ message: 'Account not found.' })
     const { technicianId, adminId, ...profile } = rows[0]
-    response.json({ ...profile, role: adminId ? 'admin' : technicianId ? 'technician' : 'customer' })
+    const serviceAreas = splitStoredAreas(profile.serviceArea).map((part) => serviceAreaLookup.get(part.toLowerCase())).filter(Boolean)
+    response.json({ ...profile, serviceAreas, role: adminId ? 'admin' : technicianId ? 'technician' : 'customer' })
   } catch (error) {
     response.status(500).json({ message: 'Could not load your profile.' })
   }
@@ -2380,7 +3471,8 @@ app.patch('/api/profile', authenticate, async (request, response) => {
   const phone = sanitizeText(body.phone, 20)
   const address = sanitizeText(body.address, 500)
   const skills = sanitizeText(body.skills, 1000)
-  const serviceArea = sanitizeText(body.serviceArea, 255)
+  const serviceAreaList = body.serviceAreas === undefined ? undefined : parseServiceAreas(body.serviceAreas)
+  const serviceArea = serviceAreaList ? serviceAreaList.join(', ') : ''
   const availability = sanitizeText(body.availability, 255)
   const photoProvided = Object.prototype.hasOwnProperty.call(body, 'profileImage')
   let photo = null
@@ -2395,9 +3487,8 @@ app.patch('/api/profile', authenticate, async (request, response) => {
   if (typeof body.address === 'string' && body.address.length > 500) {
     return response.status(400).json({ message: 'Address must be 500 characters or fewer.' })
   }
-  if ((typeof body.serviceArea === 'string' && body.serviceArea.length > 255)
-    || (typeof body.availability === 'string' && body.availability.length > 255)) {
-    return response.status(400).json({ message: 'Service area and availability must be 255 characters or fewer.' })
+  if (body.serviceAreas !== undefined && serviceAreaList === null) {
+    return response.status(400).json({ message: `Choose your service areas from the ${SERVICE_CITY} list.` })
   }
   if (request.user.role === 'technician'
     && (skills.length < 3 || (typeof body.skills === 'string' && body.skills.trim().length > 1000))) {
@@ -2455,8 +3546,12 @@ app.patch('/api/profile', authenticate, async (request, response) => {
     )
     if (user.technician_id) {
       await connection.execute(
-        'UPDATE technician SET Full_Name = ?, address = ?, Skill_details = ?, service_area = ?, availability = ? WHERE technician_id = ?',
-        [username, address || null, skills, serviceArea || null, availability || null, user.technician_id],
+        serviceAreaList === undefined
+          ? 'UPDATE technician SET Full_Name = ?, address = ?, Skill_details = ? WHERE technician_id = ?'
+          : 'UPDATE technician SET Full_Name = ?, address = ?, Skill_details = ?, service_area = ? WHERE technician_id = ?',
+        serviceAreaList === undefined
+          ? [username, address || null, skills, user.technician_id]
+          : [username, address || null, skills, serviceArea || null, user.technician_id],
       )
     }
 
@@ -2466,7 +3561,7 @@ app.patch('/api/profile', authenticate, async (request, response) => {
       user: {
         id: user.user_id, name: username, email, phone, address,
         profileImage: uploadedPhotoPath || (photoProvided ? null : user.profileImage),
-        ...(user.technician_id ? { skills, serviceArea, availability } : {}),
+        ...(user.technician_id && serviceAreaList !== undefined ? { skills, serviceArea, serviceAreas: serviceAreaList } : user.technician_id ? { skills } : {}),
         role: actualRole,
       },
     })

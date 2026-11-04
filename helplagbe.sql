@@ -221,7 +221,7 @@ CREATE TABLE `technician` (
   `Full_Name` varchar(255) NOT NULL,
   `Required_Documents` text DEFAULT NULL,
   `Skill_details` text NOT NULL,
-  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `status` enum('pending','approved','suspended','rejected') DEFAULT 'pending',
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),

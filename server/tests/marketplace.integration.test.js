@@ -43,6 +43,16 @@ after(async () => {
   await closeDatabasePool()
 })
 
+// Offers must fall inside the technician's weekly hours (Mon-Fri 09:00-18:00, Dhaka time),
+// so fixtures use 06:00 UTC (12:00 in Dhaka) on a weekday at least `daysAhead` days from now.
+function weekdayAppointment(daysAhead) {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() + daysAhead)
+  date.setUTCHours(6, 0, 0, 0)
+  while ([0, 6].includes(date.getUTCDay())) date.setUTCDate(date.getUTCDate() + 1)
+  return date.toISOString()
+}
+
 test('customer, technician, bid, and archive lifecycle works against the configured test database', { skip: !runIntegration }, async () => {
   await ensureTiDBIdSequences()
   const suffix = randomUUID()
@@ -79,7 +89,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
 
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`).send({
       detail: `Lifecycle ${suffix}`, category: 'Plumbing',
-      serviceAddress: 'Road 5, Dhanmondi, Dhaka', building: 'Green House', flatNo: '4B',
+      area: 'Dhanmondi', serviceAddress: 'Road 5, Dhanmondi, Dhaka', building: 'Green House', flatNo: '4B',
     })
     assert.equal(response.status, 201)
     const postId = response.body.id
@@ -129,7 +139,18 @@ test('customer, technician, bid, and archive lifecycle works against the configu
         name: 'Updated Integration Technician',
         email: technicianEmail,
         skills: 'Updated plumbing and repair',
-        serviceArea: 'Dhaka',
+        serviceAreas: ['Dhanmundi'],
+        profileImage: null,
+      })
+    assert.equal(response.status, 400, 'areas outside the Dhaka list are rejected')
+    response = await request(app).patch('/api/profile').set('Authorization', `Bearer ${technicianToken}`)
+      .send({
+        name: 'Updated Integration Technician',
+        email: technicianEmail,
+        phone: '01234567890',
+        address: 'Dhaka',
+        skills: 'Updated plumbing and repair',
+        serviceAreas: ['dhanmondi', 'Mirpur'],
         availability: 'Weekdays',
         profileImage: null,
       })
@@ -142,9 +163,13 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(updatedTechnician.Full_Name, 'Updated Integration Technician')
     assert.equal(updatedTechnician.Skill_details, 'Updated plumbing and repair')
     assert.equal(updatedTechnician.address, 'Dhaka')
-    assert.equal(updatedTechnician.service_area, 'Dhaka')
-    assert.equal(updatedTechnician.availability, 'Weekdays')
-    response = await request(app).get('/api/technicians').query({ location: 'Dhaka', availability: 'Weekday', sort: 'rating' })
+    assert.equal(updatedTechnician.service_area, 'Dhanmondi, Mirpur')
+    assert.notEqual(updatedTechnician.availability, 'Weekdays', 'availability is only set from the weekly schedule')
+    const weekdaySchedule = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => [day, { enabled: !['sat', 'sun'].includes(day), start: '09:00', end: '18:00' }]))
+    response = await request(app).put('/api/technician/availability').set('Authorization', `Bearer ${technicianToken}`).send({ schedule: weekdaySchedule, alerts: true })
+    assert.equal(response.status, 200)
+    assert.equal(response.body.summary, 'Mon-Fri 09:00-18:00')
+    response = await request(app).get('/api/technicians').query({ location: 'Dhanmondi', availability: 'Mon-Fri', sort: 'rating' })
     assert.equal(response.status, 200)
     assert.ok(response.body.items.some((item) => item.id === technician.technician_id))
     await pool.execute('UPDATE users SET address = ? WHERE email = ?', ['Dhanmondi, Dhaka', customerEmail])
@@ -153,7 +178,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(matchedRequest.areaMatch, 1)
     assert.equal(matchedRequest.customerAddress, undefined)
 
-    const proposedAppointment = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const proposedAppointment = weekdayAppointment(1)
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 525.25, proposedAt: proposedAppointment })
     assert.equal(response.status, 201)
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`).send({ postId, price: 500, proposedAt: proposedAppointment })
@@ -173,6 +198,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
         detail: `Lifecycle ${suffix} contact 01325409987 email tech@example.invalid at 123 Main Street`,
         category: 'Plumbing',
         subCategory: 'Repair',
+        area: 'Dhanmondi',
         serviceAddress: 'Road 5, Dhanmondi, Dhaka',
         building: 'Green House',
         flatNo: '4B',
@@ -201,7 +227,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.equal(response.status, 200)
     response = await request(app).patch(`/api/tasks/${task.task_id}/status`).set('Authorization', `Bearer ${customerToken}`).send({ status: 'accepted' })
     assert.equal(response.status, 409)
-    const rescheduledAppointment = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+    const rescheduledAppointment = weekdayAppointment(3)
     response = await request(app).post(`/api/tasks/${task.task_id}/schedule`).set('Authorization', `Bearer ${customerToken}`)
       .send({ proposedAt: rescheduledAppointment, reason: 'Customer requested a different time' })
     assert.equal(response.status, 200)
@@ -257,11 +283,11 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     })
 
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`)
-      .send({ detail: `Request to close ${suffix}`, category: 'Appliance', serviceAddress: 'Dhaka, Bangladesh' })
+      .send({ detail: `Request to close ${suffix}`, category: 'Appliance', area: 'Dhanmondi', serviceAddress: 'Dhaka, Bangladesh' })
     assert.equal(response.status, 201)
     const closePostId = response.body.id
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`)
-      .send({ postId: closePostId, price: 250, proposedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })
+      .send({ postId: closePostId, price: 250, proposedAt: weekdayAppointment(1) })
     assert.equal(response.status, 201)
     const [[closeTask]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [closePostId, technician.technician_id])
     response = await request(app).post(`/api/customer/posts/${closePostId}/close`).set('Authorization', `Bearer ${customerToken}`)
@@ -273,11 +299,11 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     assert.ok(!response.body.items.some((post) => post.id === closePostId))
 
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${customerToken}`)
-      .send({ detail: `Offer to withdraw ${suffix}`, category: 'Plumbing', serviceAddress: 'Dhaka, Bangladesh' })
+      .send({ detail: `Offer to withdraw ${suffix}`, category: 'Plumbing', area: 'Dhanmondi', serviceAddress: 'Dhaka, Bangladesh' })
     assert.equal(response.status, 201)
     const withdrawPostId = response.body.id
     response = await request(app).post('/api/tasks/bid').set('Authorization', `Bearer ${technicianToken}`)
-      .send({ postId: withdrawPostId, price: 300, proposedAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })
+      .send({ postId: withdrawPostId, price: 300, proposedAt: weekdayAppointment(1) })
     assert.equal(response.status, 201)
     const [[withdrawTask]] = await pool.execute('SELECT task_id FROM tasks WHERE post_id = ? AND technician_id = ?', [withdrawPostId, technician.technician_id])
     response = await request(app).post(`/api/technician/tasks/${withdrawTask.task_id}/withdraw`).set('Authorization', `Bearer ${technicianToken}`)
@@ -292,7 +318,7 @@ test('customer, technician, bid, and archive lifecycle works against the configu
     response = await request(app).post('/api/auth/login').send({ email: archiveEmail, password })
     assert.equal(response.status, 200)
     response = await request(app).post('/api/posts').set('Authorization', `Bearer ${response.body.token}`).send({
-      detail: `Restored history ${suffix}`, category: 'Appliance', serviceAddress: 'Dhaka, Bangladesh',
+      detail: `Restored history ${suffix}`, category: 'Appliance', area: 'Dhanmondi', serviceAddress: 'Dhaka, Bangladesh',
     })
     assert.equal(response.status, 201)
 
