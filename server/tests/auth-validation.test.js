@@ -54,11 +54,22 @@ test('customer registration rejects malformed email before querying the database
   assert.equal(response.body.message, 'Enter a valid email address.')
 })
 
+test('service requests require a known Dhaka area before database access', async () => {
+  for (const area of [undefined, '', 'Dhanmundi']) {
+    const response = await request(app)
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ detail: 'Repair an electrical outlet', category: 'Electrical', serviceAddress: 'Road 5, Dhanmondi', area })
+    assert.equal(response.status, 400)
+    assert.equal(response.body.message, 'Choose the Dhaka area where the job is.')
+  }
+})
+
 test('service requests require a service address before database access', async () => {
   const response = await request(app)
     .post('/api/posts')
     .set('Authorization', `Bearer ${customerToken}`)
-    .send({ detail: 'Repair an electrical outlet', category: 'Electrical' })
+    .send({ detail: 'Repair an electrical outlet', category: 'Electrical', area: 'Dhanmondi' })
 
   assert.equal(response.status, 400)
   assert.equal(response.body.message, 'Enter a service address between 5 and 500 characters.')
@@ -278,6 +289,7 @@ test('request creation rejects image bytes that do not match the claimed MIME ty
     .send({
       detail: 'A sufficiently detailed repair request',
       category: 'Plumbing',
+      area: 'Dhanmondi',
       serviceAddress: 'Road 5, Dhaka',
       imageData: `data:image/png;base64,${invalidPng}`,
     })
