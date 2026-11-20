@@ -138,8 +138,18 @@ function Brand() {
   return <button className="brand" type="button" onClick={() => go('/')}><span className="brand-mark">H</span><span>HelpLagbe</span></button>
 }
 
+function initialTheme() {
+  try {
+    const saved = localStorage.getItem('helplagbe_theme')
+    if (saved === 'light' || saved === 'dark') return saved
+  } catch {
+    // Storage can be blocked (private mode); fall back to the system setting.
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 function ThemeToggle() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('helplagbe_theme') || 'dark')
+  const [theme, setTheme] = useState(() => initialTheme())
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(nextTheme)
@@ -1474,7 +1484,7 @@ function App() {
   const posts = postsState.role === userRole ? postsState.posts : []
   const postsLoading = postsState.role !== userRole || postsState.loading
   const postsError = postsState.role === userRole ? postsState.error : ''
-  useEffect(() => { document.documentElement.dataset.theme = localStorage.getItem('helplagbe_theme') || 'dark' }, [])
+  useEffect(() => { document.documentElement.dataset.theme = initialTheme() }, [])
   useEffect(() => {
     let active = true
     request('/posts')
